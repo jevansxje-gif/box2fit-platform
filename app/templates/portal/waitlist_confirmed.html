@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Waitlist — Box2Fit{% endblock %}
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    {% if expired %}
+      <div class="pf-kicker">Waitlist</div>
+      <div class="big">That spot has passed on.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">The confirmation window closed, so the spot went to the next family. You're welcome to rejoin the waitlist from your account.</p>
+    {% else %}
+      <div class="pf-kicker">Spot confirmed</div>
+      <div class="big">You're locked in.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">{{ instance.class_type.name }} · {{ fmt_local(instance.starts_at_utc) }}. See you there!</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Today — Box2Fit Ops{% endblock %}
+
+{% block header_cta %}
+<div style="display:flex;gap:10px;align-items:center">
+  <span class="pf-chip pf-chip--ink">{{ current_user.email }}</span>
+  <a class="pf-btn pf-btn--ghost pf-btn--sm" style="color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.4)" href="{{ url_for('ops.logout') }}">Log out</a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% from "ops/_nav.html" import ops_nav %}
+<div class="ops-shell">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+    <div>
+      <div class="pf-kicker">Today view</div>
+      <h1 class="pf-h1" style="margin:6px 0 0">{{ today.strftime('%A, %B %d') }}</h1>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops.kiosk') }}">Kiosk mode</a>
+      <a class="pf-btn pf-btn--dark pf-btn--sm" href="{{ url_for('funnel.step_class', segment='youth', source='walkin') }}" target="_blank">+ Walk-in signup</a>
+    </div>
+  </div>
+
+  {% if not instances %}
+    <div class="pf-panel"><h2>No classes today</h2><p class="note">The schedule generator fills instances nightly; run the seed if this is a fresh install.</p></div>
+  {% endif %}
+
+  {% for inst in instances %}
+  <div class="pf-card ops-class">
+    <div class="head">
+      <span class="t">{{ inst.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+      <b>{{ inst.class_type.name }}</b>
+      {% if inst.cohort_label %}<span class="pf-chip pf-chip--ink">{{ inst.cohort_label }}</span>{% endif %}
+      {% if inst.class_type.age_bracket_label() %}<span class="pf-chip pf-chip--info">{{ inst.class_type.age_bracket_label() }}</span>{% endif %}
+      {% if inst.trainer %}<span style="color:var(--pf-text-2);font-size:14px">{{ inst.trainer.name }}</span>{% endif %}
+      <span class="pf-chip" style="margin-left:auto">{{ counts.get(inst.id, 0) }}/{{ inst.capacity }} booked</span>
+    </div>
+    <div class="ops-roster">
+      {% set roster = rosters.get(inst.id, []) %}
+      {% if not roster %}
+        <div class="roster-row"><span style="color:var(--pf-text-3);font-size:14px">No bookings yet.</span></div>
+      {% endif %}
+      {% for b in roster %}
+      <div class="roster-row">
+        <div class="who">
+          <b>{{ b.attendee.first_name }} {{ b.attendee.last_name or '' }}
+            {% if b.attendee.kind == 'child' %}<span class="pf-chip pf-chip--info" style="font-size:11px;padding:4px 8px">child</span>{% endif %}
+            {% if b.kind == 'trial' %}<span class="pf-chip pf-chip--red" style="font-size:11px;padding:4px 8px">first-timer</span>{% endif %}
+          </b>
+          <span>
+            {% if b.attendee.kind == 'child' %}Guardian: {{ b.attendee.guardian.name }} · {{ b.attendee.guardian.phone }}{% else %}{{ b.attendee.guardian.phone }}{% endif %}
+          </span>
+        </div>
+        {% if b.status == 'attended' %}
+          <span class="pf-chip pf-chip--success">Attended</span>
+          {% if b.kind in ('trial', 'walkin') %}
+          <form method="post" action="{{ url_for('ops.activate_membership', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--dark pf-btn--sm">Activate membership</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="undo">Undo</button>
+          </form>
+        {% elif b.status == 'no_show' %}
+          <span class="pf-chip pf-chip--warn">No-show</span>
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="undo">Undo</button>
+          </form>
+        {% else %}
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="attended">Attended</button>
+          </form>
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="no_show">No-show</button>
+          </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% set book_url = url_for('funnel.step_class', segment='youth') %}
+
+{% block title %}Youth Boxing — Box2Fit White Rock{% endblock %}
+{% block meta_description %}Confidence, focus, and real skills for kids and teens ages 7 to 17. Their first class is free at Box2Fit White Rock.{% endblock %}
+{% block body_class %}has-mobile-cta{% endblock %}
+
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">Youth Boxing · Ages 7 to 17 · White Rock</div>
+        <h1>Watch your kid <span class="accent">light up.</span></h1>
+        <p class="sub">Confidence, focus, and real skills in a welcoming, supportive room. Three age groups, real coaching, and a first class that's completely free.</p>
+        <div class="pf-google">
+          <span class="stars">★★★★★</span>
+          <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
+        </div>
+        <div class="hero-cta">
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">Book their free first class</a>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
+        </div>
+      </div>
+      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/youth-kids-bags.jpg') }}" alt="Kids boxing class at Box2Fit" />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Simple schedule, real structure</div>
+        <h2>Three sessions a week, in their group.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad bracket-card">
+          <span class="pf-chip pf-chip--ink">Group A</span>
+          <h3 class="pf-h3">Mon · Wed · Fri at 4 PM</h3>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Same group, same coach, same time. Kids settle in fast when the room is familiar.</p>
+        </div>
+        <div class="pf-card pf-card--pad bracket-card">
+          <span class="pf-chip pf-chip--ink">Group B</span>
+          <h3 class="pf-h3">Tue · Thu · Sat at 4 PM</h3>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">A second track for families whose week runs on different days.</p>
+        </div>
+        <div class="pf-card pf-card--pad bracket-card">
+          <span class="pf-chip pf-chip--info">Ages 7–17</span>
+          <h3 class="pf-h3">3 days a week, 4-week cycles</h3>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Membership covers three sessions a week. You pick the days they'll attend, and coaches build on every visit.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Why parents pick Box2Fit</div>
+        <h2>The class they actually ask to go to.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">10+</div><h3 class="pf-h3">Years in the community</h3><p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">A family-driven gym trusted by White Rock parents since 2015.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">3</div><h3 class="pf-h3">Age-matched groups</h3><p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Kids train with kids their own age, at the right pace and intensity.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">{{ google_rating }}★</div><h3 class="pf-h3">From {{ google_review_count }} Google reviews</h3><p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Parents tell the story better than we can. Read them below.</p></div>
+      </div>
+    </div>
+  </section>
+
+  {% if reviews %}
+  <section class="section" style="background:#fff;border-top:1px solid var(--pf-line);border-bottom:1px solid var(--pf-line)">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Real parents. Real Google reviews.</div>
+        <h2>Don't take our word for it.</h2>
+      </div>
+      <div class="cards-{{ 4 if reviews|length == 4 else 3 }}">
+        {% for r in reviews %}
+        <figure class="pf-card pf-card--flat pf-card--pad rev" style="margin:0;border:1px solid var(--pf-line)">
+          <span class="stars">{{ '★' * r.rating }}</span>
+          <blockquote>"{{ r.quote_text }}"</blockquote>
+          <div class="who"><b>{{ r.reviewer_name }}</b><span>via {{ r.source }}</span></div>
+        </figure>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Before their first class</div>
+        <h2>Questions parents ask.</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>Does my child need any experience?</summary><p>None at all. Every class is built for beginners, and coaches teach proper technique from the very first session.</p></details>
+        <details><summary>Is boxing safe for kids?</summary><p>Youth classes focus on fitness, footwork, pads and bags. Structured, supervised, and non-contact for beginners.</p></details>
+        <details><summary>Can I stay and watch?</summary><p>Absolutely. Parents are welcome to stay, especially for the first class.</p></details>
+        <details><summary>What should they bring?</summary><p>Comfortable athletic clothing, indoor shoes, and a water bottle. Gloves and wraps are provided.</p></details>
+        <details><summary>What does it cost after the free class?</summary><p>Nothing is charged unless you choose to continue. Memberships are month to month, no contracts, cancel anytime in one click.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Train Smarter. Get Results.</div>
+      <h2>Their first class is on us.</h2>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">Book their free first class</a>
+      <div class="fine">Limited spots per class · No contracts · White Rock</div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block after_body %}
+<div class="mobile-cta pf-sticky">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">Book their free first class</a>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Reviews — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:860px">
+  {{ ops_nav() }}
+  <h1 class="pf-h1" style="margin:0 0 18px">Google review proof</h1>
+
+  <div class="pf-panel" style="margin-top:0">
+    <h2>Aggregate badge (update monthly)</h2>
+    <form method="post" style="display:flex;gap:12px;align-items:end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Rating</label><input class="pf-input" name="google_rating" value="{{ google_rating }}" style="width:90px" /></div>
+      <div><label class="pf-label">Review count</label><input class="pf-input" name="google_review_count" value="{{ google_review_count }}" style="width:110px" /></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="badge">Save badge</button>
+    </form>
+  </div>
+
+  <div class="pf-panel">
+    <h2>Add review</h2>
+    <p class="note">Paste VERBATIM from the Google Business Profile — never paraphrase. First name + initial only.</p>
+    <form method="post" style="display:grid;gap:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div><label class="pf-label">Name (First L.)</label><input class="pf-input" name="reviewer_name" required /></div>
+        <div><label class="pf-label">Segments (comma: youth,shehits…)</label><input class="pf-input" name="segment_tags" /></div>
+        <div><label class="pf-label">Order</label><input class="pf-input" type="number" name="display_order" value="0" style="width:80px" /></div>
+      </div>
+      <div><label class="pf-label">Verbatim quote</label><textarea class="pf-textarea" name="quote_text" rows="2" required></textarea></div>
+      <input type="hidden" name="rating" value="5" />
+      <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" checked /><span class="t">Active</span></label>
+      <button class="pf-btn pf-btn--primary" name="action" value="save" style="justify-self:start">Add review</button>
+    </form>
+  </div>
+
+  {% for r in rows %}
+  <details class="pf-card" style="margin-bottom:8px;padding:14px 18px">
+    <summary style="cursor:pointer"><b>{{ r.reviewer_name }}</b> · {{ r.segment_tags }} <span class="pf-chip {{ 'pf-chip--success' if r.active else 'pf-chip--warn' }}">{{ 'active' if r.active else 'hidden' }}</span></summary>
+    <form method="post" style="display:grid;gap:10px;margin-top:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="id" value="{{ r.id }}" />
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input class="pf-input" name="reviewer_name" value="{{ r.reviewer_name }}" style="width:160px" />
+        <input class="pf-input" name="segment_tags" value="{{ r.segment_tags }}" style="width:200px" />
+        <input class="pf-input" type="number" name="display_order" value="{{ r.display_order }}" style="width:80px" />
+      </div>
+      <textarea class="pf-textarea" name="quote_text" rows="2">{{ r.quote_text }}</textarea>
+      <input type="hidden" name="rating" value="{{ r.rating }}" />
+      <div style="display:flex;gap:12px;align-items:center">
+        <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" {{ 'checked' if r.active }} /><span class="t">Active</span></label>
+        <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="save">Save</button>
+      </div>
+    </form>
+  </details>
+  {% endfor %}
+</div>
+{% endblock %}

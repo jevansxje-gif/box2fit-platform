@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}{{ u.name }} — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:860px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap">
+    <h1 class="pf-h1" style="margin:0">{{ u.name }}</h1>
+    <div>{% for f in row.flags %}<span class="pf-chip pf-chip--{{ 'red' if f == 'first-timer' else 'warn' }}">{{ f }}</span> {% endfor %}</div>
+  </div>
+  <p style="color:var(--pf-text-2);margin:6px 0 18px">
+    {{ u.email }} · {{ u.phone or '—' }} · joined {{ u.created_at.strftime('%b %d, %Y') }} · {{ row.visits }} visits
+    {% if lead %} · source: <b>{{ lead.utm_source or lead.landing_variant or 'direct' }}</b>{% if lead.utm_campaign %} / {{ lead.utm_campaign }}{% endif %} (read-only){% endif %}
+  </p>
+
+  <div class="cards-3" style="margin:0 0 18px">
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Attendees</div>
+      {% for a in u.attendees %}<p style="margin:8px 0 0"><b>{{ a.first_name }}</b> {{ '(child, b. ' + a.birth_year|string + ')' if a.kind == 'child' else '(self)' }}</p>{% endfor %}
+    </div>
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Memberships</div>
+      {% for s in subs %}
+      <p style="margin:8px 0 0">
+        <span class="pf-chip pf-chip--{{ 'success' if s.status == 'active' else ('warn' if s.status in ('past_due','cancelled') else 'info') }}">{{ s.status }}</span>
+        {{ s.cohort_label or '' }} ${{ s.mrr_cents // 100 }}{% if s.cancel_reason %} · {{ s.cancel_reason }}{% endif %}
+      </p>
+      {% if s.status in ('active','pending','past_due') %}
+      <form method="post" onsubmit="return confirm('Cancel this membership?')" style="margin-top:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="sub_id" value="{{ s.id }}" />
+        <input type="hidden" name="reason" value="staff_initiated" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub">Cancel membership</button>
+      </form>
+      {% endif %}
+      {% else %}<p style="margin:8px 0 0;color:var(--pf-text-2)">Trial only.</p>{% endfor %}
+    </div>
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Actions</div>
+      <form method="post" style="margin-top:10px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="resend_invite">Resend account invite</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="pf-panel">
+    <h2>Notes <span style="font-weight:400;font-size:13px;color:var(--pf-text-3)">(staff-visible only)</span></h2>
+    <form method="post" style="display:flex;gap:10px;align-items:end;margin-bottom:14px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div style="flex:1"><input class="pf-input" name="body" placeholder="Injury to respect, preference, conversation…" required /></div>
+      <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="note">Add note</button>
+    </form>
+    {% for n in notes %}
+    <div class="roster-row"><div class="who"><b style="font-weight:400">{{ n.body }}</b><span>{{ authors.get(n.author_user_id, '') }} · {{ n.created_at.strftime('%b %d, %Y %I:%M %p') }}</span></div></div>
+    {% else %}<p class="note">No notes yet.</p>{% endfor %}
+  </div>
+
+  <div class="pf-panel">
+    <h2>Recent bookings</h2>
+    {% for b in bookings %}
+    <div class="roster-row">
+      <span style="min-width:150px;font-size:14px">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</span>
+      <span style="flex:1;font-size:14px">{{ b.class_instance.class_type.name }} — {{ b.attendee.first_name }} <span style="color:var(--pf-text-3)">({{ b.kind }})</span></span>
+      <span class="pf-chip pf-chip--{{ 'success' if b.status == 'attended' else ('warn' if b.status == 'no_show' else '') }}" style="font-size:11px">{{ b.status.replace('_',' ') }}{{ ' · late' if b.late_cancel }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

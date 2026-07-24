@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Reports — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1000px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:18px">
+    <h1 class="pf-h1" style="margin:0">Reports</h1>
+    <span class="pf-chip pf-chip--success" style="font-size:15px">MRR ${{ '%.0f' % (mrr / 100) }}</span>
+  </div>
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px;overflow-x:auto">
+    <h2 class="pf-h3" style="margin:0 0 12px">Fill heatmap · last 4 weeks (avg % of capacity)</h2>
+    <table style="border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px">
+      <tr><th></th>{% for h in hours %}<th style="padding:4px 8px;color:var(--pf-text-3)">{{ h }}:00</th>{% endfor %}</tr>
+      {% for d in range(7) %}
+      <tr><th style="padding:4px 8px;text-align:left;color:var(--pf-text-3)">{{ weekdays[d] }}</th>
+        {% for h in hours %}
+          {% set v = heatmap.get((d, h)) %}
+          <td style="padding:6px 8px;text-align:center;border-radius:6px;{% if v is not none %}background:rgba(200,19,43,{{ '%.2f' % (0.08 + 0.6 * v / 100) }});color:{{ '#fff' if v > 55 else 'var(--pf-ink)' }};font-weight:700{% endif %}">{{ v if v is not none else '' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="cards-3" style="margin:0 0 18px">
+    <div class="pf-card pf-card--pad">
+      <h2 class="pf-h3" style="margin:0 0 10px">Attendance · 8 weeks</h2>
+      {% for wk, n in trend %}
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:13px">
+        <span style="min-width:70px;color:var(--pf-text-3)">{{ wk }}</span>
+        <div style="background:var(--pf-red);height:14px;border-radius:4px;width:{{ [n * 8, 200] | min }}px"></div>
+        <b>{{ n }}</b>
+      </div>
+      {% else %}<p style="color:var(--pf-text-2)">No attendance yet.</p>{% endfor %}
+    </div>
+    <div class="pf-card pf-card--pad">
+      <h2 class="pf-h3" style="margin:0 0 10px">Churn by reason</h2>
+      {% for reason, n in churn %}
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--pf-line)"><span>{{ reason.replace('_',' ') }}</span><b>{{ n }}</b></div>
+      {% else %}<p style="color:var(--pf-text-2)">No cancellations.</p>{% endfor %}
+    </div>
+    <div class="pf-card pf-card--pad">
+      <h2 class="pf-h3" style="margin:0 0 10px">No-shows &amp; late cancels</h2>
+      <p style="font-size:12px;color:var(--pf-text-3);margin:0 0 8px">Staff-only. Never shown to members.</p>
+      {% for name, d in ns_report %}
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--pf-line)"><span>{{ name }}</span><span>{{ d.no_shows }} NS · {{ d.late_cancels }} LC</span></div>
+      {% else %}<p style="color:var(--pf-text-2)">Clean sheet.</p>{% endfor %}
+    </div>
+  </div>
+
+  <div class="cards-3" style="margin:0 0 18px;grid-template-columns:1fr 1fr">
+    <div class="pf-card pf-card--pad">
+      <h2 class="pf-h3" style="margin:0 0 10px">Trial funnel by class</h2>
+      <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <tr style="color:var(--pf-text-3);text-align:left"><th>Class</th><th>Booked</th><th>Showed</th><th>Converted</th></tr>
+        {% for name, d in trial_by_class.items() %}
+        <tr style="border-top:1px solid var(--pf-line)"><td style="padding:6px 0">{{ name }}</td><td>{{ d.booked }}</td><td>{{ d.showed }}</td><td><b>{{ d.converted }}</b></td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="pf-card pf-card--pad">
+      <h2 class="pf-h3" style="margin:0 0 10px">Trial funnel by trainer</h2>
+      <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <tr style="color:var(--pf-text-3);text-align:left"><th>Trainer</th><th>Booked</th><th>Showed</th><th>Converted</th></tr>
+        {% for name, d in trial_by_trainer.items() %}
+        <tr style="border-top:1px solid var(--pf-line)"><td style="padding:6px 0">{{ name }}</td><td>{{ d.booked }}</td><td>{{ d.showed }}</td><td><b>{{ d.converted }}</b></td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <div class="pf-card pf-card--pad">
+    <h2 class="pf-h3" style="margin:0 0 10px">CSV exports</h2>
+    {% for name in ['members','leads','bookings','payments','subscriptions','calls'] %}
+    <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.export_csv', name=name) }}" style="margin:0 8px 8px 0">{{ name }}.csv</a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

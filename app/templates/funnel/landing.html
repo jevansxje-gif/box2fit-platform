@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% set dark = copy.register == 'beast' %}
+{% set book_url = url_for('funnel.step_class', segment=copy.book_segment) %}
+{% set cta = "Book their free first class" if copy.book_segment == 'youth' else "Claim your free first class" %}
+
+{% block title %}{{ copy.page_title }}{% endblock %}
+{% block meta_description %}{{ copy.subhead }}{% endblock %}
+{% block body_class %}has-mobile-cta{% endblock %}
+
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">{{ copy.eyebrow }}</div>
+        <h1>{{ copy.headline }} <span class="accent">{{ copy.headline_accent }}</span></h1>
+        <p class="sub">{{ copy.subhead }}</p>
+        <div class="pf-google">
+          <span class="stars">★★★★★</span>
+          <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
+        </div>
+        <div class="hero-cta">
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
+        </div>
+      </div>
+      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}" alt="{{ copy.hero_photo_alt }}" />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">{{ copy.benefits_eyebrow }}</div>
+        <h2>{{ copy.benefits_headline }}</h2>
+      </div>
+      <div class="cards-3">
+        {% for b in copy.benefits %}
+        <div class="pf-card pf-card--pad">
+          <div class="bnum">{{ b.num }}</div>
+          <h3 class="pf-h3">{{ b.title }}</h3>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">{{ b.body }}</p>
+          <p style="color:var(--pf-text-3);font-size:12px;margin:10px 0 0;text-transform:uppercase;letter-spacing:.04em;font-weight:700">{{ b.source }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {% if reviews %}
+  <section class="section" style="background:#fff;border-top:1px solid var(--pf-line);border-bottom:1px solid var(--pf-line)">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Real members. Real Google reviews.</div>
+        <h2>Don't take our word for it.</h2>
+      </div>
+      <div class="cards-{{ 4 if reviews|length == 4 else 3 }}">
+        {% for r in reviews %}
+        <figure class="pf-card pf-card--flat pf-card--pad rev" style="margin:0;border:1px solid var(--pf-line)">
+          <span class="stars">{{ '★' * r.rating }}</span>
+          <blockquote>"{{ r.quote_text }}"</blockquote>
+          <div class="who"><b>{{ r.reviewer_name }}</b><span>via {{ r.source }}</span></div>
+        </figure>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="section" style="background:var(--pf-paper-2)">
+    <div class="wrap coach" style="display:grid;grid-template-columns:1fr 1.1fr;gap:34px;align-items:center">
+      <img src="{{ url_for('static', filename='img/photos/' + copy.coach_photo) }}" alt="Coaching at Box2Fit" style="border-radius:var(--pf-r-xl);box-shadow:var(--pf-sh-md);aspect-ratio:4/3;object-fit:cover;width:100%" />
+      <div>
+        <div class="pf-kicker">{{ copy.coach_eyebrow }}</div>
+        <h2 style="margin:10px 0 14px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.6rem,3.2vw,2.2rem)">{{ copy.coach_headline }}</h2>
+        <p style="font-size:17px;line-height:1.6;color:var(--pf-text-2)">{{ copy.coach_body }}</p>
+        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:12px">{{ cta }}</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Before your first class</div>
+        <h2>Questions, answered.</h2>
+      </div>
+      <div class="faq">
+        {% for f in copy.faqs %}
+        <details{{ ' open' if loop.first }}><summary>{{ f.q }}</summary><p>{{ f.a }}</p></details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="pf-kicker" style="color:rgba(255,255,255,.85)">{{ copy.final_kicker }}</div>
+      <h2>{{ copy.final_headline }}</h2>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
+      <div class="fine">Limited spots per class · No contracts · White Rock</div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block after_body %}
+<div class="mobile-cta pf-sticky">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">{{ cta }}</a>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  @media (max-width: 840px) { .coach { grid-template-columns: 1fr !important; } }
+</style>
+{% endblock %}

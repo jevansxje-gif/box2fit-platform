@@ -1,0 +1,61 @@
+/* ============================================================
+   COLORS — Box2Fit White Rock Health
+   Direction: "Coastal Calm" — Box2Fit crimson as the spark inside
+   a warm, light, premium frame. Sand neutrals + coastal sea blues.
+   ============================================================ */
+:root {
+  /* ---- Brand crimson (sampled from the Box2Fit logo: ~#B81020–#C01020) ---- */
+  --b2f-red:        #C8132B;  /* primary brand accent */
+  --b2f-red-deep:   #A20F22;  /* hover / pressed */
+  --b2f-red-bright: #E11B30;  /* on-photo CTAs, max energy */
+  --b2f-red-tint:   #F7DEE1;  /* soft wash / badge bg */
+  --b2f-red-wash:   #FBEFF0;  /* faintest tint */
+
+  /* ---- Ink ---- */
+  --b2f-ink:        #20242B;  /* near-black, logo ink, headings */
+  --b2f-black:      #14161A;  /* true dark slides */
+
+  /* ---- Warm sand neutrals (the "paper") ---- */
+  --sand-50:        #FBF8F2;  /* page base */
+  --sand-100:       #F5EFE4;
+  --sand-200:       #EBE1D0;  /* sand card / fill */
+  --sand-300:       #DCCEB6;  /* warm divider */
+  --sand-400:       #C3B295;
+
+  /* ---- Coastal sea (secondary, White Rock nod) ---- */
+  --sea-900:        #233642;  /* deep sea — dark surface alt */
+  --sea-800:        #2E4A57;
+  --sea-600:        #4C7180;
+  --sea-400:        #9DBDC6;
+  --sea-200:        #CFE0E4;
+  --sea-100:        #E8F0F2;  /* soft tint */
+
+  /* ---- Text ---- */
+  --text-strong:    #20242B;
+  --text-body:      #4C525A;
+  --text-muted:     #8A9097;
+  --text-faint:     #AEB3B9;
+  --text-on-dark:   #FBF8F2;
+  --text-on-dark-soft: rgba(251,248,242,0.72);
+  --text-on-red:    #FFFFFF;
+
+  /* ---- Surfaces ---- */
+  --surface-page:   var(--sand-50);
+  --surface-card:   #FFFFFF;
+  --surface-sand:   var(--sand-200);
+  --surface-sand-soft: var(--sand-100);
+  --surface-ink:    #1B1E24;
+  --surface-sea:    var(--sea-900);
+  --surface-sea-soft: var(--sea-100);
+
+  /* ---- Lines & borders (warm hairlines) ---- */
+  --line:           #ECE4D6;
+  --line-strong:    #DBD0BC;
+  --line-on-dark:   rgba(251,248,242,0.16);
+
+  /* ---- Semantic aliases ---- */
+  --accent:         var(--b2f-red);
+  --accent-hover:   var(--b2f-red-deep);
+  --accent-soft:    var(--b2f-red-tint);
+  --focus-ring:     rgba(200,19,43,0.32);
+}

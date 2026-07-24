@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Cancelled — Box2Fit White Rock{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    <div class="pf-kicker">All done</div>
+    <div class="big">{% if not charged_yet %}You won't be charged.{% else %}Membership cancelled.{% endif %}</div>
+    <p style="margin:18px 0 4px;color:var(--pf-text-2)">
+      {% if not charged_yet %}The membership was cancelled before any charge.{% else %}No further charges will happen.{% endif %}
+      The ring's here whenever you're ready.
+    </p>
+  </div>
+</div>
+{% endblock %}

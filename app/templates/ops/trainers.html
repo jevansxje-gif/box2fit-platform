@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Trainers — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:860px">
+  {{ ops_nav() }}
+  <h1 class="pf-h1" style="margin:0 0 18px">Trainers</h1>
+  {% for t in trainers %}
+  <details class="pf-card" style="margin-bottom:10px;padding:16px 20px">
+    <summary style="cursor:pointer;font-weight:800">{{ t.name }} <span style="color:var(--pf-text-2);font-weight:400">· {{ t.role_title or '' }}</span>
+      <span class="pf-chip {{ 'pf-chip--success' if t.active else 'pf-chip--warn' }}" style="margin-left:8px">{{ 'active' if t.active else 'inactive' }}</span></summary>
+    <form method="post" style="margin-top:14px;display:grid;gap:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="trainer_id" value="{{ t.id }}" />
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px"><label class="pf-label">Name</label><input class="pf-input" name="name" value="{{ t.name }}" required /></div>
+        <div style="flex:1;min-width:180px"><label class="pf-label">Role</label><input class="pf-input" name="role_title" value="{{ t.role_title or '' }}" /></div>
+      </div>
+      <div><label class="pf-label">Certifications (comma-separated — shown on the public site)</label>
+        <input class="pf-input" name="certs" value="{{ (t.certifications or []) | join(', ') }}" /></div>
+      <div><label class="pf-label">Bio</label><textarea class="pf-textarea" name="bio" rows="2">{{ t.bio or '' }}</textarea></div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" {{ 'checked' if t.active }} /><span class="t">Active</span></label>
+        <input type="hidden" name="pay_rate" value="{{ t.pay_rate_cents or '' }}" />
+        <button class="pf-btn pf-btn--primary pf-btn--sm">Save</button>
+      </div>
+    </form>
+  </details>
+  {% endfor %}
+
+  <div class="pf-panel">
+    <h2>Add trainer</h2>
+    <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Name</label><input class="pf-input" name="name" required /></div>
+      <div><label class="pf-label">Role</label><input class="pf-input" name="role_title" /></div>
+      <div style="flex:1;min-width:200px"><label class="pf-label">Certifications</label><input class="pf-input" name="certs" placeholder="NCCP Boxing, CPR/AED" /></div>
+      <input type="hidden" name="active" value="on" /><label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" checked /><span class="t">Active</span></label>
+      <button class="pf-btn pf-btn--primary">Add</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

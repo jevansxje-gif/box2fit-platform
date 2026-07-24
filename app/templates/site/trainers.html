@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Coaches — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="ops-shell">
+  <div class="pf-kicker">The team</div>
+  <h1 class="pf-h1" style="margin:6px 0 22px">Coaches in your corner</h1>
+  <div class="cards-3" style="margin-top:0">
+    {% for t in trainers %}
+    <div class="pf-card pf-card--pad">
+      {% if t.photo %}<img src="{{ t.photo }}" alt="{{ t.name }}" style="border-radius:var(--pf-r-md);aspect-ratio:4/3;object-fit:cover;width:100%;margin-bottom:12px" />{% endif %}
+      <h3 class="pf-h3">{{ t.name }}</h3>
+      <p style="color:var(--pf-text-2);font-size:14px;margin:4px 0 8px">{{ t.role_title }}</p>
+      {% if t.bio %}<p style="color:var(--pf-text-2);font-size:14px;margin:0 0 10px">{{ t.bio }}</p>{% endif %}
+      {% for c in t.certifications or [] %}<span class="pf-chip" style="margin:0 6px 6px 0">{{ c }}</span>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

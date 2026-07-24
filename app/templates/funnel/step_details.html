@@ -1,0 +1,92 @@
+{% extends "funnel/_flow_base.html" %}
+
+{% macro errs(f) %}{% for e in f.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}{% endmacro %}
+
+{% block flow %}
+  <h1>Who's attending?</h1>
+  <p class="lede">
+    Booked: <b>{{ instance.class_type.name }}</b>{% if instance.class_type.age_bracket_label() %} ({{ instance.class_type.age_bracket_label().lower() }}){% endif %},
+    {{ fmt_local(instance.starts_at_utc) }}. Takes about a minute.
+  </p>
+
+  <form method="post" novalidate x-data="{ kind: '{{ form.attendee_kind.data or 'child' }}' }">
+    {{ form.csrf_token }}
+    <div class="hp-field" aria-hidden="true">{{ form.website(tabindex="-1", autocomplete="off") }}</div>
+
+    <div class="kind-toggle">
+      <label :class="kind === 'child' ? 'on' : ''">
+        <input type="radio" name="attendee_kind" value="child" x-model="kind" {{ 'checked' if (form.attendee_kind.data or 'child') == 'child' }} />
+        My child
+      </label>
+      <label :class="kind === 'self' ? 'on' : ''">
+        <input type="radio" name="attendee_kind" value="self" x-model="kind" {{ 'checked' if form.attendee_kind.data == 'self' }} />
+        Myself
+      </label>
+    </div>
+
+    <div x-show="kind === 'child'" class="pf-panel" style="margin-top:0">
+      <h2>About your child</h2>
+      <p class="note">We keep this to the minimum: first name and birth year. Everything else stays with you, the parent or guardian.</p>
+      <div class="pf-field">
+        {{ form.child_first_name.label(class="pf-label") }}{{ form.child_first_name(class="pf-input", autocomplete="off") }}{{ errs(form.child_first_name) }}
+      </div>
+      <div class="pf-field">
+        {{ form.child_birth_year.label(class="pf-label") }}{{ form.child_birth_year(class="pf-input", inputmode="numeric", placeholder="e.g. 2015") }}{{ errs(form.child_birth_year) }}
+      </div>
+      <div class="pf-field">
+        {{ form.emergency_contact_name.label(class="pf-label") }}{{ form.emergency_contact_name(class="pf-input", autocomplete="off") }}{{ errs(form.emergency_contact_name) }}
+      </div>
+      <div class="pf-field" style="margin-bottom:0">
+        {{ form.emergency_contact_phone.label(class="pf-label") }}{{ form.emergency_contact_phone(class="pf-input", type="tel") }}{{ errs(form.emergency_contact_phone) }}
+      </div>
+    </div>
+
+    <div class="pf-panel">
+      <h2>About you</h2>
+      <p class="note" x-show="kind === 'child'">You're the account holder. Booking updates and reminders go to you, never to your child.</p>
+      <div class="pf-field">
+        {{ form.guardian_name.label(class="pf-label") }}{{ form.guardian_name(class="pf-input", autocomplete="name") }}{{ errs(form.guardian_name) }}
+      </div>
+      <div class="pf-field">
+        {{ form.email.label(class="pf-label") }}{{ form.email(class="pf-input", type="email", autocomplete="email") }}{{ errs(form.email) }}
+      </div>
+      <div class="pf-field" style="margin-bottom:0">
+        {{ form.phone.label(class="pf-label") }}{{ form.phone(class="pf-input", type="tel", autocomplete="tel", placeholder="(604) 555-0123") }}{{ errs(form.phone) }}
+      </div>
+    </div>
+
+    <div class="pf-panel">
+      <h2>Quick health check</h2>
+      <p class="note">Completed by you<span x-show="kind === 'child'"> on your child's behalf</span>. Tick anything that applies. A coach will chat with you before class if needed.</p>
+      {% for key, question in health_questions %}
+        <label class="hq"><span>{{ question }}</span> {{ form['health_' + key]() }}</label>
+      {% endfor %}
+      <div class="pf-field" style="margin:14px 0 0">
+        {{ form.health_notes.label(class="pf-label") }}{{ form.health_notes(class="pf-textarea", rows=2) }}
+      </div>
+    </div>
+
+    <div class="pf-panel">
+      <h2>Stay in the loop (optional)</h2>
+      <p class="note">Choose what you'd like to receive. Unsubscribe anytime with one click. Box2Fit White Rock · 1522 Finlay St Unit 216, White Rock, BC · box2fit@gmail.com</p>
+      <label class="pf-check" style="margin-bottom:10px">{{ form.consent_email() }} <span class="t">{{ form.consent_email.label.text }}</span></label>
+      <label class="pf-check">{{ form.consent_sms() }} <span class="t">{{ form.consent_sms.label.text }}</span></label>
+    </div>
+
+    <div class="pf-panel">
+      <h2>Liability waiver</h2>
+      <p class="note">
+        <span x-show="kind === 'child'">As parent or legal guardian, you sign on your child's behalf. </span>
+        I understand that participation in boxing and fitness activities at Box2Fit involves inherent risks, and I voluntarily assume those risks<span x-show="kind === 'child'"> on behalf of the child named above</span>. I release Box2Fit, its coaches and staff from liability for injuries arising from ordinary negligence, to the fullest extent permitted by BC law. This is a summary. The full waiver text will be supplied for launch.
+      </p>
+      <label class="pf-check">{{ form.waiver_agree() }} <span class="t">{{ form.waiver_agree.label.text }}</span></label>
+      {{ errs(form.waiver_agree) }}
+      <div class="pf-field" style="margin:14px 0 0">
+        {{ form.signature.label(class="pf-label") }}{{ form.signature(class="pf-input", autocomplete="off") }}{{ errs(form.signature) }}
+      </div>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Continue</button>
+  </form>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}

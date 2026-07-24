@@ -1,0 +1,173 @@
+/* ============================================================
+   BOX2FIT PLATFORM — token + component layer
+   The product in members' hands. Bolder and closer to the real
+   Box2Fit brand than the proposal deck: white + ink + crimson,
+   athletic type, warmth from photography, spacing and copy.
+
+   Reuses the design-system color values (../../tokens/*) but
+   re-aliases them into a bolder, higher-contrast product theme.
+   Load AFTER the global styles.css so brand values resolve.
+   ============================================================ */
+:root{
+  /* ---- brand spine (from the real Box2Fit logo/site) ---- */
+  --pf-red:        #C8132B;
+  --pf-red-deep:   #A20F22;
+  --pf-red-bright: #E11B30;
+  --pf-red-tint:   #FCE8EA;
+  --pf-red-wash:   #FDF3F4;
+
+  --pf-ink:        #14161A;   /* headers, primary text, dark surfaces */
+  --pf-ink-2:      #22262E;
+  --pf-ink-soft:   #3A404A;
+
+  /* ---- product neutrals (warm-cool, high-contrast, not sandy) ---- */
+  --pf-white:      #FFFFFF;
+  --pf-paper:      #F6F6F4;   /* app background */
+  --pf-paper-2:    #EFEEEB;
+  --pf-line:       #E4E3DF;
+  --pf-line-2:     #D3D2CD;
+
+  --pf-text:       #14161A;
+  --pf-text-2:     #565C66;   /* AA on white at 16px+ */
+  --pf-text-3:     #767C86;   /* meta only, never labels */
+  --pf-on-dark:    #F6F6F4;
+  --pf-on-dark-2:  rgba(246,246,244,.72);
+
+  /* ---- semantic ---- */
+  --pf-success:    #1E8E5A;
+  --pf-success-bg: #E4F4EC;
+  --pf-warn:       #B9791A;
+  --pf-warn-bg:    #FBF0DC;
+  --pf-info:       #2E4A57;   /* coastal sea, used sparingly */
+  --pf-info-bg:    #E8F0F2;
+
+  /* ---- register accents ---- */
+  --pf-shehits:    #C8132B;   /* She Hits shares brand crimson */
+  --pf-shehits-bg: #FCE8EA;
+  --pf-youth:      #2E4A57;
+  --pf-youth-bg:   #E8F0F2;
+  --pf-beast:      #E11B30;   /* Beast Camp: high-energy on ink */
+
+  /* ---- type ---- */
+  --pf-display: "Hanken Grotesk", system-ui, sans-serif;  /* 800/900 = athletic voice */
+  --pf-sans:    "Hanken Grotesk", system-ui, sans-serif;
+
+  /* ---- radii (product-crisp, less pillowy than the deck) ---- */
+  --pf-r-sm: 8px;
+  --pf-r-md: 12px;
+  --pf-r-lg: 16px;
+  --pf-r-xl: 22px;
+  --pf-r-pill: 999px;
+
+  /* ---- elevation (cool, product shadows) ---- */
+  --pf-sh-sm: 0 1px 2px rgba(20,22,26,.08);
+  --pf-sh-md: 0 4px 16px rgba(20,22,26,.10), 0 1px 3px rgba(20,22,26,.06);
+  --pf-sh-lg: 0 16px 40px rgba(20,22,26,.16), 0 4px 10px rgba(20,22,26,.08);
+  --pf-sh-up: 0 -6px 24px rgba(20,22,26,.10);  /* sticky bottom bars */
+
+  --pf-focus: 0 0 0 3px rgba(200,19,43,.30);
+
+  /* accessibility floor: body text never below 16px on this platform */
+  --pf-fs-body: 16px;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+*,*::before,*::after{ box-sizing:border-box; }
+.pf{ font-family:var(--pf-sans); color:var(--pf-text); font-size:var(--pf-fs-body); line-height:1.5; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+.pf ::selection{ background:var(--pf-red); color:#fff; }
+
+/* athletic display helpers */
+.pf-kicker{ font-weight:800; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--pf-red); }
+.pf-eyebrow{ font-weight:800; font-size:13px; letter-spacing:.12em; text-transform:uppercase; }
+.pf-display{ font-family:var(--pf-display); font-weight:900; letter-spacing:-.028em; line-height:.98; text-transform:uppercase; }
+.pf-h1{ font-weight:800; font-size:30px; line-height:1.05; letter-spacing:-.02em; }
+.pf-h2{ font-weight:800; font-size:22px; line-height:1.12; letter-spacing:-.015em; }
+.pf-h3{ font-weight:700; font-size:18px; line-height:1.2; letter-spacing:-.01em; }
+.pf-num{ font-variant-numeric:tabular-nums; }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.pf-btn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font-family:var(--pf-sans); font-weight:800; font-size:16px; line-height:1; border:none; border-radius:var(--pf-r-md); padding:16px 24px; min-height:52px; cursor:pointer; transition:background .15s, transform .06s, box-shadow .15s; text-decoration:none; white-space:nowrap; }
+.pf-btn:active{ transform:translateY(1px); }
+.pf-btn:focus-visible{ outline:none; box-shadow:var(--pf-focus); }
+.pf-btn--primary{ background:var(--pf-red); color:#fff; }
+.pf-btn--primary:hover{ background:var(--pf-red-deep); }
+.pf-btn--dark{ background:var(--pf-ink); color:var(--pf-on-dark); }
+.pf-btn--dark:hover{ background:#000; }
+.pf-btn--ghost{ background:transparent; color:var(--pf-ink); box-shadow:inset 0 0 0 2px var(--pf-line-2); }
+.pf-btn--ghost:hover{ box-shadow:inset 0 0 0 2px var(--pf-ink); }
+.pf-btn--light{ background:#fff; color:var(--pf-red); box-shadow:var(--pf-sh-sm); }
+.pf-btn--light:hover{ background:var(--pf-red-wash); }
+.pf-btn--block{ width:100%; }
+.pf-btn--lg{ min-height:58px; font-size:17px; padding:18px 28px; }
+.pf-btn--sm{ min-height:42px; font-size:14px; padding:11px 16px; border-radius:var(--pf-r-sm); }
+.pf-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+/* ============================================================
+   CARDS / SURFACES
+   ============================================================ */
+.pf-card{ background:#fff; border:1px solid var(--pf-line); border-radius:var(--pf-r-lg); box-shadow:var(--pf-sh-sm); }
+.pf-card--flat{ box-shadow:none; }
+.pf-card--pad{ padding:20px; }
+
+/* ============================================================
+   CHIPS / BADGES / STATUS
+   ============================================================ */
+.pf-chip{ display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13px; line-height:1; padding:7px 12px; border-radius:var(--pf-r-pill); background:var(--pf-paper-2); color:var(--pf-ink-soft); }
+.pf-chip--red{ background:var(--pf-red-tint); color:var(--pf-red-deep); }
+.pf-chip--ink{ background:var(--pf-ink); color:#fff; }
+.pf-chip--success{ background:var(--pf-success-bg); color:var(--pf-success); }
+.pf-chip--warn{ background:var(--pf-warn-bg); color:var(--pf-warn); }
+.pf-chip--info{ background:var(--pf-info-bg); color:var(--pf-info); }
+.pf-chip--live{ position:relative; padding-left:22px; }
+.pf-chip--live::before{ content:""; position:absolute; left:11px; top:50%; transform:translateY(-50%); width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 0 0 currentColor; animation:pf-pulse 2s infinite; }
+@keyframes pf-pulse{ 0%{ box-shadow:0 0 0 0 rgba(200,19,43,.4); } 70%{ box-shadow:0 0 0 6px rgba(200,19,43,0); } 100%{ box-shadow:0 0 0 0 rgba(200,19,43,0); } }
+
+/* program label = STYLED TEXT, not a logo (swap slot for real marks later) */
+.pf-program{ font-family:var(--pf-display); font-weight:900; letter-spacing:.01em; text-transform:uppercase; }
+.pf-program--shehits{ color:var(--pf-shehits); }
+.pf-program--beast{ color:var(--pf-beast); }
+.pf-program--youth{ color:var(--pf-youth); }
+
+/* ============================================================
+   FORM FIELDS (forgiving, large, AA)
+   ============================================================ */
+.pf-field{ display:block; margin-bottom:18px; }
+.pf-label{ display:block; font-weight:700; font-size:15px; color:var(--pf-ink); margin-bottom:7px; }
+.pf-input,.pf-select,.pf-textarea{ width:100%; font-family:var(--pf-sans); font-size:16px; color:var(--pf-ink); background:#fff; border:1.5px solid var(--pf-line-2); border-radius:var(--pf-r-md); padding:15px 16px; min-height:54px; transition:border-color .15s, box-shadow .15s; }
+.pf-input::placeholder{ color:var(--pf-text-3); }
+.pf-input:focus,.pf-select:focus,.pf-textarea:focus{ outline:none; border-color:var(--pf-red); box-shadow:var(--pf-focus); }
+.pf-input--ok{ border-color:var(--pf-success); }
+.pf-input--err{ border-color:var(--pf-red); }
+.pf-hint{ font-size:14px; color:var(--pf-text-2); margin-top:6px; }
+.pf-err{ font-size:14px; color:var(--pf-red-deep); font-weight:600; margin-top:6px; }
+
+/* checkbox / consent row */
+.pf-check{ display:flex; gap:13px; align-items:flex-start; padding:15px; border:1.5px solid var(--pf-line); border-radius:var(--pf-r-md); cursor:pointer; transition:border-color .15s, background .15s; }
+.pf-check:hover{ border-color:var(--pf-line-2); }
+.pf-check--on{ border-color:var(--pf-red); background:var(--pf-red-wash); }
+.pf-check input{ width:24px; height:24px; accent-color:var(--pf-red); margin-top:1px; flex:none; }
+.pf-check .t{ font-size:15px; line-height:1.4; color:var(--pf-ink-soft); }
+
+/* ============================================================
+   PROGRESS / STEPS
+   ============================================================ */
+.pf-steps{ display:flex; align-items:center; gap:8px; }
+.pf-steps .seg{ flex:1; height:5px; border-radius:999px; background:var(--pf-line); overflow:hidden; }
+.pf-steps .seg.done{ background:var(--pf-red); }
+.pf-steps .seg.now::after{ content:""; display:block; height:100%; width:55%; background:var(--pf-red); border-radius:999px; }
+
+/* trust markers */
+.pf-trust{ display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:600; color:var(--pf-text-2); }
+.pf-trust svg{ width:16px; height:16px; }
+
+/* google rating badge */
+.pf-google{ display:inline-flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--pf-line); border-radius:var(--pf-r-pill); padding:8px 15px 8px 13px; box-shadow:var(--pf-sh-sm); }
+.pf-google .stars{ color:#F5A623; letter-spacing:1px; font-size:14px; }
+.pf-google b{ font-weight:800; }
+
+/* sticky mobile CTA bar */
+.pf-sticky{ position:sticky; bottom:0; left:0; right:0; background:rgba(255,255,255,.92); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-top:1px solid var(--pf-line); box-shadow:var(--pf-sh-up); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); z-index:40; }

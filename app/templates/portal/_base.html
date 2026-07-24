@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block header_cta %}
+{% if current_user.is_authenticated %}
+<nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+  {% for ep, label in [('portal.dashboard','Home'), ('portal.schedule','Schedule'), ('portal.my_classes','My classes'), ('portal.membership','Membership'), ('portal.referrals','Referrals')] %}
+  <a href="{{ url_for(ep) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--primary' if request.endpoint == ep else 'pf-btn--ghost' }}" style="{{ '' if request.endpoint == ep else 'color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)' }}">{{ label }}</a>
+  {% endfor %}
+  <a href="{{ url_for('portal.logout') }}" class="pf-btn pf-btn--ghost pf-btn--sm" style="color:#fff;box-shadow:none;opacity:.7">Log out</a>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="ops-shell">
+{% block portal %}{% endblock %}
+</div>
+{% endblock %}

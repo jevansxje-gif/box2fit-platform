@@ -1,0 +1,47 @@
+{% extends "portal/_base.html" %}
+{% block title %}Membership — Box2Fit{% endblock %}
+{% block portal %}
+  <div class="pf-kicker">Membership</div>
+  <h1 class="pf-h1" style="margin:6px 0 20px">Plan &amp; payments</h1>
+
+  {% for s in subs %}
+  <div class="pf-card pf-card--pad" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center">
+      <div>
+        <b>{{ attendees[s.attendee_id].first_name if s.attendee_id in attendees }}</b> —
+        {{ plans[s.plan_id].name if s.plan_id in plans }}{% if s.cohort_label %} · {{ s.cohort_label }}{% endif %}
+        <span class="pf-chip pf-chip--{{ 'success' if s.status == 'active' else ('warn' if s.status == 'past_due' else 'info') }}" style="margin-left:8px">{{ s.status.replace('_',' ') }}</span>
+        <p style="margin:6px 0 0;color:var(--pf-text-2);font-size:14px">
+          ${{ s.mrr_cents // 100 }} every 4 weeks
+          {% if s.current_period_end %} · renews {{ fmt_local(s.current_period_end, '%b %d') }}{% endif %}
+          {% if s.status == 'pending' and s.first_charge_at %} · first charge {{ fmt_local(s.first_charge_at) }}{% endif %}
+        </p>
+      </div>
+      {% if s.status in ('active', 'past_due', 'pending') %}
+      <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('portal.cancel_membership', sub_id=s.id) }}">Cancel</a>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="pf-card pf-card--pad" style="margin-bottom:14px"><p style="margin:0;color:var(--pf-text-2)">No membership yet — it starts after a free first class.</p></div>
+  {% endfor %}
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px">
+    <b>Card on file</b>
+    <p style="margin:6px 0 10px;color:var(--pf-text-2);font-size:14px">
+      {% if customer and customer.payment_method_status == 'vaulted' %}A card is saved with Stripe. Card details never touch our servers.{% else %}No card saved yet.{% endif %}
+    </p>
+    <a class="pf-btn pf-btn--dark pf-btn--sm" href="{{ url_for('portal.update_card', token=card_token) }}">Update card</a>
+  </div>
+
+  <div class="pf-kicker" style="margin-bottom:10px">Payment history</div>
+  {% for p in payments %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px">
+    <span style="min-width:110px;font-size:14px">{{ p.paid_at.strftime('%b %d, %Y') if p.paid_at }}</span>
+    <span style="flex:1;font-size:14px">${{ '%.2f' % (p.amount_cents / 100) }} {{ p.currency }}</span>
+    <span class="pf-chip pf-chip--{{ 'success' if p.status == 'paid' else 'warn' }}" style="font-size:11px">{{ p.status }}{% if p.refunded_cents %} · ${{ '%.2f' % (p.refunded_cents / 100) }} refunded{% endif %}</span>
+  </div>
+  {% else %}
+  <p style="color:var(--pf-text-2)">No payments yet.</p>
+  {% endfor %}
+{% endblock %}

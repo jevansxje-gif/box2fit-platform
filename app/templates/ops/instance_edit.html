@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Edit class — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:760px">
+  {{ ops_nav() }}
+  <h1 class="pf-h1" style="margin:0 0 6px">{{ inst.class_type.name }}{% if inst.cohort_label %} · {{ inst.cohort_label }}{% endif %}</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 18px">{{ fmt_local(inst.starts_at_utc) }} · {{ roster|length }}/{{ inst.capacity }} booked{% if inst.status == 'cancelled' %} · <b style="color:var(--pf-warn)">CANCELLED</b>{% endif %}</p>
+
+  <form method="post" class="pf-panel" style="margin-top:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <h2>Per-instance overrides</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+      <div><label class="pf-label">Capacity</label><input class="pf-input" type="number" name="capacity" value="{{ inst.capacity }}" style="width:100px" /></div>
+      <div><label class="pf-label">Room / area</label><input class="pf-input" name="room" value="{{ inst.room or '' }}" style="width:150px" /></div>
+      <div><label class="pf-label">Trainer (substitution notifies members)</label>
+        <select class="pf-select" name="trainer_id"><option value="">—</option>
+        {% for t in trainers %}<option value="{{ t.id }}" {{ 'selected' if inst.trainer_id == t.id }}>{{ t.name }}</option>{% endfor %}</select></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="override">Save</button>
+    </div>
+    {% if inst.notes %}<p class="note" style="margin-top:12px;white-space:pre-line">{{ inst.notes }}</p>{% endif %}
+  </form>
+
+  {% if inst.status != 'cancelled' %}
+  <form method="post" class="pf-panel" onsubmit="return confirm('Cancel this class? Everyone booked will be notified and offered the nearest equivalent.')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <h2>Cancel this class</h2>
+    <p class="note">One action: booked members get email/SMS with the nearest equivalent class, the waitlist dissolves gracefully.</p>
+    <button class="pf-btn pf-btn--dark" name="action" value="cancel_class">Cancel class &amp; notify {{ roster|length }} booked</button>
+  </form>
+  {% endif %}
+
+  <div class="pf-panel">
+    <h2>Roster</h2>
+    {% for b in roster %}
+    <div class="roster-row"><div class="who"><b>{{ b.attendee.display_name }}</b><span>{{ b.attendee.guardian.name }} · {{ b.attendee.guardian.phone }}</span></div>
+      <span class="pf-chip">{{ b.status }}</span></div>
+    {% else %}<p class="note">No bookings.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

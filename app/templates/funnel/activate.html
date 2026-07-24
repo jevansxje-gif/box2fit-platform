@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Start the membership — Box2Fit White Rock{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <div class="confirm-card" style="text-align:left">
+    <div class="pf-kicker">Start the membership</div>
+    <div class="big" style="text-transform:none;letter-spacing:-.01em">
+      {% if attendee.kind == 'child' %}Ready to keep {{ attendee.first_name }} training?{% else %}Ready to keep training?{% endif %}
+    </div>
+    <p style="margin:14px 0 6px;color:var(--pf-text-2);line-height:1.6">
+      {% if plan %}<b>${{ plan.price_cents // 100 }} every 4 weeks</b>, three sessions a week in
+      {{ booking.class_instance.cohort_label or 'the group' }}.{% endif %}
+      No contracts. Cancel anytime in one click.
+    </p>
+    <p style="margin:0 0 18px;color:var(--pf-text-2);font-size:14px">
+      Nothing is charged for 48 hours after you confirm — we'll remind you before the first charge.
+    </p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">
+        {% if attendee.kind == 'child' %}Start {{ attendee.first_name }}'s membership{% else %}Start my membership{% endif %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

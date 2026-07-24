@@ -1,0 +1,26 @@
+{% extends "portal/_base.html" %}
+{% block title %}Cancel membership — Box2Fit{% endblock %}
+{% block portal %}
+  <div style="max-width:560px">
+  <div class="pf-kicker">Cancel membership</div>
+  <h1 class="pf-h1" style="margin:6px 0 8px">Sorry to see {{ attendee.first_name }} go.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">No hard feelings and no fine print: cancelling stops all future charges. One quick question so we keep getting better.</p>
+
+  <form method="post" class="pf-panel" style="margin-top:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <b style="display:block;margin-bottom:10px">What's the main reason?</b>
+    {% for value, label in reasons %}
+    <label class="pf-check" style="margin-bottom:8px">
+      <input type="radio" name="reason" value="{{ value }}" required />
+      <span class="t">{{ label }}</span>
+    </label>
+    {% endfor %}
+    <div class="pf-field" style="margin-top:14px">
+      <label class="pf-label" for="note">Anything else? (optional)</label>
+      <textarea class="pf-textarea" id="note" name="note" rows="2"></textarea>
+    </div>
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="submit">Cancel the membership</button>
+    <a class="pf-btn pf-btn--ghost pf-btn--block" href="{{ url_for('portal.membership') }}" style="margin-top:10px">Keep it</a>
+  </form>
+  </div>
+{% endblock %}

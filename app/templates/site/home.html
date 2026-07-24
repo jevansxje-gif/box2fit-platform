@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Box2Fit White Rock — Boxing & Fitness for Every Age{% endblock %}
+{% block meta_description %}Family-driven boxing and fitness in White Rock. Youth groups, She Hits, Beast Camp and more. Your first class is free.{% endblock %}
+
+{% block head %}
+<meta property="og:title" content="Box2Fit White Rock" />
+<meta property="og:description" content="Family-driven boxing and fitness in White Rock. Your first class is free." />
+<meta property="og:type" content="website" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"LocalBusiness","name":"Box2Fit White Rock",
+"address":{"@type":"PostalAddress","streetAddress":"1522 Finlay St, Unit 216","addressLocality":"White Rock","addressRegion":"BC","addressCountry":"CA"},
+"telephone":"+17783846284",
+"aggregateRating":{"@type":"AggregateRating","ratingValue":"{{ google_rating }}","reviewCount":"{{ google_review_count }}"}}
+</script>
+{% endblock %}
+
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.landing_youth') }}">Book a free class</a>{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">Boxing &amp; Fitness · White Rock</div>
+        <h1>The best hour of your day, <span class="accent">with people who know your name.</span></h1>
+        <p class="sub">A family-driven boxing community for every age: youth groups, women-only She Hits, Beast Camp, and everyday fitness boxing. Beginners genuinely welcome.</p>
+        <div class="pf-google">
+          <span class="stars">★★★★★</span>
+          <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
+        </div>
+        <div class="hero-cta">
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ url_for('funnel.landing_youth') }}">Claim your free first class</a>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">No contracts. Cancel anytime.</span>
+        </div>
+      </div>
+      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/adults-sparring.jpg') }}" alt="Training at Box2Fit White Rock" />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Programs</div>
+        <h2>Find your room.</h2>
+      </div>
+      <div class="cards-3">
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing_youth') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--youth" style="font-size:20px">YOUTH BOXING</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Ages 7 to 17. Confidence, focus and real skills, three sessions a week in their group.</p>
+        </a>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='shehits') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--shehits" style="font-size:20px">SHE HITS</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Women-only boxing. Real strength and real confidence in a room that has your back.</p>
+        </a>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='beast') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--beast" style="font-size:20px">BEAST CAMP</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">The hardest hour in White Rock. Boxing, strength and conditioning at full send.</p>
+        </a>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap">
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='strong') }}">Fitness Boxing</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='focus') }}">Lunch-hour Boxing</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_schedule') }}">Full schedule</a>
+      </div>
+    </div>
+  </section>
+
+  {% if occurrences %}
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">This week</div>
+        <h2>On the schedule.</h2>
+      </div>
+      <div class="cards-4">
+        {% for o in occurrences[:4] %}
+        <div class="pf-card pf-card--pad">
+          <div class="pf-kicker" style="color:var(--pf-text-3)">{{ o.instance.local_date.strftime('%a %b %d') }}</div>
+          <h3 class="pf-h3" style="margin:6px 0 2px">{{ o.instance.class_type.name }}</h3>
+          <p style="margin:0;color:var(--pf-text-2);font-size:14px">{{ o.instance.local_time.strftime('%I:%M %p').lstrip('0') }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</p>
+        </div>
+        {% endfor %}
+      </div>
+      <p style="margin-top:14px"><a href="{{ url_for('funnel.public_schedule') }}">See the full week →</a></p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if trainers %}
+  <section class="section" style="background:#fff;border-top:1px solid var(--pf-line);border-bottom:1px solid var(--pf-line)">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Coaches</div>
+        <h2>Certified, credentialed, in your corner.</h2>
+      </div>
+      <div class="cards-3">
+        {% for t in trainers %}
+        <div class="pf-card pf-card--flat pf-card--pad" style="border:1px solid var(--pf-line)">
+          <h3 class="pf-h3">{{ t.name }}</h3>
+          <p style="color:var(--pf-text-2);font-size:14px;margin:4px 0 8px">{{ t.role_title }}</p>
+          {% for c in t.certifications or [] %}<span class="pf-chip" style="margin:0 6px 6px 0">{{ c }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <p style="margin-top:14px"><a href="{{ url_for('funnel.public_trainers') }}">Meet the whole team →</a></p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if reviews %}
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Real members. Real Google reviews.</div>
+        <h2>Don't take our word for it.</h2>
+      </div>
+      <div class="cards-3">
+        {% for r in reviews %}
+        <figure class="pf-card pf-card--pad rev" style="margin:0">
+          <span class="stars">{{ '★' * r.rating }}</span>
+          <blockquote>"{{ r.quote_text }}"</blockquote>
+          <div class="who"><b>{{ r.reviewer_name }}</b><span>via {{ r.source }}</span></div>
+        </figure>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="final">
+    <div class="wrap">
+      <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Train Smarter. Get Results.</div>
+      <h2>Your first class is on us.</h2>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ url_for('funnel.landing_youth') }}">Claim your free first class</a>
+      <div class="fine">1522 Finlay St Unit 216 · White Rock · <a href="{{ url_for('funnel.public_contact') }}" style="color:#fff">Contact</a> · <a href="https://box2fit.com" style="color:#fff">box2fit.com</a></div>
+    </div>
+  </section>
+{% endblock %}

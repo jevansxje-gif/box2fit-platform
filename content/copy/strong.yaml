@@ -1,0 +1,41 @@
+# Active adults — /strong
+page_title: "Fitness Boxing — Box2Fit White Rock"
+register: warm
+eyebrow: "Fitness Boxing · White Rock"
+headline: "Feel ten years"
+headline_accent: "younger by summer."
+subhead: "Boxing built for real life. Learn proper technique, get a full-body workout, and have fun doing it. All levels, no experience needed."
+hero_photo: adult-kettlebell.jpg
+hero_photo_alt: "Fitness training at Box2Fit"
+benefits_eyebrow: "Why Box2Fit"
+benefits_headline: "A room that has your back."
+benefits:
+  - num: "3×"
+    title: "A week is all it takes"
+    body: "A sustainable routine that builds real, lasting fitness."
+    source: "Recommended class cadence"
+  - num: "10+"
+    title: "Years in the community"
+    body: "A family-driven gym trusted by White Rock since 2015."
+    source: "Box2Fit · established 2015"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "Encouraging coaches who welcome every level."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Coached by fighters & finishers"
+coach_headline: "A room that has your back."
+coach_body: "What started over ten years ago as a father and daughter training in a park is now a family-driven boxing community in White Rock. Our coaches meet you where you are, challenging you while keeping every session welcoming and fun."
+coach_photo: adults-sparring.jpg
+faqs:
+  - q: "Do I need any experience?"
+    a: "None at all. Our classes are built for all levels and coaches teach proper technique from your very first session."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
+  - q: "How often should I come?"
+    a: "Most members train around three times a week, enough to see real progress while fitting into a busy life."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+final_kicker: "Train Smarter. Get Results."
+final_headline: "Your first class is on us."
+booking_lede: "Pick a class that fits your week. Your first one is free."
+review_tags: ["strong"]

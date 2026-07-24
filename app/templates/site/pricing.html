@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Membership — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow">
+  <div class="pf-kicker">Membership</div>
+  <h1>Simple pricing, no contracts.</h1>
+  <div class="pf-card pf-card--pad" style="margin-top:16px">
+    <div class="bnum">${{ (plan.price_cents // 100) if plan else 189 }}</div>
+    <p style="margin:4px 0 12px;color:var(--pf-text-2);font-weight:700">billed every 4 weeks · auto-renews · cancel anytime in one click</p>
+    <ul style="margin:0;padding-left:20px;color:var(--pf-text-2);line-height:1.9">
+      <li>Three sessions a week in your group</li>
+      <li>Free first class before anything is charged</li>
+      <li>No contracts, no cancellation fees, ever</li>
+      <li>Gloves and wraps provided</li>
+    </ul>
+    <a class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" href="{{ url_for('funnel.landing_youth') }}" style="margin-top:18px">Start with a free class</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Update your card — Box2Fit White Rock{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <h1>Update your card</h1>
+  {% if past_due %}
+  <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
+    A recent payment didn't go through. Update your card below and you're all set — booking re-enables the moment the payment succeeds. Any classes already booked are still yours.
+  </div>
+  {% else %}
+  <p class="lede">Swap the card on file for {{ guardian.name.split(' ')[0] }}'s account. Takes a minute.</p>
+  {% endif %}
+
+  {% if stripe_configured %}
+    <form id="payment-form">
+      <div id="payment-element"></div>
+      <div id="payment-error" class="pf-err" role="alert"></div>
+      <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" id="submit-btn" type="submit" style="margin-top:18px">Save new card</button>
+      <p class="pf-hint" style="text-align:center;margin-top:12px">Card details are handled by Stripe. They never touch our servers.</p>
+    </form>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+      const stripe = Stripe({{ stripe_publishable_key | tojson }});
+      const elements = stripe.elements({ clientSecret: {{ client_secret | tojson }} });
+      elements.create('payment').mount('#payment-element');
+      document.getElementById('payment-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        const { error } = await stripe.confirmSetup({
+          elements,
+          confirmParams: { return_url: window.location.href },
+        });
+        if (error) {
+          document.getElementById('payment-error').textContent = error.message;
+          btn.disabled = false;
+        }
+      });
+    </script>
+  {% else %}
+    <div class="pf-panel">
+      <h2>Stripe not configured (dev mode)</h2>
+      <p class="note">Set STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY to render the live card element here.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

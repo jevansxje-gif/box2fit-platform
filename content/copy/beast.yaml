@@ -1,0 +1,41 @@
+# Beast mode — /beast (bold register)
+page_title: "Beast Camp — Box2Fit White Rock"
+register: beast
+eyebrow: "Beast Camp · White Rock"
+headline: "The hardest hour"
+headline_accent: "in White Rock."
+subhead: "Boxing, strength, and conditioning in one high-energy hour. No contracts. All levels. The training that built this gym."
+hero_photo: hero-battle-ropes-logo.jpg
+hero_photo_alt: "Beast Camp at Box2Fit"
+benefits_eyebrow: "Why Beast Camp"
+benefits_headline: "Get strong. Get fit. Get results."
+benefits:
+  - num: "60"
+    title: "Minutes of work"
+    body: "Boxing, strength and conditioning packed into one high-energy hour."
+    source: "Beast Camp class format"
+  - num: "~800"
+    title: "Calories per hour"
+    body: "Boxing training can burn up to ~800 cal/hr at full effort."
+    source: "Up to · varies by individual"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "The best workouts, top-notch coaches."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Coached by fighters & finishers"
+coach_headline: "The training that built this gym."
+coach_body: "Beast Camp is where Box2Fit's engine runs hottest. Beginner to advanced, everyone works. Coaches push you to your level's edge and teach you to box properly and efficiently while you're there."
+coach_photo: adults-sparring.jpg
+faqs:
+  - q: "Is Beast Camp too hard for beginners?"
+    a: "No. Everything scales. You work at your edge, not someone else's, and coaches adjust every drill to your level."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
+  - q: "How often should I come?"
+    a: "Most Beast Camp regulars train three or more times a week. Start with what you can recover from."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+final_kicker: "Get Strong. Get Fit. Get Results."
+final_headline: "Prove it to yourself."
+booking_lede: "Pick a Beast Camp session. Your first one is free."
+review_tags: ["beast"]

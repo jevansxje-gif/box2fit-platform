@@ -1,0 +1,29 @@
+{% extends "portal/_base.html" %}
+{% block title %}Preferences — Box2Fit{% endblock %}
+{% block portal %}
+  <div style="max-width:560px">
+  <div class="pf-kicker">Preferences</div>
+  <h1 class="pf-h1" style="margin:6px 0 20px">Notifications &amp; consent</h1>
+  <form method="post" class="pf-panel" style="margin-top:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <b style="display:block;margin-bottom:8px">Service notifications</b>
+    <p class="note" style="margin-bottom:10px">Booking confirmations and payment notices always send — they're about your account.</p>
+    {% for key, label in [('reminders','Class reminders'), ('schedule','Schedule changes & coach updates'), ('news','Gym news & announcements')] %}
+    <label class="pf-check" style="margin-bottom:8px">
+      <input type="checkbox" name="pref_{{ key }}" {{ 'checked' if prefs[key] }} />
+      <span class="t">{{ label }}</span>
+    </label>
+    {% endfor %}
+    <b style="display:block;margin:18px 0 8px">Marketing (separate consent, CASL)</b>
+    <label class="pf-check" style="margin-bottom:8px">
+      <input type="checkbox" name="consent_email" {{ 'checked' if current_user.consent_email }} />
+      <span class="t">Marketing emails (tips, offers)</span>
+    </label>
+    <label class="pf-check" style="margin-bottom:14px">
+      <input type="checkbox" name="consent_sms" {{ 'checked' if current_user.consent_sms }} />
+      <span class="t">Marketing texts</span>
+    </label>
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="submit">Save preferences</button>
+  </form>
+  </div>
+{% endblock %}

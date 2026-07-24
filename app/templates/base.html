@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{% block title %}Box2Fit White Rock{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Boxing and fitness in White Rock. Your first class is free.{% endblock %}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}" />
+{% block head %}{% endblock %}
+</head>
+<body class="pf {% block body_class %}{% endblock %}">
+  <header class="site-hdr">
+    <div class="wrap">
+      <a href="{{ url_for('funnel.index') }}" aria-label="Box2Fit home"><img src="{{ url_for('static', filename='img/brand/logo-white.png') }}" alt="Box2Fit" /></a>
+      {% block header_cta %}{% endblock %}
+    </div>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="wrap flashes">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  <main>
+  {% block content %}{% endblock %}
+  </main>
+  <footer class="site-foot">
+    <div class="wrap">
+      <img src="{{ url_for('static', filename='img/brand/logo-white.png') }}" alt="Box2Fit" />
+      <div class="info"><b>Box2Fit White Rock</b><br />1522 Finlay St, Unit 216, White Rock, BC<br /><a href="tel:+17783846284">(778) 384-6284</a></div>
+    </div>
+  </footer>
+  {% block after_body %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,17 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#22262E">
+  <div style="background:#14161A;padding:18px 24px"><span style="color:#fff;font-weight:800;letter-spacing:1px">BOX2FIT WHITE ROCK</span></div>
+  <div style="padding:24px;border:1px solid #E4E3DF;border-top:0">
+    <h1 style="margin:0 0 8px;font-size:24px;color:#14161A">
+      {% if is_2h %}{% if is_child %}{{ attendee.first_name }}'s class is in about 2 hours{% else %}See you in a couple of hours, {{ guardian.name.split(' ')[0] }}{% endif %}{% else %}{% if is_child %}{{ attendee.first_name }}'s free class is tomorrow{% else %}Your free class is tomorrow{% endif %}{% endif %}
+    </h1>
+    <p style="font-size:18px;font-weight:bold;color:#C8132B;margin:0 0 16px">{{ class_name }}<br />{{ when }}</p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 16px">
+      {{ address }} — arrive 10 minutes early.<br />
+      Athletic clothing, indoor shoes, water bottle. Gloves &amp; wraps provided.
+    </p>
+    <p style="font-size:13px;color:#767C86;line-height:1.6;margin:16px 0 0">
+      Plans changed? <a href="{{ cancel_url }}" style="color:#C8132B">Cancel in one click</a> and we'll release the spot. No penalties.
+    </p>
+  </div>
+  <p style="font-size:11px;color:#8A9097;padding:12px 24px">Box2Fit White Rock · {{ address }} · (778) 384-6284<br />This is a transactional reminder about your booking.</p>
+</div>

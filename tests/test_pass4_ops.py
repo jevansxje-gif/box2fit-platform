@@ -1,0 +1,357 @@
+"""Pass 4: schedule builder + cancel-class notifications, substitutions,
+member directory + notes + flags, reports + CSV, announcements, reviews,
+outbox dispatch, call matching — and the FINAL full-platform E2E."""
+import json
+import re
+from datetime import timedelta
+
+from app.extensions import db
+from app.models import (
+    Announcement,
+    Booking,
+    BookingStatus,
+    Call,
+    ClassInstance,
+    EventOutbox,
+    InstanceStatus,
+    Lead,
+    MemberNote,
+    Message,
+    Payment,
+    Review,
+    Role,
+    StripeCustomer,
+    Subscription,
+    SubscriptionStatus,
+    User,
+    WaitlistEntry,
+    utcnow,
+)
+from app.services.dispatch import drain, hash_user_data
+
+from test_pass1_e2e import _book_child, _first_instance
+from test_pass2_money import _vault_card, _webhook
+from test_pass3_portal import _login, _make_member
+
+
+def _admin(app):
+    """A gym_admin staff client (reports are admin-only)."""
+    u = User(
+        client_account_id=1, email="admin@test.local", name="Gym Admin",
+        role=Role.gym_admin.value,
+    )
+    u.set_password("pw")
+    db.session.add(u)
+    db.session.commit()
+    c = app.test_client()
+    c.post("/ops/login", data={"email": "admin@test.local", "password": "pw"})
+    return c
+
+
+# ----------------------------------------------------- schedule + trainers ---
+def test_schedule_builder_and_cancel_class(app, client, client_account):
+    staff = _admin(app)
+    r = staff.get("/ops/schedule-builder")
+    assert r.status_code == 200
+
+    # add a template with a trainer conflict → rejected
+    from app.models import ClassType, ScheduleTemplate, Trainer
+
+    kids = db.session.query(ClassType).filter_by(key="kids_7_10").one()
+    trainer = db.session.query(Trainer).one()
+    existing = db.session.query(ScheduleTemplate).first()
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "add_template",
+            "class_type_id": kids.id,
+            "weekday": existing.weekday,
+            "start_time": existing.start_time_local.strftime("%H:%M"),
+            "trainer_id": trainer.id,
+        },
+        follow_redirects=True,
+    )
+    assert b"Conflict" in r.data
+
+    # cancel a class with a booking → member notified, waitlist dissolved
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    guardian, child = _make_member(client_account, email="wl@example.com")
+    from app.services import waitlist as wl
+
+    wl.join(instance, child)
+    db.session.commit()
+
+    r = staff.post(
+        f"/ops/instances/{instance.id}",
+        data={"action": "cancel_class"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    db.session.refresh(instance)
+    assert instance.status == InstanceStatus.cancelled.value
+    booking = db.session.query(Booking).filter_by(class_instance_id=instance.id).one()
+    assert booking.status == BookingStatus.cancelled.value
+    cancel_msgs = db.session.query(Message).filter_by(template="class_cancelled").all()
+    assert len(cancel_msgs) == 2  # email + sms
+    assert db.session.query(WaitlistEntry).one().status == "released"
+
+
+def test_substitution_notifies_members(app, client, client_account):
+    from app.models import Trainer
+
+    staff = _admin(app)
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    new_trainer = Trainer(
+        client_account_id=client_account.id, name="Coach Sub", active=True
+    )
+    db.session.add(new_trainer)
+    db.session.commit()
+
+    staff.post(
+        f"/ops/instances/{instance.id}",
+        data={"action": "override", "trainer_id": new_trainer.id, "capacity": instance.capacity},
+    )
+    db.session.refresh(instance)
+    assert instance.trainer_id == new_trainer.id
+    assert "sub:" in (instance.notes or "")  # history logged
+    notice = db.session.query(Message).filter_by(template="sub_notice").one()
+    assert "Coach Sub" in notice.body_preview
+
+
+# ------------------------------------------------- directory, notes, flags ---
+def test_member_directory_flags_and_notes(app, client, client_account):
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    staff = _admin(app)
+
+    r = staff.get("/ops/members")
+    assert b"Sam Parent" in r.data
+    assert b"first-timer" in r.data  # no attendance yet → flag
+
+    guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
+    r = staff.post(
+        f"/ops/members/{guardian.id}",
+        data={"action": "note", "body": "Maya has a peanut allergy — epipen in bag"},
+        follow_redirects=True,
+    )
+    assert b"peanut allergy" in r.data
+    note = db.session.query(MemberNote).one()
+    assert note.user_id == guardian.id
+
+    # source attribution visible read-only
+    r = staff.get(f"/ops/members/{guardian.id}")
+    assert b"source:" in r.data
+
+
+# --------------------------------------------------- reports, CSV, reviews ---
+def test_reports_and_csv_admin_only(app, client, client_account):
+    staff = _admin(app)
+    r = staff.get("/ops/reports")
+    assert r.status_code == 200
+    assert b"Fill heatmap" in r.data
+
+    r = staff.get("/ops/export/leads.csv")
+    assert r.status_code == 200
+    assert r.mimetype == "text/csv"
+    assert b"utm_campaign" in r.data
+
+    # front desk cannot see reports
+    fd = app.test_client()
+    fd.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
+    assert fd.get("/ops/reports").status_code == 403
+    assert fd.get("/ops/export/payments.csv").status_code == 403
+
+
+def test_announcements_portal_banner_and_consented_email(app, client, client_account):
+    staff = _admin(app)
+    guardian, _ = _make_member(client_account, email="news@example.com")
+    guardian.consent_email = True  # CASL consent for the marketing-ish email
+    db.session.commit()
+
+    staff.post(
+        "/ops/announcements",
+        data={"action": "create", "title": "Holiday schedule", "body": "Closed Aug 4."},
+    )
+    a = db.session.query(Announcement).one()
+
+    # portal banner
+    _login(client, guardian.email)
+    r = client.get("/portal/")
+    assert b"Holiday schedule" in r.data
+
+    # email respects consent + news pref
+    staff.post("/ops/announcements", data={"action": "email", "id": a.id})
+    sent = db.session.query(Message).filter_by(template="announcement").all()
+    assert any(m.recipient == "news@example.com" for m in sent)
+
+
+def test_review_crud_and_badge(app, client, client_account):
+    staff = _admin(app)
+    staff.post(
+        "/ops/reviews",
+        data={
+            "action": "save", "reviewer_name": "New P.", "rating": "5",
+            "quote_text": "Verbatim words here.", "segment_tags": "youth",
+            "display_order": "1", "active": "on",
+        },
+    )
+    assert db.session.query(Review).filter_by(reviewer_name="New P.").count() == 1
+    staff.post(
+        "/ops/reviews",
+        data={"action": "badge", "google_rating": "4.9", "google_review_count": "31"},
+    )
+    r = client.get("/youth")
+    assert b"4.9" in r.data and b"31 Google reviews" in r.data
+
+
+# ------------------------------------------------------- tracking + calls ---
+def test_outbox_dispatch_and_hashing(app, client, client_account):
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    pending = db.session.query(EventOutbox).filter(
+        EventOutbox.dispatched_at.is_(None)
+    ).count()
+    assert pending >= 2  # Lead + Schedule
+
+    # unconfigured destinations → marked dispatched with note (dev behavior)
+    with app.test_request_context():
+        done = drain()
+    db.session.commit()
+    assert done == pending
+    assert (
+        db.session.query(EventOutbox).filter(EventOutbox.dispatched_at.is_(None)).count()
+        == 0
+    )
+
+    hashed = hash_user_data({"email": " Sam.Parent@Example.com ", "phone": "+16045550123"})
+    assert hashed["em"][0] == __import__("hashlib").sha256(
+        b"sam.parent@example.com"
+    ).hexdigest()
+    assert hashed["ph"][0] == __import__("hashlib").sha256(b"16045550123").hexdigest()
+
+
+def test_call_webhook_matching_and_attribution(client, client_account):
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    lead = db.session.query(Lead).one()
+    lead.status = "activated"
+    db.session.commit()
+
+    r = client.post(
+        "/api/v1/webhooks/calls",
+        json={
+            "customer_phone_number": "604-555-0123",
+            "tracking_phone_number": "+16040001111",
+            "duration": "95",
+            "start_time": "2026-07-24T10:00:00Z",
+        },
+    )
+    data = r.get_json()
+    assert data["received"] is True
+    call = db.session.query(Call).one()
+    assert call.matched_lead_id == lead.id
+    assert call.caller_number == "+16045550123"
+    events = {e.event_name for e in db.session.query(EventOutbox).all()}
+    assert "CallAttributedConversion" in events
+
+
+# --------------------------------------------------------- FINAL E2E gate ---
+def test_final_full_platform_e2e(app, client, client_account, monkeypatch):
+    """funnel booking → activation → portal login → class book → kiosk
+    check-in → attendance → reporting + command-center numbers reconcile."""
+    # 1. funnel: ad click + child booking
+    client.get("/youth?utm_source=meta&utm_campaign=final&utm_content=final-A")
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
+    booking = db.session.query(Booking).one()
+    _vault_card(guardian)
+
+    # 2. attend + activate + first invoice paid
+    staff = app.test_client()
+    staff.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
+    staff.post(f"/ops/bookings/{booking.id}/attendance", data={"action": "attended"})
+    staff.post(f"/ops/bookings/{booking.id}/activate")
+    sub = db.session.query(Subscription).one()
+    sub.stripe_subscription_id = "sub_final"
+    db.session.commit()
+    _webhook(client, "invoice.paid", {
+        "id": "in_final_1", "subscription": "sub_final",
+        "amount_paid": 18900, "currency": "cad", "charge": "ch_final_1",
+    })
+
+    # 3. portal: set password via the welcome invite, then book next class
+    welcome = db.session.query(Message).filter_by(template="membership_welcome").one()
+    invite = re.search(r"/portal/set-password/[\w\-\.]+", welcome.body_preview).group(0)
+    r = client.post(invite, data={"password": "newpassword1"}, follow_redirects=False)
+    assert r.status_code == 302  # logged in
+
+    next_inst = [
+        o["instance"]
+        for o in __import__(
+            "app.services.scheduling", fromlist=["upcoming_instances"]
+        ).upcoming_instances(client_account.id, segment_tag="youth")
+        if o["instance"].class_type.key == "kids_7_10" and o["instance"].id != instance.id
+    ]
+    if not next_inst:  # only one generated occurrence — create the next week's
+        from datetime import time as dtime
+        from app.services.tzutil import local_to_utc, today_local
+
+        d = instance.local_date + timedelta(days=7)
+        ni = ClassInstance(
+            client_account_id=client_account.id,
+            class_type_id=instance.class_type_id,
+            cohort_label="Group A",
+            starts_at_utc=local_to_utc(d, dtime(11, 0)),
+            local_date=d, local_time=dtime(11, 0), duration_min=45, capacity=12,
+        )
+        db.session.add(ni)
+        db.session.commit()
+        next_inst = [ni]
+    child = booking.attendee
+    r = client.post(
+        "/portal/bookings",
+        data={"instance_id": next_inst[0].id, "attendee_id": child.id},
+        follow_redirects=True,
+    )
+    assert b"booked" in r.data.lower()
+    member_booking = (
+        db.session.query(Booking)
+        .filter_by(attendee_id=child.id, class_instance_id=next_inst[0].id)
+        .one()
+    )
+    assert member_booking.kind == "member"
+
+    # 4. kiosk check-in for the member booking (move class to today)
+    from datetime import time as dtime
+    from app.services.tzutil import local_to_utc, today_local
+
+    ni = next_inst[0]
+    ni.local_date = today_local()
+    ni.local_time = dtime(23, 57)
+    ni.starts_at_utc = local_to_utc(today_local(), dtime(23, 57))
+    db.session.commit()
+    r = staff.post("/ops/kiosk/search", data={"q": "maya"})
+    assert b"Maya" in r.data
+    r = staff.post(f"/ops/kiosk/checkin/{member_booking.id}")
+    assert b"Welcome back" in r.data  # member now, not first-timer
+    db.session.refresh(member_booking)
+    assert member_booking.status == BookingStatus.attended.value
+
+    # 5. reporting + command-center numbers reconcile
+    admin = _admin(app)
+    r = admin.get("/ops/reports")
+    assert r.status_code == 200
+    payment = db.session.query(Payment).one()
+    assert payment.agency_share_cents == round(18900 * client_account.commission_rate)
+    assert db.session.query(Lead).one().status == "activated"
+    assert sub.status == SubscriptionStatus.active.value
+    # trial conversion shows 1 booked / 1 showed / 1 converted for Kids Boxing
+    assert b"Kids Boxing" in r.data
+
+    # CSV exports reconcile with the DB
+    r = admin.get("/ops/export/payments.csv")
+    assert b"in_final_1" in r.data
+    assert str(payment.agency_share_cents).encode() in r.data

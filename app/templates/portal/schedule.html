@@ -1,0 +1,51 @@
+{% extends "portal/_base.html" %}
+{% block title %}Schedule — My Box2Fit{% endblock %}
+{% block portal %}
+  <div class="pf-kicker">Going or not going</div>
+  <h1 class="pf-h1" style="margin:6px 0 6px">Class schedule</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">Tap to book the sessions you'll attend. Cancel anytime, no penalties.</p>
+
+  {% if past_due %}
+  <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
+    Booking is paused until a quick card update.
+    <a class="pf-btn pf-btn--primary pf-btn--sm" href="{{ url_for('portal.update_card', token=card_token) }}" style="margin-left:10px">Update card</a>
+  </div>
+  {% endif %}
+
+  {% set ns = namespace(day=None) %}
+  {% for o in occurrences %}
+    {% if o.instance.local_date != ns.day %}
+      {% set ns.day = o.instance.local_date %}
+      <div class="day-lbl">{{ o.instance.local_date.strftime('%A · %b %d') }}</div>
+    {% endif %}
+    <div class="pf-card" style="margin-bottom:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <span style="font-weight:800;min-width:84px;font-variant-numeric:tabular-nums">{{ o.instance.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+      <div style="flex:1;min-width:180px">
+        <b>{{ o.instance.class_type.name }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</b><br />
+        <span style="font-size:14px;color:var(--pf-text-2)">{{ o.instance.class_type.age_bracket_label() or 'All levels' }}{% if o.instance.trainer %} · {{ o.instance.trainer.name }}{% endif %} ·
+        {% if o.remaining == 0 %}Full{% else %}{{ o.remaining }} spots open{% endif %}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {% for a in attendees %}
+          {% set b = booked_map.get((a.id, o.instance.id)) %}
+          {% set w = waiting.get((a.id, o.instance.id)) %}
+          {% if b %}
+            <form method="post" action="{{ url_for('portal.cancel_booking', booking_id=b.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button class="pf-btn pf-btn--sm pf-btn--primary" title="Booked — tap to cancel">✓ {{ a.first_name }} going</button>
+            </form>
+          {% elif w %}
+            <span class="pf-chip pf-chip--info">{{ a.first_name }}: waitlist{{ ' (spot offered!)' if w.status == 'offered' }}</span>
+          {% else %}
+            <form method="post" action="{{ url_for('portal.create_booking') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <input type="hidden" name="instance_id" value="{{ o.instance.id }}" />
+              <input type="hidden" name="attendee_id" value="{{ a.id }}" />
+              <button class="pf-btn pf-btn--sm pf-btn--ghost">{{ 'Join waitlist' if o.remaining == 0 else 'Book ' + a.first_name }}</button>
+            </form>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% endblock %}

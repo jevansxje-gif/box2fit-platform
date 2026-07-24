@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Cancelled — Box2Fit White Rock{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    <div class="pf-kicker">All done</div>
+    <div class="big">Booking cancelled.</div>
+    <p style="margin:18px 0 4px">The spot has been released. No penalties, ever.</p>
+    <p style="margin:8px 0 0;color:var(--pf-text-2);font-size:15px">Want a different time? <a href="{{ url_for('funnel.landing_youth') }}">Book another free class</a>.</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+# Women — /shehits
+page_title: "She Hits · Women-only boxing — Box2Fit White Rock"
+register: warm
+eyebrow: "She Hits · Women-only boxing"
+headline: "Strong looks"
+headline_accent: "good on you."
+subhead: "She Hits is our women-only boxing class. Build real strength and real confidence in a room that has your back. Beginners welcome, always."
+hero_photo: adult-woman-cables.jpg
+hero_photo_alt: "She Hits training at Box2Fit"
+benefits_eyebrow: "Why She Hits"
+benefits_headline: "A room that has your back."
+benefits:
+  - num: "100%"
+    title: "Women-only room"
+    body: "Train hard in a supportive space led by our She Hits coach."
+    source: "She Hits · women-only class"
+  - num: "3×"
+    title: "A week is all it takes"
+    body: "A sustainable routine that builds real, lasting strength."
+    source: "Recommended class cadence"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "A challenge every session, while keeping the fun."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Led by our She Hits coach"
+coach_headline: "Strong, together."
+coach_body: "Every She Hits session is a challenge that stays welcoming and fun, whether it's your first class or your hundredth. Come as you are, leave stronger."
+coach_photo: woman-flex-logo.jpg
+faqs:
+  - q: "I've never boxed. Is this for me?"
+    a: "Yes. Most She Hits members started with zero experience. Everything is taught from the ground up in a no-pressure environment."
+  - q: "Is it really women-only?"
+    a: "Yes. She Hits is a dedicated women-only class."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+final_kicker: "Train Smarter. Get Results."
+final_headline: "Your first class is on us."
+booking_lede: "Pick a She Hits session. Your first class is free."
+review_tags: ["shehits"]

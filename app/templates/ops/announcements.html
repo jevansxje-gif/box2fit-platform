@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Announcements — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:860px">
+  {{ ops_nav() }}
+  <h1 class="pf-h1" style="margin:0 0 18px">Announcements</h1>
+  <div class="pf-panel" style="margin-top:0">
+    <h2>New announcement</h2>
+    <p class="note">Shows as a banner in the member portal immediately. Emailing respects the news preference and CASL consent.</p>
+    <form method="post" style="display:grid;gap:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:2;min-width:220px"><label class="pf-label">Title</label><input class="pf-input" name="title" required placeholder="Holiday schedule" /></div>
+        <div><label class="pf-label">Audience</label>
+          <select class="pf-select" name="class_type_id"><option value="">Gym-wide</option>
+          {% for c in class_types %}<option value="{{ c.id }}">{{ c.name }} only</option>{% endfor %}</select></div>
+      </div>
+      <div><label class="pf-label">Body</label><textarea class="pf-textarea" name="body" rows="3" required></textarea></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="create" style="justify-self:start">Publish</button>
+    </form>
+  </div>
+  {% for a in rows %}
+  <div class="pf-card pf-card--pad" style="margin-bottom:10px">
+    <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+      <b>{{ a.title }}</b>
+      <span class="pf-chip {{ 'pf-chip--success' if a.active else 'pf-chip--warn' }}">{{ 'live' if a.active else 'off' }}</span>
+      <span class="pf-chip pf-chip--info">{{ type_names.get(a.class_type_id, 'Gym-wide') }}</span>
+      {% if a.emailed_at %}<span class="pf-chip">emailed {{ a.emailed_at.strftime('%b %d') }}</span>{% endif %}
+      <span style="margin-left:auto;color:var(--pf-text-3);font-size:12px">{{ a.created_by }} · {{ a.created_at.strftime('%b %d') }}</span>
+    </div>
+    <p style="margin:8px 0 10px;color:var(--pf-text-2)">{{ a.body }}</p>
+    <form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="id" value="{{ a.id }}" />
+      <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="toggle">{{ 'Unpublish' if a.active else 'Publish' }}</button>
+      {% if a.active and not a.emailed_at %}<button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="email">Email members</button>{% endif %}
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

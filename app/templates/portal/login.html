@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Box2Fit{% endblock %}
+{% block content %}
+<div class="flow" style="max-width:440px">
+  <h1>Member sign-in</h1>
+  <p class="lede">Manage bookings, membership and referrals.</p>
+  <form method="post" class="pf-panel" style="margin-top:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div class="pf-field">
+      <label class="pf-label" for="email">Email</label>
+      <input class="pf-input" id="email" name="email" type="email" autocomplete="username" required />
+    </div>
+    <div class="pf-field">
+      <label class="pf-label" for="password">Password</label>
+      <input class="pf-input" id="password" name="password" type="password" autocomplete="current-password" />
+    </div>
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="submit" name="mode" value="password">Sign in</button>
+    <button class="pf-btn pf-btn--ghost pf-btn--block" type="submit" name="mode" value="magic" style="margin-top:10px">Email me a sign-in link instead</button>
+    <p class="pf-hint" style="margin-top:12px;text-align:center">No password yet? The email link works for every member.</p>
+  </form>
+</div>
+{% endblock %}

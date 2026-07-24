@@ -1,0 +1,29 @@
+{% extends "portal/_base.html" %}
+{% block title %}Waivers — Box2Fit{% endblock %}
+{% block portal %}
+  <div class="pf-kicker">Waivers</div>
+  <h1 class="pf-h1" style="margin:6px 0 20px">Waivers on file</h1>
+  {% for row in status %}
+  <div class="pf-card pf-card--pad" style="margin-bottom:12px">
+    <b>{{ row.attendee.first_name }}</b>
+    {% if row.needs_resign %}
+      <span class="pf-chip pf-chip--warn" style="margin-left:8px">New version needs signing</span>
+      <p style="color:var(--pf-text-2);font-size:14px;margin:10px 0">{{ row.doc.body_md }}</p>
+      <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="attendee_id" value="{{ row.attendee.id }}" />
+        <div class="pf-field" style="flex:1;min-width:220px;margin:0">
+          <label class="pf-label">Type your full legal name to sign</label>
+          <input class="pf-input" name="signature" required />
+        </div>
+        <button class="pf-btn pf-btn--primary">Sign</button>
+      </form>
+    {% elif row.sig %}
+      <span class="pf-chip pf-chip--success" style="margin-left:8px">Signed</span>
+      <p style="color:var(--pf-text-2);font-size:14px;margin:8px 0 0">Signed by {{ row.sig.signature_name }} on {{ row.sig.signed_at.strftime('%B %d, %Y') }}.</p>
+    {% else %}
+      <span class="pf-chip" style="margin-left:8px">None on file</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% endblock %}

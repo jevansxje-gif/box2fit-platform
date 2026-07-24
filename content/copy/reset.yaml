@@ -1,0 +1,41 @@
+# Parents — /reset (second front door for the youth funnel)
+page_title: "Youth Boxing — Box2Fit White Rock"
+register: warm
+eyebrow: "Youth Boxing · Ages 7 to 17"
+headline: "Watch your kid"
+headline_accent: "light up."
+subhead: "Confidence, focus, and real skills in a welcoming, supportive room. The class they actually ask to go to."
+hero_photo: youth-kids-bags.jpg
+hero_photo_alt: "Youth boxing class at Box2Fit"
+benefits_eyebrow: "Why Box2Fit"
+benefits_headline: "The class they ask to go to."
+benefits:
+  - num: "3×"
+    title: "Sessions a week, in their group"
+    body: "Group A trains Mon, Wed, Fri. Group B trains Tue, Thu, Sat. Always 4 PM."
+    source: "Youth program structure"
+  - num: "10+"
+    title: "Years in the community"
+    body: "A family-driven gym trusted by White Rock parents since 2015."
+    source: "Box2Fit · established 2015"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "Parents tell the story better than we can."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Coached by fighters & finishers"
+coach_headline: "A room that has their back."
+coach_body: "Our coaches are great with kids: patient, enthusiastic, and focused on confidence as much as technique. You book and pay; your child trains."
+coach_photo: youth-stretch-circle.jpg
+faqs:
+  - q: "Does my child need any experience?"
+    a: "None at all. Classes are built for beginners and coaches teach proper technique from the very first session."
+  - q: "Is boxing safe for kids?"
+    a: "Youth classes focus on fitness, footwork, pads and bags. Structured, supervised, and non-contact for beginners."
+  - q: "Can I watch the class?"
+    a: "Absolutely. Parents are welcome to stay and watch, especially for the first class."
+  - q: "What should they bring?"
+    a: "Comfortable athletic clothing, indoor shoes, and a water bottle. Gloves and wraps are provided."
+final_kicker: "Train Smarter. Get Results."
+final_headline: "Their first class is on us."
+booking_lede: "Pick their group and a time that fits your family's week. The first class is free."
+review_tags: ["reset", "youth"]

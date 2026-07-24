@@ -1,0 +1,47 @@
+{% extends "funnel/_flow_base.html" %}
+
+{% block flow %}
+  <h1>Save {{ attendee.first_name + "'s" if attendee.kind == 'child' else 'your' }} spot</h1>
+  <p class="lede">
+    <b>{{ booking.class_instance.class_type.name }}</b>, {{ fmt_local(booking.class_instance.starts_at_utc) }} — booked and confirmed.
+  </p>
+
+  <div class="disclosure">{{ disclosure }}</div>
+
+  {% if stripe_configured %}
+    <form id="payment-form">
+      <div id="payment-element"></div>
+      <div id="payment-error" class="pf-err" role="alert"></div>
+      <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" id="submit-btn" type="submit" style="margin-top:18px">Save card</button>
+      <p class="pf-hint" style="text-align:center;margin-top:12px">Card details are handled by Stripe. They never touch our servers.</p>
+    </form>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+      const stripe = Stripe({{ stripe_publishable_key | tojson }});
+      const elements = stripe.elements({ clientSecret: {{ client_secret | tojson }} });
+      elements.create('payment').mount('#payment-element');
+      document.getElementById('payment-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        const { error } = await stripe.confirmSetup({
+          elements,
+          confirmParams: { return_url: {{ return_url | tojson }} },
+        });
+        if (error) {
+          document.getElementById('payment-error').textContent = error.message;
+          btn.disabled = false;
+        }
+      });
+    </script>
+  {% else %}
+    <div class="pf-panel">
+      <h2>Stripe not configured (dev mode)</h2>
+      <p class="note">Set STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY to render the live card element here.</p>
+      <form method="post" action="{{ url_for('funnel.skip_card') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="pf-btn pf-btn--dark" type="submit">Skip card step (dev)</button>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}

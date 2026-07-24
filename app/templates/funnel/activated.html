@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Box2Fit{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    <div class="pf-kicker">Membership starting</div>
+    <div class="big">{% if attendee.kind == 'child' %}{{ attendee.first_name }} is in the crew.{% else %}Welcome to the crew.{% endif %}</div>
+    <p style="margin:18px 0 4px;color:var(--pf-text-2);line-height:1.6">
+      The first charge happens in 48 hours — we just sent a reminder with a one-click cancel link, so nothing is locked in.
+      See you in {{ booking.class_instance.cohort_label or 'class' }}!
+    </p>
+  </div>
+</div>
+{% endblock %}

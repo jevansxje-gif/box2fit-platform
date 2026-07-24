@@ -1,0 +1,38 @@
+{% extends "portal/_base.html" %}
+{% block title %}My classes — Box2Fit{% endblock %}
+{% block portal %}
+  <div class="pf-kicker">My classes</div>
+  <h1 class="pf-h1" style="margin:6px 0 20px">Streaks &amp; sessions</h1>
+
+  <div class="cards-3" style="margin:0 0 20px">
+    {% for a in attendees %}
+    <div class="pf-card pf-card--pad">
+      <b>{{ a.first_name }}</b>
+      <p style="margin:8px 0 0"><span class="bnum" style="font-size:1.8rem">{{ stats[a.id].streak_weeks }}</span> <span style="color:var(--pf-text-2)">week streak</span></p>
+      <p style="margin:4px 0 0;color:var(--pf-text-2);font-size:14px">{{ stats[a.id].month_visits }} visits this month</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="pf-kicker" style="margin-bottom:10px">Upcoming</div>
+  {% if not upcoming %}<div class="pf-card pf-card--pad" style="margin-bottom:18px"><p style="margin:0;color:var(--pf-text-2)">Nothing booked — <a href="{{ url_for('portal.schedule') }}">pick your sessions</a>.</p></div>{% endif %}
+  {% for b in upcoming %}
+  <div class="pf-card" style="margin-bottom:8px;padding:12px 18px;display:flex;gap:12px;align-items:center">
+    <b style="min-width:140px">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</b>
+    <span style="flex:1">{{ b.class_instance.class_type.name }}{% if b.class_instance.cohort_label %} · {{ b.class_instance.cohort_label }}{% endif %} — {{ b.attendee.first_name }}</span>
+    <form method="post" action="{{ url_for('portal.cancel_booking', booking_id=b.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button class="pf-btn pf-btn--ghost pf-btn--sm">Cancel</button>
+    </form>
+  </div>
+  {% endfor %}
+
+  <div class="pf-kicker" style="margin:22px 0 10px">History</div>
+  {% for b in history[:20] %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px">
+    <span style="min-width:140px;font-size:14px">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</span>
+    <span style="flex:1;font-size:14px">{{ b.class_instance.class_type.name }} — {{ b.attendee.first_name }}</span>
+    <span class="pf-chip pf-chip--{{ 'success' if b.status == 'attended' else ('warn' if b.status == 'no_show' else '') }}" style="font-size:11px">{{ b.status.replace('_',' ') }}</span>
+  </div>
+  {% endfor %}
+{% endblock %}

@@ -1,0 +1,801 @@
+"""Ops depth (Pass 4): schedule builder + instance overrides, trainer
+management with conflicts & substitutions, member directory + notes + flags,
+reporting + CSV exports, announcements, review CRUD.
+
+Mounted at /ops alongside the Today view. Dense and fast over decorative,
+per the design brief.
+"""
+import csv
+import io
+import logging
+from collections import defaultdict
+from datetime import date, time, timedelta
+from functools import wraps
+
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required
+
+from ..extensions import db
+from ..models import (
+    Announcement,
+    AttendeeProfile,
+    Booking,
+    BookingStatus,
+    Call,
+    ClassInstance,
+    ClassType,
+    ClosureDate,
+    InstanceStatus,
+    Lead,
+    MemberNote,
+    Payment,
+    Review,
+    Role,
+    ScheduleTemplate,
+    SiteSetting,
+    Subscription,
+    SubscriptionStatus,
+    Trainer,
+    User,
+    WaitlistEntry,
+    utcnow,
+)
+from ..services.messaging import send_email, send_sms
+from ..services.scheduling import booked_counts, generate_instances
+from ..services.tzutil import fmt_local, now_utc, today_local
+from .ops import STAFF_ROLES, staff_required
+
+bp = Blueprint("ops_admin", __name__)
+log = logging.getLogger(__name__)
+
+ADMIN_ROLES = {Role.gym_admin.value, Role.agency_admin.value}
+
+
+def admin_required(fn):
+    @wraps(fn)
+    @login_required
+    def wrapper(*args, **kwargs):
+        if current_user.role not in ADMIN_ROLES:
+            abort(403)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def _cid() -> int:
+    return current_user.client_account_id
+
+
+# ------------------------------------------------------- schedule builder ---
+@bp.route("/schedule-builder", methods=["GET", "POST"])
+@staff_required
+def schedule_builder():
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "add_template":
+            trainer_id = request.form.get("trainer_id", type=int) or None
+            weekday = request.form.get("weekday", type=int)
+            start = time.fromisoformat(request.form.get("start_time"))
+            conflict = _trainer_conflict(trainer_id, weekday, start)
+            if conflict:
+                flash(
+                    f"Conflict: that trainer already leads {conflict} at an "
+                    "overlapping time.",
+                    "error",
+                )
+            else:
+                db.session.add(
+                    ScheduleTemplate(
+                        client_account_id=_cid(),
+                        class_type_id=request.form.get("class_type_id", type=int),
+                        cohort_label=(request.form.get("cohort") or "").strip() or None,
+                        weekday=weekday,
+                        start_time_local=start,
+                        capacity=request.form.get("capacity", type=int) or None,
+                        trainer_id=trainer_id,
+                        active=True,
+                    )
+                )
+                db.session.commit()
+                generate_instances(_cid())
+                db.session.commit()
+                flash("Template added and instances generated.", "success")
+        elif action == "toggle_template":
+            tpl = db.session.get(
+                ScheduleTemplate, request.form.get("template_id", type=int)
+            )
+            if tpl and tpl.client_account_id == _cid():
+                tpl.active = not tpl.active
+                db.session.commit()
+                flash("Template updated.", "success")
+        elif action == "add_closure":
+            db.session.add(
+                ClosureDate(
+                    client_account_id=_cid(),
+                    closed_on=date.fromisoformat(request.form.get("closed_on")),
+                    reason=(request.form.get("reason") or "").strip() or None,
+                )
+            )
+            # remove already-generated instances on that day (no bookings assumed
+            # for future closures; booked ones must be cancelled explicitly)
+            db.session.commit()
+            flash("Closure added — future generation skips this date.", "success")
+        elif action == "generate":
+            created = generate_instances(_cid())
+            db.session.commit()
+            flash(f"{created} instances generated.", "success")
+        return redirect(url_for("ops_admin.schedule_builder"))
+
+    templates = (
+        db.session.query(ScheduleTemplate)
+        .filter_by(client_account_id=_cid())
+        .order_by(ScheduleTemplate.weekday, ScheduleTemplate.start_time_local)
+        .all()
+    )
+    class_types = (
+        db.session.query(ClassType).filter_by(client_account_id=_cid(), active=True).all()
+    )
+    trainers = (
+        db.session.query(Trainer).filter_by(client_account_id=_cid(), active=True).all()
+    )
+    closures = (
+        db.session.query(ClosureDate)
+        .filter(ClosureDate.client_account_id == _cid(), ClosureDate.closed_on >= today_local())
+        .order_by(ClosureDate.closed_on)
+        .all()
+    )
+    instances = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.client_account_id == _cid(),
+            ClassInstance.local_date >= today_local(),
+            ClassInstance.local_date <= today_local() + timedelta(days=14),
+        )
+        .order_by(ClassInstance.local_date, ClassInstance.local_time)
+        .all()
+    )
+    counts = booked_counts([i.id for i in instances])
+    return render_template(
+        "ops/schedule_builder.html",
+        templates=templates,
+        class_types=class_types,
+        trainers=trainers,
+        closures=closures,
+        instances=instances,
+        counts=counts,
+        weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    )
+
+
+def _trainer_conflict(
+    trainer_id: int | None, weekday: int, start: time, exclude_template_id: int | None = None
+) -> str | None:
+    if trainer_id is None:
+        return None
+    for tpl in (
+        db.session.query(ScheduleTemplate)
+        .filter_by(client_account_id=_cid(), trainer_id=trainer_id, weekday=weekday, active=True)
+        .all()
+    ):
+        if tpl.id == exclude_template_id:
+            continue
+        dur = tpl.duration_min or tpl.class_type.duration_min
+        t0 = tpl.start_time_local
+        end_min = t0.hour * 60 + t0.minute + dur
+        new_min = start.hour * 60 + start.minute
+        if t0.hour * 60 + t0.minute <= new_min < end_min or (
+            new_min <= t0.hour * 60 + t0.minute < new_min + dur
+        ):
+            return tpl.class_type.name
+    return None
+
+
+@bp.route("/instances/<int:instance_id>", methods=["GET", "POST"])
+@staff_required
+def instance_edit(instance_id: int):
+    inst = db.session.get(ClassInstance, instance_id) or abort(404)
+    if inst.client_account_id != _cid():
+        abort(404)
+    trainers = (
+        db.session.query(Trainer).filter_by(client_account_id=_cid(), active=True).all()
+    )
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "override":
+            old_trainer_id = inst.trainer_id
+            inst.capacity = request.form.get("capacity", type=int) or inst.capacity
+            inst.room = (request.form.get("room") or "").strip() or None
+            new_trainer_id = request.form.get("trainer_id", type=int) or None
+            if new_trainer_id != old_trainer_id:
+                inst.trainer_id = new_trainer_id
+                _log_substitution(inst, old_trainer_id, new_trainer_id)
+                _notify_substitution(inst)
+            db.session.commit()
+            flash("Instance updated.", "success")
+        elif action == "cancel_class":
+            _cancel_class(inst)
+            db.session.commit()
+            flash("Class cancelled — everyone booked has been notified.", "success")
+            return redirect(url_for("ops_admin.schedule_builder"))
+        return redirect(url_for("ops_admin.instance_edit", instance_id=inst.id))
+    roster = [
+        b
+        for b in inst.bookings
+        if b.status in (BookingStatus.booked.value, BookingStatus.attended.value)
+    ]
+    return render_template(
+        "ops/instance_edit.html", inst=inst, trainers=trainers, roster=roster
+    )
+
+
+def _log_substitution(inst: ClassInstance, old_id: int | None, new_id: int | None):
+    old = db.session.get(Trainer, old_id).name if old_id else "unassigned"
+    new = db.session.get(Trainer, new_id).name if new_id else "unassigned"
+    stamp = f"[{utcnow():%Y-%m-%d %H:%M}] sub: {old} → {new} by {current_user.email}"
+    inst.notes = f"{inst.notes}\n{stamp}" if inst.notes else stamp
+
+
+def _notify_substitution(inst: ClassInstance) -> None:
+    coach = inst.trainer.name if inst.trainer else "a new coach"
+    when = fmt_local(inst.starts_at_utc)
+    for b in inst.bookings:
+        if b.status != BookingStatus.booked.value:
+            continue
+        guardian = b.attendee.guardian
+        send_email(
+            guardian, guardian.email,
+            f"Coach update for {inst.class_type.name} ({when})",
+            render_template(
+                "emails/sub_notice.html",
+                guardian=guardian,
+                attendee=b.attendee,
+                class_name=inst.class_type.name,
+                when=when,
+                coach=coach,
+            ),
+            "sub_notice", inst.client_account_id, attendee_id=b.attendee_id,
+        )
+
+
+def _cancel_class(inst: ClassInstance) -> None:
+    """Cancel with one action: notify booked members, auto-offer the nearest
+    equivalent class, dissolve the waitlist gracefully."""
+    inst.status = InstanceStatus.cancelled.value
+    when = fmt_local(inst.starts_at_utc)
+    alt = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.client_account_id == inst.client_account_id,
+            ClassInstance.class_type_id == inst.class_type_id,
+            ClassInstance.status == InstanceStatus.scheduled.value,
+            ClassInstance.starts_at_utc > inst.starts_at_utc,
+            ClassInstance.id != inst.id,
+        )
+        .order_by(ClassInstance.starts_at_utc)
+        .first()
+    )
+    alt_when = fmt_local(alt.starts_at_utc) if alt else None
+    for b in inst.bookings:
+        if b.status not in (BookingStatus.booked.value,):
+            continue
+        b.status = BookingStatus.cancelled.value
+        b.cancelled_at = utcnow()
+        guardian = b.attendee.guardian
+        send_email(
+            guardian, guardian.email,
+            f"Class cancelled: {inst.class_type.name} ({when})",
+            render_template(
+                "emails/class_cancelled.html",
+                guardian=guardian,
+                attendee=b.attendee,
+                class_name=inst.class_type.name,
+                when=when,
+                alt_when=alt_when,
+            ),
+            "class_cancelled", inst.client_account_id, attendee_id=b.attendee_id,
+        )
+        send_sms(
+            guardian, guardian.phone,
+            f"Box2Fit: {inst.class_type.name} on {when} is cancelled — sorry! "
+            + (f"Nearest equivalent: {alt_when}. Book from your account." if alt_when else "We'll see you at the next one."),
+            "class_cancelled", inst.client_account_id, attendee_id=b.attendee_id,
+        )
+    for w in (
+        db.session.query(WaitlistEntry)
+        .filter(
+            WaitlistEntry.class_instance_id == inst.id,
+            WaitlistEntry.status.in_(["waiting", "offered"]),
+        )
+        .all()
+    ):
+        w.status = "released"
+
+
+# ---------------------------------------------------------------- trainers ---
+@bp.route("/trainers", methods=["GET", "POST"])
+@staff_required
+def trainers():
+    if request.method == "POST":
+        tid = request.form.get("trainer_id", type=int)
+        t = db.session.get(Trainer, tid) if tid else Trainer(client_account_id=_cid())
+        if t.client_account_id != _cid():
+            abort(404)
+        t.name = request.form.get("name", "").strip()
+        t.role_title = request.form.get("role_title", "").strip() or None
+        t.bio = request.form.get("bio", "").strip() or None
+        t.certifications = [
+            c.strip() for c in (request.form.get("certs") or "").split(",") if c.strip()
+        ]
+        t.pay_rate_cents = request.form.get("pay_rate", type=int)  # v1.1-ready
+        t.active = request.form.get("active") == "on"
+        if tid is None:
+            db.session.add(t)
+        db.session.commit()
+        flash("Trainer saved.", "success")
+        return redirect(url_for("ops_admin.trainers"))
+    rows = db.session.query(Trainer).filter_by(client_account_id=_cid()).all()
+    return render_template("ops/trainers.html", trainers=rows)
+
+
+# ------------------------------------------------------- member directory ---
+NOSHOW_FLAG_THRESHOLD = 3  # no-shows in the last 60 days → "high no-show"
+
+
+@bp.get("/members")
+@staff_required
+def members():
+    q = (request.args.get("q") or "").strip().lower()
+    users = (
+        db.session.query(User)
+        .filter_by(client_account_id=_cid(), role=Role.member.value)
+        .order_by(User.created_at.desc())
+        .all()
+    )
+    if q:
+        users = [
+            u
+            for u in users
+            if q in u.name.lower()
+            or q in u.email.lower()
+            or q in (u.phone or "")
+            or any(q in a.first_name.lower() for a in u.attendees)
+        ]
+    rows = [_member_row(u) for u in users[:200]]
+    return render_template("ops/members.html", rows=rows, q=q)
+
+
+def _member_row(u: User) -> dict:
+    subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
+    status = "trial"
+    for s in subs:
+        if s.status in (SubscriptionStatus.active.value, SubscriptionStatus.pending.value):
+            status = s.status
+            break
+        if s.status == SubscriptionStatus.past_due.value:
+            status = "past_due"
+            break
+        if s.status == SubscriptionStatus.cancelled.value:
+            status = "cancelled"
+    ids = [a.id for a in u.attendees] or [0]
+    attended = (
+        db.session.query(Booking)
+        .join(ClassInstance)
+        .filter(
+            Booking.attendee_id.in_(ids),
+            Booking.status == BookingStatus.attended.value,
+        )
+        .order_by(ClassInstance.starts_at_utc.desc())
+        .all()
+    )
+    last_visit = attended[0].class_instance.local_date if attended else None
+    noshows_60d = (
+        db.session.query(Booking)
+        .join(ClassInstance)
+        .filter(
+            Booking.attendee_id.in_(ids),
+            Booking.status == BookingStatus.no_show.value,
+            ClassInstance.local_date >= today_local() - timedelta(days=60),
+        )
+        .count()
+    )
+    lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
+    flags = []
+    if not attended:
+        flags.append("first-timer")
+    elif last_visit and last_visit < today_local() - timedelta(days=14) and status in (
+        "active",
+        "pending",
+    ):
+        flags.append("at-risk")
+    if noshows_60d >= NOSHOW_FLAG_THRESHOLD:
+        flags.append("high no-show")
+    return {
+        "user": u,
+        "status": status,
+        "visits": len(attended),
+        "last_visit": last_visit,
+        "flags": flags,
+        "source": (lead.utm_source or lead.landing_variant) if lead else None,
+        "cohorts": [s.cohort_label for s in subs if s.cohort_label],
+    }
+
+
+@bp.route("/members/<int:user_id>", methods=["GET", "POST"])
+@staff_required
+def member_detail(user_id: int):
+    u = db.session.get(User, user_id) or abort(404)
+    if u.client_account_id != _cid():
+        abort(404)
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "note":
+            body = (request.form.get("body") or "").strip()
+            if body:
+                db.session.add(
+                    MemberNote(
+                        client_account_id=_cid(),
+                        user_id=u.id,
+                        attendee_id=request.form.get("attendee_id", type=int),
+                        author_user_id=current_user.id,
+                        body=body,
+                    )
+                )
+                db.session.commit()
+                flash("Note added.", "success")
+        elif action == "resend_invite":
+            from ..services.signed_links import SALT_SET_PASSWORD, make_token
+            from ..services.urls import absolute_url
+
+            url = absolute_url(
+                "portal.set_password", token=make_token(u.id, SALT_SET_PASSWORD)
+            )
+            send_email(
+                u, u.email, "Your Box2Fit member account",
+                render_template("emails/magic_link.html", user=u, url=url),
+                "invite", _cid(),
+            )
+            u.invited_at = utcnow()
+            db.session.commit()
+            flash("Invite re-sent.", "success")
+        elif action == "cancel_sub":
+            from ..services import billing
+
+            sub = db.session.get(Subscription, request.form.get("sub_id", type=int))
+            if sub and sub.user_id == u.id:
+                billing.cancel_subscription(
+                    sub,
+                    reason=request.form.get("reason") or "staff_initiated",
+                    note=f"by {current_user.email}",
+                )
+                db.session.commit()
+                flash("Membership cancelled.", "success")
+        return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+
+    row = _member_row(u)
+    notes = (
+        db.session.query(MemberNote)
+        .filter_by(user_id=u.id)
+        .order_by(MemberNote.created_at.desc())
+        .all()
+    )
+    authors = {
+        n.author_user_id: db.session.get(User, n.author_user_id).name for n in notes
+    }
+    bookings = (
+        db.session.query(Booking)
+        .join(ClassInstance)
+        .filter(Booking.attendee_id.in_([a.id for a in u.attendees] or [0]))
+        .order_by(ClassInstance.starts_at_utc.desc())
+        .limit(20)
+        .all()
+    )
+    subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
+    lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
+    return render_template(
+        "ops/member_detail.html",
+        u=u,
+        row=row,
+        notes=notes,
+        authors=authors,
+        bookings=bookings,
+        subs=subs,
+        lead=lead,
+    )
+
+
+# ---------------------------------------------------------------- reports ---
+@bp.get("/reports")
+@admin_required
+def reports():
+    start = today_local() - timedelta(days=28)
+    instances = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.client_account_id == _cid(),
+            ClassInstance.local_date >= start,
+            ClassInstance.local_date <= today_local(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+        )
+        .all()
+    )
+    counts = booked_counts([i.id for i in instances])
+
+    # fill heatmap: weekday × hour → avg fill %
+    heat: dict = defaultdict(list)
+    for i in instances:
+        heat[(i.local_date.weekday(), i.local_time.hour)].append(
+            min(1.0, counts.get(i.id, 0) / i.capacity) if i.capacity else 0
+        )
+    heatmap = {k: round(100 * sum(v) / len(v)) for k, v in heat.items()}
+    hours = sorted({h for (_, h) in heatmap})
+
+    # attendance trend, 8 weeks
+    attended = (
+        db.session.query(Booking)
+        .join(ClassInstance)
+        .filter(
+            Booking.client_account_id == _cid(),
+            Booking.status == BookingStatus.attended.value,
+            ClassInstance.local_date >= today_local() - timedelta(weeks=8),
+        )
+        .all()
+    )
+    weekly: dict = defaultdict(int)
+    for b in attended:
+        y, w, _ = b.class_instance.local_date.isocalendar()
+        weekly[f"{y}-W{w:02d}"] += 1
+    trend = sorted(weekly.items())
+
+    # churn by reason
+    churn: dict = defaultdict(int)
+    for s in (
+        db.session.query(Subscription)
+        .filter_by(client_account_id=_cid(), status=SubscriptionStatus.cancelled.value)
+        .all()
+    ):
+        churn[s.cancel_reason or "unknown"] += 1
+
+    # trial funnel by class type and trainer
+    trials = (
+        db.session.query(Booking)
+        .join(ClassInstance)
+        .filter(Booking.client_account_id == _cid(), Booking.kind.in_(["trial", "walkin"]))
+        .all()
+    )
+    activated_attendees = {
+        s.attendee_id
+        for s in db.session.query(Subscription)
+        .filter(Subscription.client_account_id == _cid(), Subscription.activated_at.isnot(None))
+        .all()
+    }
+    tf: dict = defaultdict(lambda: {"booked": 0, "showed": 0, "converted": 0})
+    tf_trainer: dict = defaultdict(lambda: {"booked": 0, "showed": 0, "converted": 0})
+    for b in trials:
+        keys = [b.class_instance.class_type.name]
+        tkeys = [b.class_instance.trainer.name if b.class_instance.trainer else "—"]
+        for k in keys:
+            tf[k]["booked"] += 1
+            if b.status == BookingStatus.attended.value:
+                tf[k]["showed"] += 1
+            if b.attendee_id in activated_attendees:
+                tf[k]["converted"] += 1
+        for k in tkeys:
+            tf_trainer[k]["booked"] += 1
+            if b.status == BookingStatus.attended.value:
+                tf_trainer[k]["showed"] += 1
+            if b.attendee_id in activated_attendees:
+                tf_trainer[k]["converted"] += 1
+
+    # no-show / late-cancel leaders (staff-only view, never member-facing)
+    ns_rows = (
+        db.session.query(Booking)
+        .filter(
+            Booking.client_account_id == _cid(),
+            Booking.status.in_([BookingStatus.no_show.value]),
+        )
+        .all()
+    )
+    lc_rows = (
+        db.session.query(Booking)
+        .filter(Booking.client_account_id == _cid(), Booking.late_cancel.is_(True))
+        .all()
+    )
+    per_member: dict = defaultdict(lambda: {"no_shows": 0, "late_cancels": 0})
+    for b in ns_rows:
+        per_member[b.attendee.display_name]["no_shows"] += 1
+    for b in lc_rows:
+        per_member[b.attendee.display_name]["late_cancels"] += 1
+    ns_report = sorted(
+        per_member.items(),
+        key=lambda kv: -(kv[1]["no_shows"] + kv[1]["late_cancels"]),
+    )[:15]
+
+    mrr = sum(
+        s.mrr_cents
+        for s in db.session.query(Subscription)
+        .filter_by(client_account_id=_cid(), status=SubscriptionStatus.active.value)
+        .all()
+    )
+    return render_template(
+        "ops/reports.html",
+        heatmap=heatmap,
+        hours=hours,
+        trend=trend,
+        churn=sorted(churn.items(), key=lambda kv: -kv[1]),
+        trial_by_class=dict(tf),
+        trial_by_trainer=dict(tf_trainer),
+        ns_report=ns_report,
+        mrr=mrr,
+        weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    )
+
+
+EXPORTS = {
+    "members": (
+        User,
+        ["id", "name", "email", "phone", "role", "consent_email", "consent_sms", "created_at"],
+    ),
+    "leads": (
+        Lead,
+        ["id", "name", "email", "phone", "segment", "status", "utm_source",
+         "utm_medium", "utm_campaign", "utm_content", "landing_variant",
+         "referral_code", "created_at"],
+    ),
+    "bookings": (
+        Booking,
+        ["id", "attendee_id", "class_instance_id", "kind", "status", "late_cancel",
+         "booked_at", "cancelled_at", "checked_in_at"],
+    ),
+    "payments": (
+        Payment,
+        ["id", "user_id", "subscription_id", "stripe_invoice_id", "amount_cents",
+         "agency_share_cents", "refunded_cents", "status", "paid_at"],
+    ),
+    "subscriptions": (
+        Subscription,
+        ["id", "user_id", "attendee_id", "cohort_label", "status", "mrr_cents",
+         "activated_at", "cancelled_at", "cancel_reason"],
+    ),
+    "calls": (
+        Call,
+        ["id", "tracking_number", "caller_number", "duration_sec", "started_at",
+         "matched_lead_id", "outcome"],
+    ),
+}
+
+
+@bp.get("/export/<name>.csv")
+@admin_required
+def export_csv(name: str):
+    if name not in EXPORTS:
+        abort(404)
+    model, cols = EXPORTS[name]
+    rows = db.session.query(model).filter_by(client_account_id=_cid()).all() \
+        if hasattr(model, "client_account_id") else db.session.query(model).all()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([getattr(r, c) for c in cols])
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={name}.csv"},
+    )
+
+
+# ----------------------------------------------------------- announcements ---
+@bp.route("/announcements", methods=["GET", "POST"])
+@staff_required
+def announcements():
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "create":
+            db.session.add(
+                Announcement(
+                    client_account_id=_cid(),
+                    title=request.form.get("title", "").strip(),
+                    body=request.form.get("body", "").strip(),
+                    class_type_id=request.form.get("class_type_id", type=int) or None,
+                    created_by=current_user.email,
+                )
+            )
+            db.session.commit()
+            flash("Announcement live — it now shows in the portal.", "success")
+        elif action == "toggle":
+            a = db.session.get(Announcement, request.form.get("id", type=int))
+            if a and a.client_account_id == _cid():
+                a.active = not a.active
+                db.session.commit()
+        elif action == "email":
+            a = db.session.get(Announcement, request.form.get("id", type=int))
+            if a and a.client_account_id == _cid():
+                sent = _email_announcement(a)
+                db.session.commit()
+                flash(f"Announcement emailed to {sent} members (consent + news pref respected).", "success")
+        return redirect(url_for("ops_admin.announcements"))
+    rows = (
+        db.session.query(Announcement)
+        .filter_by(client_account_id=_cid())
+        .order_by(Announcement.created_at.desc())
+        .all()
+    )
+    class_types = db.session.query(ClassType).filter_by(client_account_id=_cid()).all()
+    type_names = {c.id: c.name for c in class_types}
+    return render_template(
+        "ops/announcements.html", rows=rows, class_types=class_types, type_names=type_names
+    )
+
+
+def _email_announcement(a: Announcement) -> int:
+    members = (
+        db.session.query(User)
+        .filter_by(client_account_id=_cid(), role=Role.member.value, active=True)
+        .all()
+    )
+    sent = 0
+    for m in members:
+        prefs = {"news": True, **(m.notify_prefs or {})}
+        if not prefs.get("news"):
+            continue
+        msg = send_email(
+            m, m.email, a.title,
+            render_template("emails/announcement.html", user=m, a=a),
+            "announcement", _cid(), transactional=False,  # respects CASL consent
+        )
+        if msg.delivery_status != "suppressed_no_consent":
+            sent += 1
+    a.emailed_at = utcnow()
+    return sent
+
+
+# ----------------------------------------------------------------- reviews ---
+@bp.route("/reviews", methods=["GET", "POST"])
+@staff_required
+def reviews():
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "save":
+            rid = request.form.get("id", type=int)
+            r = db.session.get(Review, rid) if rid else Review(client_account_id=_cid())
+            if r.client_account_id != _cid():
+                abort(404)
+            r.reviewer_name = request.form.get("reviewer_name", "").strip()
+            r.quote_text = request.form.get("quote_text", "").strip()  # verbatim!
+            r.rating = request.form.get("rating", type=int) or 5
+            r.segment_tags = request.form.get("segment_tags", "").strip()
+            r.display_order = request.form.get("display_order", type=int) or 0
+            r.active = request.form.get("active") == "on"
+            if rid is None:
+                db.session.add(r)
+            db.session.commit()
+            flash("Review saved.", "success")
+        elif action == "badge":
+            SiteSetting.set("google_rating", request.form.get("google_rating", "5.0"))
+            SiteSetting.set(
+                "google_review_count", request.form.get("google_review_count", "0")
+            )
+            db.session.commit()
+            flash("Aggregate badge updated.", "success")
+        return redirect(url_for("ops_admin.reviews"))
+    rows = (
+        db.session.query(Review)
+        .filter_by(client_account_id=_cid())
+        .order_by(Review.display_order, Review.id)
+        .all()
+    )
+    return render_template(
+        "ops/reviews.html",
+        rows=rows,
+        google_rating=SiteSetting.get("google_rating", "5.0"),
+        google_review_count=SiteSetting.get("google_review_count", "0"),
+    )

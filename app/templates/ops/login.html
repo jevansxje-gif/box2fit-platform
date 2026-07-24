@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Staff login — Box2Fit Ops{% endblock %}
+
+{% block content %}
+<div class="flow" style="max-width:440px">
+  <h1>Staff login</h1>
+  <p class="lede">Front desk, trainers and gym admin.</p>
+  <form method="post" class="pf-panel" style="margin-top:0">
+    {{ form.csrf_token }}
+    <div class="pf-field">
+      {{ form.email.label(class="pf-label") }}{{ form.email(class="pf-input", type="email", autocomplete="username") }}
+    </div>
+    <div class="pf-field">
+      {{ form.password.label(class="pf-label") }}{{ form.password(class="pf-input", autocomplete="current-password") }}
+    </div>
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

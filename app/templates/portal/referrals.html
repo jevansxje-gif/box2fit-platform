@@ -1,0 +1,30 @@
+{% extends "portal/_base.html" %}
+{% block title %}Referrals — Box2Fit{% endblock %}
+{% block portal %}
+  <div style="max-width:560px">
+  <div class="pf-kicker">Refer a friend</div>
+  <h1 class="pf-h1" style="margin:6px 0 8px">Share the room.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">Friends who join through your link get their first class free (as always) and you get the credit when the reward program kicks in.</p>
+
+  <div class="pf-card pf-card--pad" style="text-align:center;margin-bottom:14px">
+    <div class="pf-kicker" style="color:var(--pf-text-3)">Your code</div>
+    <p style="margin:8px 0;font-weight:900;font-size:34px;letter-spacing:.03em">{{ code }}</p>
+    <p style="margin:0 0 14px;color:var(--pf-text-2);font-size:13px;word-break:break-all">{{ share_url }}</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="pf-btn pf-btn--dark pf-btn--sm" onclick="navigator.clipboard.writeText('{{ share_url }}');this.textContent='Copied!'">Copy link</button>
+      <a class="pf-btn pf-btn--ghost pf-btn--sm" href="mailto:?subject=Try%20Box2Fit%20with%20me&body={{ share_url | urlencode }}">Email</a>
+      <a class="pf-btn pf-btn--ghost pf-btn--sm" href="sms:?body={{ share_url | urlencode }}">Text</a>
+    </div>
+  </div>
+
+  <div class="pf-kicker" style="margin-bottom:10px">Your referrals</div>
+  {% for l in referred %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px">
+    <span style="flex:1">{{ l.name.split(' ')[0] }} {{ l.name.split(' ')[1][0] + '.' if l.name.split(' ')|length > 1 }}</span>
+    <span class="pf-chip pf-chip--{{ 'success' if l.status == 'activated' else 'info' }}">{{ l.status }}</span>
+  </div>
+  {% else %}
+  <p style="color:var(--pf-text-2)">No referrals yet — send that link!</p>
+  {% endfor %}
+  </div>
+{% endblock %}

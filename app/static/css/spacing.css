@@ -1,0 +1,36 @@
+/* ============================================================
+   SPACING & RADIUS — Box2Fit White Rock Health
+   4px base grid. Generous by default — white space is the brand.
+   ============================================================ */
+:root {
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* Generous editorial gutters for slides / pages */
+  --gutter-slide: 96px;
+  --gutter-page:  64px;
+
+  /* ---- Radii (soft, premium — not pill-everything) ---- */
+  --radius-xs:  6px;
+  --radius-sm:  10px;
+  --radius-md:  16px;
+  --radius-lg:  22px;
+  --radius-xl:  28px;
+  --radius-pill: 999px;
+
+  /* ---- Container widths ---- */
+  --maxw-prose: 64ch;
+  --maxw-content: 1180px;
+}

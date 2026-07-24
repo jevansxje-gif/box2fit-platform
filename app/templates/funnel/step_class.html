@@ -1,0 +1,38 @@
+{% extends "funnel/_flow_base.html" %}
+
+{% block flow %}
+  <h1>Pick their free class</h1>
+  <p class="lede">Choose the age group and a time that fits your week. The first class is free.</p>
+
+  {% if not occurrences %}
+    <div class="pf-panel"><h2>No upcoming classes posted yet</h2>
+    <p class="note">Call us at <a href="tel:+17783846284">(778) 384-6284</a> and we'll get you in.</p></div>
+  {% endif %}
+
+  {% set ns = namespace(day=None) %}
+  {% for o in occurrences %}
+    {% if o.instance.local_date != ns.day %}
+      {% set ns.day = o.instance.local_date %}
+      <div class="day-lbl">{{ o.instance.local_date.strftime('%A · %b %d') }}</div>
+    {% endif %}
+    <form method="post">
+      {{ form.csrf_token }}
+      <div class="hp-field" aria-hidden="true">{{ form.website(tabindex="-1", autocomplete="off") }}</div>
+      <input type="hidden" name="instance_id" value="{{ o.instance.id }}" />
+      <button class="slot" type="submit" {{ 'disabled' if o.remaining == 0 }}>
+        <span class="t">{{ o.instance.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+        <span class="nm">
+          <b>{{ o.instance.class_type.name }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</b>
+          <span>{{ o.instance.class_type.age_bracket_label() or 'All levels' }}{% if o.instance.trainer %} · {{ o.instance.trainer.name }}{% endif %}</span>
+        </span>
+        {% if o.remaining == 0 %}
+          <span class="pf-chip pf-chip--warn">Full</span>
+        {% elif o.remaining <= 3 %}
+          <span class="pf-chip pf-chip--red">{{ o.remaining }} spots left</span>
+        {% else %}
+          <span class="pf-chip pf-chip--success">{{ o.remaining }} spots open</span>
+        {% endif %}
+      </button>
+    </form>
+  {% endfor %}
+{% endblock %}

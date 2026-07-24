@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Schedule builder — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1000px">
+  {{ ops_nav() }}
+  <h1 class="pf-h1" style="margin:0 0 18px">Schedule builder</h1>
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px">
+    <h2 class="pf-h3" style="margin:0 0 12px">Weekly templates</h2>
+    {% for t in templates %}
+    <div class="roster-row">
+      <span style="min-width:44px;font-weight:800">{{ weekdays[t.weekday] }}</span>
+      <span style="min-width:82px;font-variant-numeric:tabular-nums">{{ t.start_time_local.strftime('%I:%M %p').lstrip('0') }}</span>
+      <span style="flex:1"><b>{{ t.class_type.name }}</b>{% if t.cohort_label %} · {{ t.cohort_label }}{% endif %}{% if t.trainer %} · {{ t.trainer.name }}{% endif %}</span>
+      <span class="pf-chip {{ 'pf-chip--success' if t.active else 'pf-chip--warn' }}">{{ 'active' if t.active else 'off' }}</span>
+      <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="template_id" value="{{ t.id }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="toggle_template">{{ 'Deactivate' if t.active else 'Activate' }}</button></form>
+    </div>
+    {% endfor %}
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:14px;padding-top:14px;border-top:1px solid var(--pf-line)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Class</label>
+        <select class="pf-select" name="class_type_id" style="min-width:170px">{% for c in class_types %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="Group C" style="width:110px" /></div>
+      <div><label class="pf-label">Day</label>
+        <select class="pf-select" name="weekday">{% for d in weekdays %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}</select></div>
+      <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="16:00" required /></div>
+      <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="12" style="width:80px" /></div>
+      <div><label class="pf-label">Trainer</label>
+        <select class="pf-select" name="trainer_id"><option value="">—</option>{% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add template</button>
+    </form>
+  </div>
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px">
+    <h2 class="pf-h3" style="margin:0 0 12px">Closures</h2>
+    {% for c in closures %}<span class="pf-chip pf-chip--warn" style="margin:0 6px 6px 0">{{ c.closed_on }} {{ c.reason or '' }}</span>{% endfor %}
+    <form method="post" style="display:flex;gap:10px;align-items:end;margin-top:10px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Date</label><input class="pf-input" type="date" name="closed_on" required /></div>
+      <div style="flex:1"><label class="pf-label">Reason</label><input class="pf-input" name="reason" placeholder="Holiday" /></div>
+      <button class="pf-btn pf-btn--dark" name="action" value="add_closure">Add closure</button>
+      <button class="pf-btn pf-btn--ghost" name="action" value="generate">Regenerate instances</button>
+    </form>
+  </div>
+
+  <h2 class="pf-h3" style="margin:0 0 12px">Next 14 days ({{ instances|length }} classes)</h2>
+  {% set ns = namespace(day=None) %}
+  {% for i in instances %}
+    {% if i.local_date != ns.day %}{% set ns.day = i.local_date %}<div class="day-lbl">{{ i.local_date.strftime('%A · %b %d') }}</div>{% endif %}
+    <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px;{{ 'opacity:.5' if i.status == 'cancelled' }}">
+      <span style="min-width:82px;font-weight:800;font-variant-numeric:tabular-nums">{{ i.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+      <span style="flex:1"><b>{{ i.class_type.name }}</b>{% if i.cohort_label %} · {{ i.cohort_label }}{% endif %}{% if i.trainer %} · {{ i.trainer.name }}{% endif %}{% if i.room %} · {{ i.room }}{% endif %}</span>
+      {% if i.status == 'cancelled' %}<span class="pf-chip pf-chip--warn">cancelled</span>
+      {% else %}<span class="pf-chip">{{ counts.get(i.id, 0) }}/{{ i.capacity }}</span>{% endif %}
+      <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.instance_edit', instance_id=i.id) }}">Edit</a>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

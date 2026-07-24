@@ -1,0 +1,73 @@
+{% extends "portal/_base.html" %}
+{% block title %}My Box2Fit{% endblock %}
+{% block portal %}
+  <div class="pf-kicker">My Box2Fit</div>
+  <h1 class="pf-h1" style="margin:6px 0 20px">Hi, {{ current_user.name.split(' ')[0] }}</h1>
+
+  {% for a in announcements %}
+  <div class="disclosure" style="margin-bottom:14px"><b>{{ a.title }}</b> — {{ a.body }}</div>
+  {% endfor %}
+
+  {% if past_due %}
+  <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
+    Quick card update needed to book new classes — existing bookings are safe.
+    <a class="pf-btn pf-btn--primary pf-btn--sm" href="{{ url_for('portal.update_card', token=card_token) }}" style="margin-left:10px">Update card</a>
+  </div>
+  {% endif %}
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px">
+    <div class="pf-kicker" style="color:var(--pf-text-3)">Next class</div>
+    {% if next_booking %}
+      <h2 class="pf-h2" style="margin:8px 0 4px">{{ next_booking.class_instance.class_type.name }}{% if next_booking.class_instance.cohort_label %} · {{ next_booking.class_instance.cohort_label }}{% endif %}</h2>
+      <p style="margin:0;color:var(--pf-red);font-weight:800">{{ fmt_local(next_booking.class_instance.starts_at_utc) }}</p>
+      <p style="margin:6px 0 0;color:var(--pf-text-2);font-size:14px">{{ next_booking.attendee.first_name }} is booked. See you there!</p>
+    {% else %}
+      <h2 class="pf-h2" style="margin:8px 0 4px">Nothing booked yet</h2>
+      <p style="margin:0 0 12px;color:var(--pf-text-2)">Pick the sessions you're coming to this week.</p>
+      <a class="pf-btn pf-btn--primary" href="{{ url_for('portal.schedule') }}">Open the schedule</a>
+    {% endif %}
+  </div>
+
+  {% if quick %}
+  <div class="pf-kicker" style="margin-bottom:10px">Quick book</div>
+  <div class="cards-3" style="margin-top:0;margin-bottom:18px">
+    {% for o in quick %}
+    <div class="pf-card pf-card--pad">
+      <b>{{ o.instance.class_type.name }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</b>
+      <p style="margin:4px 0 10px;color:var(--pf-text-2);font-size:14px">{{ fmt_local(o.instance.starts_at_utc) }} · {{ o.remaining }} spots open</p>
+      <form method="post" action="{{ url_for('portal.create_booking') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="instance_id" value="{{ o.instance.id }}" />
+        <input type="hidden" name="attendee_id" value="{{ attendees[0].id if attendees }}" />
+        <button class="pf-btn pf-btn--dark pf-btn--sm" {{ 'disabled' if not attendees }}>Book {{ attendees[0].first_name if attendees }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="cards-3" style="margin-top:0">
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Membership</div>
+      {% for a in attendees %}
+        <p style="margin:8px 0 0"><b>{{ a.first_name }}</b> —
+        {% set s = sub_by_attendee.get(a.id) %}
+        {% if s %}<span class="pf-chip pf-chip--{{ 'success' if s.status == 'active' else ('warn' if s.status == 'past_due' else 'info') }}">{{ s.status.replace('_', ' ') }}{% if s.cohort_label %} · {{ s.cohort_label }}{% endif %}</span>
+        {% else %}<span class="pf-chip">trial</span>{% endif %}</p>
+      {% endfor %}
+      <a href="{{ url_for('portal.membership') }}" style="display:inline-block;margin-top:12px">Manage membership →</a>
+    </div>
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Refer a friend</div>
+      <p style="margin:8px 0 4px;font-weight:900;font-size:22px;letter-spacing:.02em">{{ referral_code }}</p>
+      <p style="margin:0;color:var(--pf-text-2);font-size:14px">Share your code — first class is on us.</p>
+      <a href="{{ url_for('portal.referrals') }}" style="display:inline-block;margin-top:12px">Share it →</a>
+    </div>
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Settings</div>
+      <p style="margin:8px 0 0;color:var(--pf-text-2);font-size:14px">Notifications, consents, and waivers on file.</p>
+      <a href="{{ url_for('portal.settings') }}" style="display:inline-block;margin-top:12px">Preferences →</a><br />
+      <a href="{{ url_for('portal.waivers') }}" style="display:inline-block;margin-top:6px">Waivers →</a>
+    </div>
+  </div>
+{% endblock %}

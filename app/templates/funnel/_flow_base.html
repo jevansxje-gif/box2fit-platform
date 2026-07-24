@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Book a free class — Box2Fit White Rock{% endblock %}
+
+{% block content %}
+<div class="flow">
+  <div class="pf-steps">
+    <div class="seg{{ ' done' if step > 1 else (' now' if step == 1) }}"></div>
+    <div class="seg{{ ' done' if step > 2 else (' now' if step == 2) }}"></div>
+    <div class="seg{{ ' done' if step > 3 else (' now' if step == 3) }}"></div>
+  </div>
+  <div class="steps-lbl"><span>Pick a class</span><span>Who's attending</span><span>Save the spot</span></div>
+  {% block flow %}{% endblock %}
+</div>
+{% endblock %}

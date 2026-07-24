@@ -1,0 +1,14 @@
+/* ============================================================
+   FONTS
+   White Rock Health uses two Google-Fonts families as stand-ins
+   for the brand's web type (the brand's exact licensed fonts were
+   not provided). Swap the @import + --font-* tokens when supplied.
+
+   - Spectral  : warm literary serif — editorial display, pull quotes,
+                 the positioning line. The "premium, calm" register.
+   - Hanken Grotesk : confident humanist sans — UI, body, ad headlines.
+                 The "motivating, clear" register.
+   The athletic Box2Fit wordmark (logo asset) supplies the bold
+   collegiate moment; we do NOT recreate it in a font.
+   ============================================================ */
+@import url("https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700;800;900&display=swap");

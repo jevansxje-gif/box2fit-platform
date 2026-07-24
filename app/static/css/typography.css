@@ -1,0 +1,56 @@
+/* ============================================================
+   TYPOGRAPHY — Box2Fit White Rock Health
+   Serif (Spectral) = premium editorial display + quotes.
+   Sans  (Hanken Grotesk) = UI, body, motivating ad headlines.
+   ============================================================ */
+:root {
+  /* ---- Families ---- */
+  --font-serif: "Spectral", Georgia, "Times New Roman", serif;
+  --font-sans:  "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans); /* motivating headlines lead in sans */
+  --font-body:    var(--font-sans);
+
+  /* ---- Weights ---- */
+  --fw-regular: 400;  /* @kind font */
+  --fw-medium:  500;  /* @kind font */
+  --fw-semibold:600;  /* @kind font */
+  --fw-bold:    700;  /* @kind font */
+  --fw-extra:   800;  /* @kind font */
+  --fw-black:   900;  /* @kind font */
+
+  /* ---- Type scale (fluid-friendly base, px) ---- */
+  --fs-display: 88px;  /* hero / cover */
+  --fs-h1:      56px;
+  --fs-h2:      40px;
+  --fs-h3:      28px;
+  --fs-h4:      22px;
+  --fs-lead:    21px;  /* intro paragraph */
+  --fs-body:    17px;
+  --fs-small:   15px;
+  --fs-caption: 13px;
+  --fs-eyebrow: 13px;  /* uppercase label */
+
+  /* ---- Line heights ---- */
+  --lh-tight:   1.02;  /* @kind font */
+  --lh-snug:    1.12;  /* @kind font */
+  --lh-heading: 1.06;  /* @kind font */
+  --lh-body:    1.55;  /* @kind font */
+  --lh-relaxed: 1.65;  /* @kind font */
+
+  /* ---- Letter spacing ---- */
+  --ls-tight:   -0.025em;  /* @kind font */
+  --ls-snug:    -0.012em;  /* @kind font */
+  --ls-normal:  0;         /* @kind font */
+  --ls-eyebrow: 0.14em;  /* @kind font */
+  --ls-label:   0.06em;   /* @kind font */
+}
+
+/* Eyebrow / kicker convenience (uppercase brand label) */
+.b2f-eyebrow {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-extra);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--b2f-red);
+}

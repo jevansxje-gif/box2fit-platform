@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Members — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1000px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:16px">
+    <h1 class="pf-h1" style="margin:0">Members</h1>
+    <form method="get" style="display:flex;gap:8px">
+      <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:280px;min-height:44px" autofocus />
+      <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
+    </form>
+  </div>
+  {% for r in rows %}
+  <a href="{{ url_for('ops_admin.member_detail', user_id=r.user.id) }}" class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:12px 16px;margin-bottom:6px;text-decoration:none;color:inherit">
+    <div class="who" style="flex:1.4">
+      <b>{{ r.user.name }}</b>
+      <span>{{ r.user.email }} · {{ r.user.phone or '—' }}{% if r.user.attendees %} · kids: {{ r.user.attendees|selectattr('kind','equalto','child')|map(attribute='first_name')|join(', ') or '—' }}{% endif %}</span>
+    </div>
+    <span class="pf-chip pf-chip--{{ 'success' if r.status == 'active' else ('warn' if r.status in ('past_due','cancelled') else 'info') }}">{{ r.status.replace('_',' ') }}</span>
+    {% for c in r.cohorts %}<span class="pf-chip pf-chip--ink">{{ c }}</span>{% endfor %}
+    {% for f in r.flags %}<span class="pf-chip pf-chip--{{ 'red' if f == 'first-timer' else 'warn' }}">{{ f }}</span>{% endfor %}
+    <span style="color:var(--pf-text-2);font-size:13px;min-width:130px;text-align:right">{{ r.visits }} visits{% if r.last_visit %} · last {{ r.last_visit.strftime('%b %d') }}{% endif %}</span>
+  </a>
+  {% else %}
+  <p style="color:var(--pf-text-2)">No members match.</p>
+  {% endfor %}
+</div>
+{% endblock %}

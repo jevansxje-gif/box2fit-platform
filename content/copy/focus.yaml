@@ -1,0 +1,41 @@
+# Professionals — /focus (books the midday Reset classes)
+page_title: "Fitness Boxing — Box2Fit White Rock"
+register: warm
+eyebrow: "Fitness Boxing · Lunch & after-work"
+headline: "Your inbox can't"
+headline_accent: "follow you here."
+subhead: "One hour to switch off, sweat it out, and reset. The most efficient hour on your calendar. All levels, no experience needed."
+hero_photo: pro-battle-ropes.jpg
+hero_photo_alt: "Battle ropes training at Box2Fit"
+benefits_eyebrow: "Why Box2Fit"
+benefits_headline: "The most efficient hour you'll spend."
+benefits:
+  - num: "60"
+    title: "Minutes, in and out"
+    body: "Warm-up, technique, work, done. No wandering between machines."
+    source: "One-hour class format"
+  - num: "3×"
+    title: "A week is all it takes"
+    body: "A sustainable routine that builds real, lasting fitness."
+    source: "Recommended class cadence"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "A killer workout in a safe, comfortable environment."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Coached by fighters & finishers"
+coach_headline: "Switch off. Swing hard."
+coach_body: "Boxing demands full attention, which is exactly why it clears your head like nothing else. Tight, structured sessions that meet you at your level and push you just past it."
+coach_photo: pt-resistance-band.jpg
+faqs:
+  - q: "Do I need any experience?"
+    a: "None at all. Our classes are built for all levels and coaches teach proper technique from your very first session."
+  - q: "How long is a class?"
+    a: "One hour, start to finish. Arrive 10 minutes early for your first session and we'll get you set up."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock, minutes from uptown White Rock and South Surrey."
+final_kicker: "Train Smarter. Get Results."
+final_headline: "Your first class is on us."
+booking_lede: "Pick a midday class that fits around work. Your first one is free."
+review_tags: ["focus"]

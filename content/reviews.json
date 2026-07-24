@@ -1,0 +1,79 @@
+{
+  "_note": "Verified from the Box2Fit White Rock Google Business Profile (screenshots provided by client). Quotes are VERBATIM — do not paraphrase. Attribute as first name + initial. 'audience' tags which campaign segment each quote suits.",
+  "business": {
+    "name": "BOX2FIT White Rock",
+    "rating": 5.0,
+    "count": 28,
+    "category": "Boxing gym",
+    "address": "1522 Finlay St Unit 216, White Rock",
+    "phone": "(778) 384-6284",
+    "source": "Google"
+  },
+  "reviews": [
+    {
+      "name": "Nadia G.",
+      "audience": ["active-adults", "women"],
+      "quote": "My mom and I joined Box2Fit a little over a month ago, and it's truly one of the best decisions we've made! The coaches are incredibly encouraging, welcoming, and kind."
+    },
+    {
+      "name": "Deanna R.",
+      "audience": ["active-adults", "women"],
+      "quote": "My husband and I wanted to try something different than your regular gym workout and let me tell you it has been worth every moment and penny."
+    },
+    {
+      "name": "Michelle A.",
+      "audience": ["parents", "teens"],
+      "quote": "My son loves the BOX2FIT kids class! All the trainers have been great with him. It's a welcoming and supportive environment. He is always excited to go."
+    },
+    {
+      "name": "Kathleen C.",
+      "audience": ["parents", "teens"],
+      "quote": "My son is very sheltered and extremely hard to motivate. She got my son out of his shell and is super enthusiastic for his next class and to grow in boxing."
+    },
+    {
+      "name": "Lindsey K.",
+      "audience": ["parents", "teens"],
+      "quote": "My son has been doing the boxing classes for kids for just over a year now and he loves it! I have seen an improvement in all the other sports he does."
+    },
+    {
+      "name": "Pro K.",
+      "audience": ["teens", "parents"],
+      "quote": "After a long time my son is finally enjoying, learning, and getting a proper workout! I highly recommend this place for all ages."
+    },
+    {
+      "name": "Elena G.",
+      "audience": ["women"],
+      "quote": "I entered the boxing world not knowing anything and the first lesson I felt wonderful. Everything was explained thoroughly, making it a non-stressful and fun environment. 10/10 would recommend!"
+    },
+    {
+      "name": "Alana K.",
+      "audience": ["women"],
+      "quote": "Wonderful environment whether you're a beginner or have experience. Esmeralda makes each session a challenge while keeping the fun!"
+    },
+    {
+      "name": "Michael B.",
+      "audience": ["professionals", "active-adults"],
+      "quote": "Perfect place for anyone wanting to learn how to box or simply have fun and have an amazing workout! No experience needed."
+    },
+    {
+      "name": "G. A.",
+      "audience": ["professionals"],
+      "quote": "Box2Fit is the best boxing gym! The coaches are amazing and you get a killer workout in a safe and comfortable environment."
+    },
+    {
+      "name": "Faraz N.",
+      "audience": ["beast-mode", "professionals"],
+      "quote": "Box2Fit is a knockout! The best workouts, top-notch coaches! Highly recommend!"
+    },
+    {
+      "name": "Dan B.",
+      "audience": ["beast-mode"],
+      "quote": "Best boxing gym in Surrey! Will take you from beginner to advanced while learning how to box properly and efficiently. 100% recommend."
+    },
+    {
+      "name": "Sandcastle F.",
+      "audience": ["beast-mode", "active-adults"],
+      "quote": "Amazing classes, helped me get in my best shape in years. Coach Esmeralda has such great energy and is very motivating."
+    }
+  ]
+}

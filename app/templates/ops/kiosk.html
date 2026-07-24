@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Check in — Box2Fit{% endblock %}
+{% block content %}
+<style>
+  .kiosk { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
+  .kiosk h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; font-size: clamp(2.2rem, 6vw, 3.4rem); margin: 0 0 20px; }
+  .kiosk .pf-input { font-size: 26px; min-height: 74px; text-align: center; }
+  .kiosk .match { display: flex; align-items: center; gap: 14px; width: 100%; background: #fff; border: 2px solid var(--pf-line-2); border-radius: var(--pf-r-lg); padding: 20px 22px; margin-top: 12px; font-size: 22px; cursor: pointer; }
+  .kiosk .match:hover { border-color: var(--pf-ink); }
+  .kiosk-success { background: var(--pf-success); color: #fff; border-radius: var(--pf-r-xl); padding: 70px 30px; }
+  .kiosk-success .name { font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 8vw, 4.4rem); line-height: 1; }
+  .kiosk-success .msg { font-size: 24px; margin-top: 14px; font-weight: 700; }
+  .kiosk-first { background: var(--pf-red); }
+</style>
+<div class="kiosk">
+  {% if result %}
+    <div class="kiosk-success {{ 'kiosk-first' if result.first_time }}">
+      <div class="name">{{ 'Great to have you,' if result.first_time else 'Welcome back,' }}<br />{{ result.attendee.first_name }}!</div>
+      <div class="msg">{{ 'First class — a coach will come say hi!' if result.first_time else "You're checked in." }}</div>
+    </div>
+    <a class="pf-btn pf-btn--dark pf-btn--lg" href="{{ url_for('ops.kiosk') }}" style="margin-top:26px">Next member</a>
+  {% else %}
+    <h1>Check in</h1>
+    <form method="post" action="{{ url_for('ops.kiosk_search') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input class="pf-input" name="q" value="{{ query }}" placeholder="Type your first name…" autofocus autocomplete="off" />
+      <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" style="margin-top:14px">Find me</button>
+    </form>
+    {% if matches is defined %}
+      {% for b in matches %}
+      <form method="post" action="{{ url_for('ops.kiosk_checkin', booking_id=b.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="match">
+          <b style="flex:1;text-align:left">{{ b.attendee.first_name }} {{ (b.attendee.last_name or '')[:1] }}{{ '.' if b.attendee.last_name }}</b>
+          <span style="color:var(--pf-text-2);font-size:16px">{{ b.class_instance.local_time.strftime('%I:%M %p').lstrip('0') }} {{ b.class_instance.class_type.name }}</span>
+          {% if b.status == 'attended' %}<span class="pf-chip pf-chip--success">Checked in</span>{% endif %}
+        </button>
+      </form>
+      {% else %}
+        {% if query %}<p style="margin-top:18px;font-size:19px;color:var(--pf-text-2)">No booking found for "{{ query }}" today. Walk-ins welcome — grab a coach or <a href="{{ url_for('funnel.step_class', segment='youth', source='walkin') }}">sign up here</a>.</p>{% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

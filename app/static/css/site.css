@@ -27,6 +27,9 @@ img{ display:block; max-width:100%; }
 .hero-photo{ border-radius:var(--pf-r-xl); box-shadow:var(--pf-sh-lg); aspect-ratio:4/5; object-fit:cover; width:100%; }
 .hero-cta{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:28px; }
 .hero .pf-google{ margin-top:22px; }
+/* the badge is a white pill — pin its text to ink regardless of section */
+.pf-google{ color:var(--pf-ink); }
+.pf-google span{ color:var(--pf-ink); }
 
 .section{ padding:64px 0; }
 .section-head{ max-width:560px; }

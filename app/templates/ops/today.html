@@ -24,6 +24,37 @@
     </div>
   </div>
 
+  <div class="pf-card ops-class">
+    <div class="head">
+      <b>New sign-ups</b>
+      <span class="pf-chip pf-chip--red">{{ recent_signups|length }}</span>
+      <span style="color:var(--pf-text-2);font-size:13px">last {{ signup_window_days }} days · free first classes</span>
+    </div>
+    <div class="ops-roster">
+      {% for b in recent_signups %}
+      <div class="roster-row">
+        <div class="who">
+          <b>{{ b.attendee.first_name }} {{ b.attendee.last_name or '' }}
+            {% if b.attendee.kind == 'child' %}<span class="pf-chip pf-chip--info" style="font-size:11px;padding:4px 8px">child</span>{% endif %}
+            {% if b.ipad_walkin %}<span class="pf-chip" style="font-size:11px;padding:4px 8px">walk-in</span>{% endif %}
+          </b>
+          <span>
+            {% if b.attendee.kind == 'child' %}Guardian: {{ b.attendee.guardian.name }} · {{ b.attendee.guardian.phone }}{% else %}{{ b.attendee.guardian.phone }}{% endif %}
+            · signed up {{ fmt_local(b.booked_at, '%a %b %d') }}
+          </span>
+        </div>
+        <span style="font-size:14px;color:var(--pf-ink);font-weight:700;white-space:nowrap">
+          → {{ b.class_instance.local_date.strftime('%a %b %d') }} · {{ b.class_instance.local_time.strftime('%I:%M %p').lstrip('0') }}
+          {% if b.class_instance.cohort_label %}· {{ b.class_instance.cohort_label }}{% endif %}
+        </span>
+        <span class="pf-chip pf-chip--{{ 'success' if b.status == 'attended' else ('warn' if b.status in ('cancelled', 'no_show') else 'info') }}" style="font-size:11px">{{ b.status.replace('_',' ') }}</span>
+      </div>
+      {% else %}
+      <div class="roster-row"><span style="color:var(--pf-text-3);font-size:14px">No new sign-ups in the last {{ signup_window_days }} days.</span></div>
+      {% endfor %}
+    </div>
+  </div>
+
   {% if not instances %}
     <div class="pf-panel"><h2>No classes today</h2><p class="note">The schedule generator fills instances nightly; run the seed if this is a fresh install.</p></div>
   {% endif %}

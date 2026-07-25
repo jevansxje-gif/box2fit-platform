@@ -74,11 +74,29 @@ def logout():
     return redirect(url_for("ops.login"))
 
 
+SIGNUP_WINDOW_DAYS = 7  # how far back the Today view's sign-ups panel looks
+
+
 @bp.get("/")
 @bp.get("/today")
 @staff_required
 def today():
+    from datetime import timedelta
+
+    from ..models import BookingKind, utcnow
+
     d = today_local()
+    recent_signups = (
+        db.session.query(Booking)
+        .filter(
+            Booking.client_account_id == current_user.client_account_id,
+            Booking.kind.in_([BookingKind.trial.value, BookingKind.walkin.value]),
+            Booking.booked_at >= utcnow() - timedelta(days=SIGNUP_WINDOW_DAYS),
+        )
+        .order_by(Booking.booked_at.desc())
+        .limit(25)
+        .all()
+    )
     instances = (
         db.session.query(ClassInstance)
         .filter(
@@ -108,6 +126,8 @@ def today():
         counts=counts,
         rosters=rosters,
         today=d,
+        recent_signups=recent_signups,
+        signup_window_days=SIGNUP_WINDOW_DAYS,
     )
 
 

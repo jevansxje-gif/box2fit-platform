@@ -120,6 +120,25 @@ def test_substitution_notifies_members(app, client, client_account):
     assert "Coach Sub" in notice.body_preview
 
 
+def test_today_view_shows_new_signups(app, client, client_account):
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    staff = app.test_client()
+    staff.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
+    r = staff.get("/ops/today")
+    assert b"New sign-ups" in r.data
+    assert b"Maya" in r.data
+    assert b"Guardian: Sam Parent" in r.data
+    # shows which day they signed up for (the class date)
+    assert instance.local_date.strftime("%a %b %d").encode() in r.data
+    # a cancelled signup still shows, chipped as cancelled
+    booking = db.session.query(Booking).one()
+    booking.status = BookingStatus.cancelled.value
+    db.session.commit()
+    r = staff.get("/ops/today")
+    assert b"cancelled" in r.data
+
+
 # ------------------------------------------------- directory, notes, flags ---
 def test_member_directory_flags_and_notes(app, client, client_account):
     instance = _first_instance(client_account)

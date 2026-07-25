@@ -83,17 +83,21 @@ def _seed():
     db.session.add_all([kids, teens])
     db.session.flush()
 
-    # One weekly template per type on tomorrow's weekday, late in the day so
-    # generated instances are always in the future during the test run.
-    tomorrow = today_local() + timedelta(days=1)
+    # One weekly template per type, timed ~23h from NOW (local) so the first
+    # generated instance is always inside the T-24h reminder window but
+    # outside T-2h — regardless of what time of day the suite runs.
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    target = datetime.now(ZoneInfo("America/Vancouver")) + timedelta(hours=23)
     for ct, cohort in ((kids, "Group A"), (teens, "Group B")):
         db.session.add(
             ScheduleTemplate(
                 client_account_id=ca.id,
                 class_type_id=ct.id,
                 cohort_label=cohort,
-                weekday=tomorrow.weekday(),
-                start_time_local=time(11, 0),
+                weekday=target.date().weekday(),
+                start_time_local=time(target.hour, 0),
                 trainer_id=trainer.id,
                 active=True,
             )

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Schedule — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:900px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px">
+    <h1 class="pf-h1" style="margin:0">Schedule</h1>
+    <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.schedule_builder') }}">Edit in Builder →</a>
+  </div>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">Active classes for the next 14 days. Deactivated classes and coaches never appear here.</p>
+
+  {% if not by_day %}
+  <div class="pf-panel"><h2>Nothing scheduled</h2><p class="note">Add weekly templates in the Builder tab and regenerate.</p></div>
+  {% endif %}
+
+  {% for day, occs in by_day.items() %}
+  <div class="pf-card ops-class">
+    <div class="head"><b>{{ day.strftime('%A · %B %d') }}</b><span class="pf-chip" style="margin-left:auto">{{ occs|length }} classes</span></div>
+    <div class="ops-roster">
+      {% for o in occs %}
+      <div class="roster-row">
+        <span style="min-width:84px;font-weight:800;font-variant-numeric:tabular-nums">{{ o.instance.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+        <div class="who">
+          <b>{{ o.instance.class_type.name }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</b>
+          <span>{{ o.instance.class_type.age_bracket_label() or 'All levels' }}{% if o.instance.trainer and o.instance.trainer.active %} · {{ o.instance.trainer.name }}{% else %} · <em>coach TBA</em>{% endif %}{% if o.instance.room %} · {{ o.instance.room }}{% endif %}</span>
+        </div>
+        {% if o.remaining == 0 %}<span class="pf-chip pf-chip--warn">Full</span>
+        {% elif o.remaining <= 3 %}<span class="pf-chip pf-chip--red">{{ o.remaining }} left</span>
+        {% else %}<span class="pf-chip pf-chip--success">{{ o.instance.capacity - o.remaining }}/{{ o.instance.capacity }} booked</span>{% endif %}
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.instance_edit', instance_id=o.instance.id) }}">Edit</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -117,15 +117,23 @@ def upcoming_instances(
     days: int = 14,
     trials_only: bool = False,
 ) -> list[dict]:
+    from sqlalchemy import or_
+
     q = (
         db.session.query(ClassInstance)
         .join(ClassType, ClassInstance.class_type_id == ClassType.id)
+        .outerjoin(ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id)
         .filter(
             ClassInstance.client_account_id == client_account_id,
             ClassInstance.status == InstanceStatus.scheduled.value,
             ClassInstance.starts_at_utc > now_utc(),
             ClassInstance.local_date <= today_local() + timedelta(days=days),
             ClassType.active.is_(True),
+            # instances of a deactivated weekly template never show
+            or_(
+                ClassInstance.template_id.is_(None),
+                ScheduleTemplate.active.is_(True),
+            ),
         )
     )
     if segment_tag:

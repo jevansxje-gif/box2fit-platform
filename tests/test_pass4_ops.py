@@ -97,6 +97,70 @@ def test_schedule_builder_and_cancel_class(app, client, client_account):
     assert db.session.query(WaitlistEntry).one().status == "released"
 
 
+def test_deactivate_template_removes_future_classes(app, client, client_account):
+    from app.models import ScheduleTemplate
+    from app.services.scheduling import upcoming_instances
+
+    staff = _admin(app)
+    instance = _first_instance(client_account, "kids_7_10")
+    _book_child(client, instance)  # one booked occurrence + one empty next week
+    tpl = db.session.get(ScheduleTemplate, instance.template_id)
+
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={"action": "toggle_template", "template_id": tpl.id},
+        follow_redirects=True,
+    )
+    assert b"deactivated" in r.data
+
+    # gone from every schedule surface
+    with app.test_request_context():
+        occ = upcoming_instances(client_account.id, segment_tag="youth")
+    assert all(o["instance"].class_type.key != "kids_7_10" for o in occ)
+    assert b"Kids Boxing" not in staff.get("/ops/schedule").data  # live tab
+    assert b"Kids Boxing" not in client.get("/book/youth").data   # funnel picker
+
+    # the booked occurrence was cancelled WITH member notification
+    db.session.refresh(instance)
+    assert instance.status == InstanceStatus.cancelled.value
+    assert db.session.query(Message).filter_by(template="class_cancelled").count() >= 1
+
+    # reactivating puts the classes back
+    staff.post(
+        "/ops/schedule-builder",
+        data={"action": "toggle_template", "template_id": tpl.id},
+    )
+    with app.test_request_context():
+        occ = upcoming_instances(client_account.id, segment_tag="youth")
+    assert any(o["instance"].class_type.key == "kids_7_10" for o in occ)
+
+
+def test_deactivate_trainer_unassigns_everywhere(app, client, client_account):
+    from app.models import ScheduleTemplate, Trainer
+
+    staff = _admin(app)
+    trainer = db.session.query(Trainer).first()
+    assert b"Coach Alex T." in staff.get("/ops/schedule").data
+
+    # save with the Active checkbox unticked → deactivation
+    r = staff.post(
+        "/ops/trainers",
+        data={
+            "trainer_id": trainer.id, "name": trainer.name,
+            "role_title": "", "certs": "", "bio": "",
+        },
+        follow_redirects=True,
+    )
+    assert b"unassigned" in r.data
+    assert all(
+        t.trainer_id != trainer.id
+        for t in db.session.query(ScheduleTemplate).all()
+    )
+    page = staff.get("/ops/schedule").data
+    assert b"Coach Alex T." not in page
+    assert b"coach TBA" in page
+
+
 def test_substitution_notifies_members(app, client, client_account):
     from app.models import Trainer
 

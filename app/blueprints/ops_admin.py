@@ -75,6 +75,22 @@ def _cid() -> int:
     return current_user.client_account_id
 
 
+# ----------------------------------------------------------- live schedule ---
+@bp.get("/schedule")
+@staff_required
+def live_schedule():
+    """The ACTUAL schedule: active classes only (active class types, active
+    templates, scheduled status), active coaches only. Building/editing lives
+    in the separate Builder tab."""
+    from ..services.scheduling import upcoming_instances
+
+    occurrences = upcoming_instances(_cid(), days=14)
+    by_day: dict = {}
+    for o in occurrences:
+        by_day.setdefault(o["instance"].local_date, []).append(o)
+    return render_template("ops/live_schedule.html", by_day=by_day)
+
+
 # ------------------------------------------------------- schedule builder ---
 @bp.route("/schedule-builder", methods=["GET", "POST"])
 @staff_required
@@ -115,8 +131,18 @@ def schedule_builder():
             )
             if tpl and tpl.client_account_id == _cid():
                 tpl.active = not tpl.active
-                db.session.commit()
-                flash("Template updated.", "success")
+                if tpl.active:
+                    db.session.commit()
+                    generate_instances(_cid())
+                    db.session.commit()
+                    flash("Template reactivated — classes are back on the schedule.", "success")
+                else:
+                    removed, cancelled = _remove_future_instances(tpl.id)
+                    db.session.commit()
+                    msg = f"Template deactivated — {removed} upcoming classes removed from the schedule."
+                    if cancelled:
+                        msg += f" {cancelled} had bookings: members were notified and offered the nearest class."
+                    flash(msg, "success")
         elif action == "add_closure":
             db.session.add(
                 ClosureDate(
@@ -153,12 +179,20 @@ def schedule_builder():
         .order_by(ClosureDate.closed_on)
         .all()
     )
+    from sqlalchemy import or_
+
     instances = (
         db.session.query(ClassInstance)
+        .outerjoin(ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id)
         .filter(
             ClassInstance.client_account_id == _cid(),
             ClassInstance.local_date >= today_local(),
             ClassInstance.local_date <= today_local() + timedelta(days=14),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+            or_(
+                ClassInstance.template_id.is_(None),
+                ScheduleTemplate.active.is_(True),
+            ),
         )
         .order_by(ClassInstance.local_date, ClassInstance.local_time)
         .all()
@@ -174,6 +208,40 @@ def schedule_builder():
         counts=counts,
         weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     )
+
+
+def _remove_future_instances(template_id: int) -> tuple[int, int]:
+    """When a weekly template is deactivated, its future classes leave the
+    calendar: booked ones are cancelled WITH member notification, empty ones
+    are deleted outright. Returns (total_removed, cancelled_with_bookings)."""
+    future = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.template_id == template_id,
+            ClassInstance.local_date >= today_local(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+        )
+        .all()
+    )
+    removed = cancelled = 0
+    for inst in future:
+        has_bookings = any(
+            b.status == BookingStatus.booked.value for b in inst.bookings
+        )
+        if has_bookings:
+            _cancel_class(inst)  # notifies members, dissolves waitlist
+            cancelled += 1
+        else:
+            for w in db.session.query(WaitlistEntry).filter_by(
+                class_instance_id=inst.id
+            ):
+                w.status = "released"
+            if inst.bookings:  # historical rows reference it — keep, cancelled
+                inst.status = InstanceStatus.cancelled.value
+            else:
+                db.session.delete(inst)
+        removed += 1
+    return removed, cancelled
 
 
 def _trainer_conflict(
@@ -336,11 +404,34 @@ def trainers():
             c.strip() for c in (request.form.get("certs") or "").split(",") if c.strip()
         ]
         t.pay_rate_cents = request.form.get("pay_rate", type=int)  # v1.1-ready
+        was_active = t.active if tid else True
         t.active = request.form.get("active") == "on"
         if tid is None:
             db.session.add(t)
+        unassigned = 0
+        if was_active and not t.active and tid:
+            # Inactive coaches never show anywhere: unassign from templates
+            # and all future classes.
+            for tpl in db.session.query(ScheduleTemplate).filter_by(
+                client_account_id=_cid(), trainer_id=t.id
+            ):
+                tpl.trainer_id = None
+                unassigned += 1
+            for inst in db.session.query(ClassInstance).filter(
+                ClassInstance.client_account_id == _cid(),
+                ClassInstance.trainer_id == t.id,
+                ClassInstance.local_date >= today_local(),
+            ):
+                inst.trainer_id = None
         db.session.commit()
-        flash("Trainer saved.", "success")
+        if unassigned:
+            flash(
+                f"Trainer saved and unassigned from {unassigned} weekly slots "
+                "and all upcoming classes.",
+                "success",
+            )
+        else:
+            flash("Trainer saved.", "success")
         return redirect(url_for("ops_admin.trainers"))
     rows = db.session.query(Trainer).filter_by(client_account_id=_cid()).all()
     return render_template("ops/trainers.html", trainers=rows)

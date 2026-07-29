@@ -106,12 +106,11 @@ def seed():
         db.session.flush()
     print(f"client account: {client.name} (commission {client.commission_rate})")
 
-    trainers = []
-    for name, role_title, certs in TRAINERS:
-        t = db.session.query(Trainer).filter_by(
-            client_account_id=client.id, name=name
-        ).one_or_none()
-        if t is None:
+    # Placeholder coaches seed ONLY into an empty roster — once real trainers
+    # exist (added via ops), re-seeding never resurrects the placeholders.
+    trainers = db.session.query(Trainer).filter_by(client_account_id=client.id).all()
+    if not trainers:
+        for name, role_title, certs in TRAINERS:
             t = Trainer(
                 client_account_id=client.id,
                 name=name,
@@ -121,8 +120,10 @@ def seed():
             )
             db.session.add(t)
             db.session.flush()
-        trainers.append(t)
-    print(f"trainers: {len(trainers)}")
+            trainers.append(t)
+        print(f"trainers: {len(trainers)} placeholders (empty roster)")
+    else:
+        print(f"trainers: {len(trainers)} existing, none added")
 
     types = {}
     for key, name, seg, amin, amax, dur, cap in CLASS_TYPES:
@@ -179,7 +180,9 @@ def seed():
                     cohort_label=cohort,
                     weekday=weekday,
                     start_time_local=t_local,
-                    trainer_id=trainers[trainer_idx].id,
+                    trainer_id=trainers[trainer_idx].id
+                    if trainer_idx < len(trainers)
+                    else None,
                     active=True,
                 )
             )

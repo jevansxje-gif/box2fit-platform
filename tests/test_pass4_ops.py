@@ -230,6 +230,25 @@ def test_add_weekly_class_on_multiple_days(app, client, client_account):
     assert b"Pick at least one day" in r.data
 
 
+def test_delete_trainer_unassigns_and_removes(app, client, client_account):
+    from app.models import ScheduleTemplate, Trainer
+
+    staff = _admin(app)
+    trainer = db.session.query(Trainer).first()  # seeded, assigned to templates
+    tid = trainer.id
+    r = staff.post(
+        "/ops/trainers",
+        data={"action": "delete", "trainer_id": str(tid)},
+        follow_redirects=True,
+    )
+    assert b"deleted and unassigned" in r.data
+    assert db.session.get(Trainer, tid) is None
+    assert (
+        db.session.query(ScheduleTemplate).filter_by(trainer_id=tid).count() == 0
+    )
+    assert db.session.query(ClassInstance).filter_by(trainer_id=tid).count() == 0
+
+
 def test_bulk_assign_coach_and_daily_override(app, client, client_account):
     from app.models import ScheduleTemplate, Trainer
 

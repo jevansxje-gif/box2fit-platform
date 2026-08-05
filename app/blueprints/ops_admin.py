@@ -585,6 +585,21 @@ def _notify_substitution(inst: ClassInstance) -> None:
 @bp.route("/trainers", methods=["GET", "POST"])
 @staff_required
 def trainers():
+    if request.method == "POST" and request.form.get("action") == "delete":
+        t = db.session.get(Trainer, request.form.get("trainer_id", type=int))
+        if t is None or t.client_account_id != _cid():
+            abort(404)
+        # Deleting removes them everywhere: unassign from all weekly slots
+        # and every class occurrence (past ones show "—" in reports).
+        for tpl in db.session.query(ScheduleTemplate).filter_by(trainer_id=t.id):
+            tpl.trainer_id = None
+        for inst in db.session.query(ClassInstance).filter_by(trainer_id=t.id):
+            inst.trainer_id = None
+        name = t.name
+        db.session.delete(t)
+        db.session.commit()
+        flash(f"{name} deleted and unassigned from all classes.", "success")
+        return redirect(url_for("ops_admin.trainers"))
     if request.method == "POST":
         tid = request.form.get("trainer_id", type=int)
         t = db.session.get(Trainer, tid) if tid else Trainer(client_account_id=_cid())

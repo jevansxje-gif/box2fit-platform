@@ -85,6 +85,10 @@ def today():
 
     from ..models import BookingKind, utcnow
 
+    from sqlalchemy import or_
+
+    from ..models import ScheduleTemplate
+
     d = today_local()
     recent_signups = (
         db.session.query(Booking)
@@ -99,10 +103,17 @@ def today():
     )
     instances = (
         db.session.query(ClassInstance)
+        .outerjoin(ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id)
         .filter(
             ClassInstance.client_account_id == current_user.client_account_id,
             ClassInstance.local_date == d,
             ClassInstance.status == InstanceStatus.scheduled.value,
+            # deactivated weekly templates never show, even for legacy
+            # instances generated before the deactivation
+            or_(
+                ClassInstance.template_id.is_(None),
+                ScheduleTemplate.active.is_(True),
+            ),
         )
         .order_by(ClassInstance.local_time)
         .all()
@@ -169,16 +180,27 @@ def kiosk_search():
     from ..models import ClassInstance, InstanceStatus
     from ..services.tzutil import today_local
 
+    from sqlalchemy import or_
+
+    from ..models import ScheduleTemplate
+
     query = (request.form.get("q") or "").strip().lower()
     matches = []
     if len(query) >= 2:
         rows = (
             db.session.query(Booking)
             .join(ClassInstance, Booking.class_instance_id == ClassInstance.id)
+            .outerjoin(
+                ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id
+            )
             .filter(
                 Booking.client_account_id == current_user.client_account_id,
                 ClassInstance.local_date == today_local(),
                 ClassInstance.status == InstanceStatus.scheduled.value,
+                or_(
+                    ClassInstance.template_id.is_(None),
+                    ScheduleTemplate.active.is_(True),
+                ),
                 Booking.status.in_(
                     [BookingStatus.booked.value, BookingStatus.attended.value]
                 ),

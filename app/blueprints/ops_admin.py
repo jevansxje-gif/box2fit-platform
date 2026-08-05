@@ -49,6 +49,11 @@ from ..models import (
     WaitlistEntry,
     utcnow,
 )
+from ..services.class_admin import (
+    cancel_class as _cancel_class,
+    prune_inactive_template_instances,
+    remove_future_instances as _remove_future_instances,
+)
 from ..services.messaging import send_email, send_sms
 from ..services.scheduling import booked_counts, generate_instances
 from ..services.tzutil import fmt_local, now_utc, today_local
@@ -157,8 +162,12 @@ def schedule_builder():
             flash("Closure added — future generation skips this date.", "success")
         elif action == "generate":
             created = generate_instances(_cid())
+            pruned = prune_inactive_template_instances(_cid())
             db.session.commit()
-            flash(f"{created} instances generated.", "success")
+            msg = f"{created} instances generated."
+            if pruned:
+                msg += f" {pruned} stale classes of deactivated templates removed."
+            flash(msg, "success")
         return redirect(url_for("ops_admin.schedule_builder"))
 
     templates = (
@@ -208,40 +217,6 @@ def schedule_builder():
         counts=counts,
         weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     )
-
-
-def _remove_future_instances(template_id: int) -> tuple[int, int]:
-    """When a weekly template is deactivated, its future classes leave the
-    calendar: booked ones are cancelled WITH member notification, empty ones
-    are deleted outright. Returns (total_removed, cancelled_with_bookings)."""
-    future = (
-        db.session.query(ClassInstance)
-        .filter(
-            ClassInstance.template_id == template_id,
-            ClassInstance.local_date >= today_local(),
-            ClassInstance.status == InstanceStatus.scheduled.value,
-        )
-        .all()
-    )
-    removed = cancelled = 0
-    for inst in future:
-        has_bookings = any(
-            b.status == BookingStatus.booked.value for b in inst.bookings
-        )
-        if has_bookings:
-            _cancel_class(inst)  # notifies members, dissolves waitlist
-            cancelled += 1
-        else:
-            for w in db.session.query(WaitlistEntry).filter_by(
-                class_instance_id=inst.id
-            ):
-                w.status = "released"
-            if inst.bookings:  # historical rows reference it — keep, cancelled
-                inst.status = InstanceStatus.cancelled.value
-            else:
-                db.session.delete(inst)
-        removed += 1
-    return removed, cancelled
 
 
 def _trainer_conflict(
@@ -332,60 +307,6 @@ def _notify_substitution(inst: ClassInstance) -> None:
             ),
             "sub_notice", inst.client_account_id, attendee_id=b.attendee_id,
         )
-
-
-def _cancel_class(inst: ClassInstance) -> None:
-    """Cancel with one action: notify booked members, auto-offer the nearest
-    equivalent class, dissolve the waitlist gracefully."""
-    inst.status = InstanceStatus.cancelled.value
-    when = fmt_local(inst.starts_at_utc)
-    alt = (
-        db.session.query(ClassInstance)
-        .filter(
-            ClassInstance.client_account_id == inst.client_account_id,
-            ClassInstance.class_type_id == inst.class_type_id,
-            ClassInstance.status == InstanceStatus.scheduled.value,
-            ClassInstance.starts_at_utc > inst.starts_at_utc,
-            ClassInstance.id != inst.id,
-        )
-        .order_by(ClassInstance.starts_at_utc)
-        .first()
-    )
-    alt_when = fmt_local(alt.starts_at_utc) if alt else None
-    for b in inst.bookings:
-        if b.status not in (BookingStatus.booked.value,):
-            continue
-        b.status = BookingStatus.cancelled.value
-        b.cancelled_at = utcnow()
-        guardian = b.attendee.guardian
-        send_email(
-            guardian, guardian.email,
-            f"Class cancelled: {inst.class_type.name} ({when})",
-            render_template(
-                "emails/class_cancelled.html",
-                guardian=guardian,
-                attendee=b.attendee,
-                class_name=inst.class_type.name,
-                when=when,
-                alt_when=alt_when,
-            ),
-            "class_cancelled", inst.client_account_id, attendee_id=b.attendee_id,
-        )
-        send_sms(
-            guardian, guardian.phone,
-            f"Box2Fit: {inst.class_type.name} on {when} is cancelled — sorry! "
-            + (f"Nearest equivalent: {alt_when}. Book from your account." if alt_when else "We'll see you at the next one."),
-            "class_cancelled", inst.client_account_id, attendee_id=b.attendee_id,
-        )
-    for w in (
-        db.session.query(WaitlistEntry)
-        .filter(
-            WaitlistEntry.class_instance_id == inst.id,
-            WaitlistEntry.status.in_(["waiting", "offered"]),
-        )
-        .all()
-    ):
-        w.status = "released"
 
 
 # ---------------------------------------------------------------- trainers ---

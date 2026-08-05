@@ -135,6 +135,50 @@ def test_deactivate_template_removes_future_classes(app, client, client_account)
     assert any(o["instance"].class_type.key == "kids_7_10" for o in occ)
 
 
+def test_today_hides_and_prunes_legacy_inactive_template_instances(
+    app, client, client_account
+):
+    """Instances generated BEFORE their template was deactivated (pre-update
+    orphans) must not show on Today/kiosk, and the prune sweep removes them."""
+    from datetime import time as dtime
+
+    from app.models import ClassType, ScheduleTemplate
+    from app.services.class_admin import prune_inactive_template_instances
+    from app.services.tzutil import local_to_utc, today_local
+
+    ct = ClassType(
+        client_account_id=client_account.id,
+        key="legacy", name="Legacy Orphan Boxing", segment_tag="strong",
+        duration_min=45, default_capacity=10,
+    )
+    db.session.add(ct)
+    db.session.flush()
+    tpl = ScheduleTemplate(
+        client_account_id=client_account.id, class_type_id=ct.id,
+        weekday=today_local().weekday(), start_time_local=dtime(23, 50),
+        active=False,  # deactivated — but its instance below already exists
+    )
+    db.session.add(tpl)
+    db.session.flush()
+    orphan = ClassInstance(
+        client_account_id=client_account.id, template_id=tpl.id,
+        class_type_id=ct.id, starts_at_utc=local_to_utc(today_local(), dtime(23, 50)),
+        local_date=today_local(), local_time=dtime(23, 50),
+        duration_min=45, capacity=10,
+    )
+    db.session.add(orphan)
+    db.session.commit()
+
+    staff = _admin(app)
+    assert b"Legacy Orphan Boxing" not in staff.get("/ops/today").data
+    assert b"Legacy Orphan Boxing" not in staff.get("/ops/schedule").data
+
+    pruned = prune_inactive_template_instances(client_account.id)
+    db.session.commit()
+    assert pruned == 1
+    assert db.session.get(ClassInstance, orphan.id) is None  # empty → deleted
+
+
 def test_deactivate_trainer_unassigns_everywhere(app, client, client_account):
     from app.models import ScheduleTemplate, Trainer
 

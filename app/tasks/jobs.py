@@ -128,9 +128,12 @@ def match_unmatched_calls() -> int:
 
 @shared_task(name="app.tasks.jobs.generate_all_schedules")
 def generate_all_schedules() -> int:
+    from ..services.class_admin import prune_inactive_template_instances
+
     total = 0
     for client in db.session.query(ClientAccount).filter_by(active=True).all():
         total += generate_instances(client.id)
+        prune_inactive_template_instances(client.id)
     db.session.commit()
     return total
 

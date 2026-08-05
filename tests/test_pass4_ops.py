@@ -71,7 +71,8 @@ def test_schedule_builder_and_cancel_class(app, client, client_account):
         },
         follow_redirects=True,
     )
-    assert b"Conflict" in r.data
+    assert b"coach already leads" in r.data
+    assert b"Nothing added" in r.data
 
     # cancel a class with a booking → member notified, waitlist dissolved
     instance = _first_instance(client_account)
@@ -179,6 +180,54 @@ def test_add_new_class_type_and_schedule_it(app, client, client_account):
     )
     assert b"upcoming classes removed" in r.data
     assert b"Dance Fit" not in staff.get("/ops/schedule").data
+
+
+def test_add_weekly_class_on_multiple_days(app, client, client_account):
+    """Group-style scheduling: one add places the class on several days
+    (e.g. Mon/Wed/Fri) in a single action."""
+    from app.models import ClassType, ScheduleTemplate
+
+    staff = _admin(app)
+    she = ClassType(
+        client_account_id=client_account.id, key="she_hits", name="She Hits",
+        segment_tag="shehits", duration_min=60, default_capacity=16,
+    )
+    db.session.add(she)
+    db.session.commit()
+
+    from werkzeug.datastructures import MultiDict
+
+    r = staff.post(
+        "/ops/schedule-builder",
+        data=MultiDict(
+            [
+                ("action", "add_template"),
+                ("class_type_id", str(she.id)), ("cohort", ""),
+                ("weekdays", "0"), ("weekdays", "2"), ("weekdays", "4"),
+                ("start_time", "18:00"), ("capacity", ""), ("trainer_id", ""),
+            ]
+        ),
+        follow_redirects=True,
+    )
+    assert b"repeats every Monday, Wednesday, Friday at 6:00 PM" in r.data
+    tpls = db.session.query(ScheduleTemplate).filter_by(class_type_id=she.id).all()
+    assert sorted(t.weekday for t in tpls) == [0, 2, 4]
+    assert all(t.start_time_local.hour == 18 for t in tpls)
+
+    # occurrences exist on all three weekdays
+    rows = db.session.query(ClassInstance).filter_by(class_type_id=she.id).all()
+    assert {i.local_date.weekday() for i in rows} == {0, 2, 4}
+
+    # no days picked → friendly error
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "add_template", "class_type_id": str(she.id),
+            "cohort": "", "start_time": "18:00", "capacity": "",
+        },
+        follow_redirects=True,
+    )
+    assert b"Pick at least one day" in r.data
 
 
 def test_move_weekly_class_time_keeps_bookings_and_notifies(

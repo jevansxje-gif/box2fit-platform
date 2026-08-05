@@ -104,48 +104,66 @@ def schedule_builder():
         action = request.form.get("action")
         if action == "add_template":
             trainer_id = request.form.get("trainer_id", type=int) or None
-            weekday = request.form.get("weekday", type=int)
+            # Multi-day add: checkboxes send weekdays[]; single "weekday"
+            # kept as a fallback.
+            weekdays = request.form.getlist("weekdays", type=int)
+            if not weekdays:
+                single = request.form.get("weekday", type=int)
+                weekdays = [single] if single is not None else []
             start = time.fromisoformat(request.form.get("start_time"))
-            conflict = _trainer_conflict(trainer_id, weekday, start)
-            if conflict:
-                flash(
-                    f"Conflict: that trainer already leads {conflict} at an "
-                    "overlapping time.",
-                    "error",
-                )
-            else:
+            day_names = [
+                "Monday", "Tuesday", "Wednesday", "Thursday",
+                "Friday", "Saturday", "Sunday",
+            ]
+            if not weekdays:
+                flash("Pick at least one day of the week.", "error")
+                return redirect(url_for("ops_admin.schedule_builder"))
+
+            new_ids, skipped = [], []
+            for wd in sorted(set(weekdays)):
+                conflict = _trainer_conflict(trainer_id, wd, start)
+                if conflict:
+                    skipped.append(f"{day_names[wd]} (coach already leads {conflict})")
+                    continue
                 tpl = ScheduleTemplate(
                     client_account_id=_cid(),
                     class_type_id=request.form.get("class_type_id", type=int),
                     cohort_label=(request.form.get("cohort") or "").strip() or None,
-                    weekday=weekday,
+                    weekday=wd,
                     start_time_local=start,
                     capacity=request.form.get("capacity", type=int) or None,
                     trainer_id=trainer_id,
                     active=True,
                 )
                 db.session.add(tpl)
-                db.session.commit()
+                db.session.flush()
+                new_ids.append(tpl.id)
+            db.session.commit()
+            if new_ids:
                 generate_instances(_cid())
                 db.session.commit()
                 placed = (
                     db.session.query(ClassInstance)
-                    .filter_by(template_id=tpl.id)
+                    .filter(ClassInstance.template_id.in_(new_ids))
                     .order_by(ClassInstance.local_date)
                     .all()
                 )
-                weekday_name = [
-                    "Monday", "Tuesday", "Wednesday", "Thursday",
-                    "Friday", "Saturday", "Sunday",
-                ][weekday]
-                dates = ", ".join(i.local_date.strftime("%b %d") for i in placed)
-                flash(
-                    f"{tpl.class_type.name} now repeats every {weekday_name} at "
-                    f"{start.strftime('%I:%M %p').lstrip('0')} — {len(placed)} "
-                    f"classes placed on the calendar ({dates}), and future weeks "
-                    "keep generating automatically.",
-                    "success",
+                first = db.session.get(ScheduleTemplate, new_ids[0])
+                added_days = ", ".join(
+                    day_names[db.session.get(ScheduleTemplate, i).weekday]
+                    for i in new_ids
                 )
+                msg = (
+                    f"{first.class_type.name} now repeats every {added_days} at "
+                    f"{start.strftime('%I:%M %p').lstrip('0')} — {len(placed)} "
+                    "classes placed on the calendar, and future weeks keep "
+                    "generating automatically."
+                )
+                if skipped:
+                    msg += " Skipped: " + "; ".join(skipped) + "."
+                flash(msg, "success")
+            elif skipped:
+                flash("Nothing added — " + "; ".join(skipped) + ".", "error")
         elif action == "save_type":
             _save_class_type()
         elif action == "save_template":

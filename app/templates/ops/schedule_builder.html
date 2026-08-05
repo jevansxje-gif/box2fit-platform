@@ -92,8 +92,16 @@
       <div><label class="pf-label">Class</label>
         <select class="pf-select" name="class_type_id" style="min-width:170px">{% for c in class_types %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
       <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="—" style="width:110px" /></div>
-      <div><label class="pf-label">Day</label>
-        <select class="pf-select" name="weekday">{% for d in weekdays %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}</select></div>
+      <div>
+        <label class="pf-label">Days (pick one or several)</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          {% for d in weekdays %}
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--pf-line-2);border-radius:var(--pf-r-sm);padding:9px 10px;cursor:pointer;font-weight:700;font-size:14px;background:#fff">
+            <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" style="accent-color:var(--pf-red);width:16px;height:16px" /> {{ d }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
       <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="16:00" required /></div>
       <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="—" style="width:80px" /></div>
       <div><label class="pf-label">Coach</label>

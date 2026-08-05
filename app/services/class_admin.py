@@ -112,6 +112,75 @@ def remove_future_instances(template_id: int) -> tuple[int, int]:
     return removed, cancelled
 
 
+def reschedule_template(tpl: ScheduleTemplate, new_weekday: int, new_start) -> int:
+    """Move a weekly class to a new day/time. Future occurrences MOVE with
+    their bookings intact; booked members get a schedule-change email. An
+    occurrence whose new time would already be in the past is cancelled
+    (with the usual notification) instead. Returns moved count."""
+    from datetime import timedelta as _td
+
+    from .tzutil import local_to_utc, now_utc
+
+    delta_days = new_weekday - tpl.weekday
+    changed = (
+        tpl.weekday != new_weekday or tpl.start_time_local != new_start
+    )
+    if not changed:
+        return 0
+    tpl.weekday = new_weekday
+    tpl.start_time_local = new_start
+
+    moved = 0
+    future = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.template_id == tpl.id,
+            ClassInstance.local_date >= today_local(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+        )
+        .all()
+    )
+    for inst in future:
+        old_desc = fmt_local(inst.starts_at_utc)
+        new_date = inst.local_date + _td(days=delta_days)
+        new_utc = local_to_utc(new_date, new_start)
+        if new_utc <= now_utc():
+            cancel_class(inst)
+            continue
+        inst.local_date = new_date
+        inst.local_time = new_start
+        inst.starts_at_utc = new_utc
+        moved += 1
+        for b in inst.bookings:
+            if b.status != BookingStatus.booked.value:
+                continue
+            guardian = b.attendee.guardian
+            new_desc = fmt_local(new_utc)
+            send_email(
+                guardian, guardian.email,
+                f"Schedule change: {inst.class_type.name} moved to {new_desc}",
+                render_template(
+                    "emails/schedule_change.html",
+                    guardian=guardian,
+                    attendee=b.attendee,
+                    class_name=inst.class_type.name,
+                    old_when=old_desc,
+                    new_when=new_desc,
+                ),
+                "schedule_change", inst.client_account_id,
+                attendee_id=b.attendee_id,
+            )
+            send_sms(
+                guardian, guardian.phone,
+                f"Box2Fit: {inst.class_type.name} moved from {old_desc} to "
+                f"{new_desc}. Your booking moved with it — reply or cancel "
+                "from your account if it doesn't work.",
+                "schedule_change", inst.client_account_id,
+                attendee_id=b.attendee_id,
+            )
+    return moved
+
+
 def prune_inactive_template_instances(client_account_id: int) -> int:
     """Sweep: remove lingering future occurrences of EVERY inactive template
     (catches instances generated before a deactivation). Runs nightly with

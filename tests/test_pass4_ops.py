@@ -135,6 +135,95 @@ def test_deactivate_template_removes_future_classes(app, client, client_account)
     assert any(o["instance"].class_type.key == "kids_7_10" for o in occ)
 
 
+def test_add_new_class_type_and_schedule_it(app, client, client_account):
+    """The Dance example: define a brand-new class in the catalog, place it
+    on the weekly schedule, see it live everywhere."""
+    from app.models import ClassType
+
+    staff = _admin(app)
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "save_type", "name": "Dance Fit", "age_min": "", "age_max": "",
+            "duration_min": "50", "default_capacity": "15", "segment_tag": "",
+            "accepts_trials": "on", "active": "on",
+        },
+        follow_redirects=True,
+    )
+    assert b"added to the class catalog" in r.data
+    dance = db.session.query(ClassType).filter_by(name="Dance Fit").one()
+    assert dance.key == "dance_fit"
+
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "add_template", "class_type_id": str(dance.id), "cohort": "",
+            "weekday": "2", "start_time": "17:30", "capacity": "",
+        },
+        follow_redirects=True,
+    )
+    assert b"repeats every Wednesday at 5:30 PM" in r.data
+    assert b"Dance Fit" in staff.get("/ops/schedule").data  # live schedule
+    assert b"Dance Fit" in client.get("/schedule").data     # public schedule
+
+    # deactivating the class type clears it back off the calendar
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "save_type", "type_id": str(dance.id), "name": "Dance Fit",
+            "age_min": "", "age_max": "", "duration_min": "50",
+            "default_capacity": "15", "segment_tag": "", "accepts_trials": "on",
+            # active checkbox omitted → inactive
+        },
+        follow_redirects=True,
+    )
+    assert b"upcoming classes removed" in r.data
+    assert b"Dance Fit" not in staff.get("/ops/schedule").data
+
+
+def test_move_weekly_class_time_keeps_bookings_and_notifies(
+    app, client, client_account
+):
+    from datetime import time as dtime
+
+    from app.models import ScheduleTemplate
+
+    instance = _first_instance(client_account, "kids_7_10")
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    tpl = db.session.get(ScheduleTemplate, instance.template_id)
+    # clear the seeded coach off the OTHER template so the move can't hit the
+    # (correct) trainer-overlap rejection
+    for other in db.session.query(ScheduleTemplate).all():
+        if other.id != tpl.id:
+            other.trainer_id = None
+    db.session.commit()
+    old_date = instance.local_date
+    new_time = dtime(tpl.start_time_local.hour, 30)  # +30 min, same day
+
+    staff = _admin(app)
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "save_template", "template_id": str(tpl.id),
+            "weekday": str(tpl.weekday),
+            "start_time": new_time.strftime("%H:%M"),
+            "cohort": tpl.cohort_label or "", "capacity": "",
+            "trainer_id": str(tpl.trainer_id or ""),
+        },
+        follow_redirects=True,
+    )
+    assert b"moved to the new day/time" in r.data
+
+    db.session.refresh(instance)
+    db.session.refresh(booking)
+    assert instance.local_time == new_time      # occurrence moved
+    assert instance.local_date == old_date
+    assert booking.status == BookingStatus.booked.value  # booking intact
+    change = db.session.query(Message).filter_by(template="schedule_change").all()
+    assert {m.channel for m in change} == {"email", "sms"}
+
+
 def test_today_hides_and_prunes_legacy_inactive_template_instances(
     app, client, client_account
 ):

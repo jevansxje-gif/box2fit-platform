@@ -7,30 +7,98 @@
   <h1 class="pf-h1" style="margin:0 0 18px">Schedule builder</h1>
 
   <div class="pf-card pf-card--pad" style="margin-bottom:18px">
-    <h2 class="pf-h3" style="margin:0 0 4px">Weekly classes</h2>
-    <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Each row repeats every week — adding one places it on every matching day of the calendar automatically.</p>
-    {% for t in templates %}
-    <div class="roster-row">
-      <span style="min-width:44px;font-weight:800">{{ weekdays[t.weekday] }}</span>
-      <span style="min-width:82px;font-variant-numeric:tabular-nums">{{ t.start_time_local.strftime('%I:%M %p').lstrip('0') }}</span>
-      <span style="flex:1"><b>{{ t.class_type.name }}</b>{% if t.cohort_label %} · {{ t.cohort_label }}{% endif %}{% if t.trainer %} · {{ t.trainer.name }}{% endif %}</span>
-      <span class="pf-chip {{ 'pf-chip--success' if t.active else 'pf-chip--warn' }}">{{ 'active' if t.active else 'off' }}</span>
-      <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="template_id" value="{{ t.id }}" />
-        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="toggle_template">{{ 'Deactivate' if t.active else 'Activate' }}</button></form>
-    </div>
+    <h2 class="pf-h3" style="margin:0 0 4px">1 · Class catalog</h2>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Define any class here (boxing, dance, anything) — then place it on the weekly schedule in step 2.</p>
+
+    {% for ct in all_class_types %}
+    <details class="pf-card pf-card--flat" style="border:1px solid var(--pf-line);margin-bottom:8px;padding:12px 16px">
+      <summary style="cursor:pointer;font-weight:700">
+        {{ ct.name }}
+        {% if ct.age_bracket_label() %}<span class="pf-chip pf-chip--info" style="margin-left:6px">{{ ct.age_bracket_label() }}</span>{% endif %}
+        <span class="pf-chip {{ 'pf-chip--success' if ct.active else 'pf-chip--warn' }}" style="margin-left:6px">{{ 'active' if ct.active else 'inactive' }}</span>
+      </summary>
+      <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="type_id" value="{{ ct.id }}" />
+        <div><label class="pf-label">Name</label><input class="pf-input" name="name" value="{{ ct.name }}" required style="width:190px" /></div>
+        <div><label class="pf-label">Age min</label><input class="pf-input" type="number" name="age_min" value="{{ ct.age_min or '' }}" style="width:76px" /></div>
+        <div><label class="pf-label">Age max</label><input class="pf-input" type="number" name="age_max" value="{{ ct.age_max or '' }}" style="width:76px" /></div>
+        <div><label class="pf-label">Minutes</label><input class="pf-input" type="number" name="duration_min" value="{{ ct.duration_min }}" style="width:80px" /></div>
+        <div><label class="pf-label">Capacity</label><input class="pf-input" type="number" name="default_capacity" value="{{ ct.default_capacity }}" style="width:84px" /></div>
+        <div><label class="pf-label">Marketing page</label>
+          <select class="pf-select" name="segment_tag">
+            {% for value, label in segment_choices %}<option value="{{ value }}" {{ 'selected' if (ct.segment_tag or '') == value }}>{{ label }}</option>{% endfor %}
+          </select></div>
+        <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="accepts_trials" {{ 'checked' if ct.accepts_trials }} /><span class="t">Free trials</span></label>
+        <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" {{ 'checked' if ct.active }} /><span class="t">Active</span></label>
+        <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="save_type">Save</button>
+      </form>
+    </details>
     {% endfor %}
-    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:14px;padding-top:14px;border-top:1px solid var(--pf-line)">
+
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px;padding-top:14px;border-top:1px solid var(--pf-line)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">New class name</label><input class="pf-input" name="name" placeholder="e.g. Dance Fit" required style="width:190px" /></div>
+      <div><label class="pf-label">Age min</label><input class="pf-input" type="number" name="age_min" placeholder="—" style="width:76px" /></div>
+      <div><label class="pf-label">Age max</label><input class="pf-input" type="number" name="age_max" placeholder="—" style="width:76px" /></div>
+      <div><label class="pf-label">Minutes</label><input class="pf-input" type="number" name="duration_min" value="45" style="width:80px" /></div>
+      <div><label class="pf-label">Capacity</label><input class="pf-input" type="number" name="default_capacity" value="12" style="width:84px" /></div>
+      <div><label class="pf-label">Marketing page</label>
+        <select class="pf-select" name="segment_tag">
+          {% for value, label in segment_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select></div>
+      <label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="accepts_trials" checked /><span class="t">Free trials</span></label>
+      <input type="hidden" name="active" value="" /><label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" checked /><span class="t">Active</span></label>
+      <button class="pf-btn pf-btn--dark" name="action" value="save_type">Add class</button>
+    </form>
+  </div>
+
+  <div class="pf-card pf-card--pad" style="margin-bottom:18px">
+    <h2 class="pf-h3" style="margin:0 0 4px">2 · Weekly schedule</h2>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Each row repeats every week. Open a row to change its day, time, group, capacity or coach — moving a class moves its future dates, keeps bookings, and emails booked members automatically.</p>
+
+    {% for t in templates %}
+    <details class="pf-card pf-card--flat" style="border:1px solid var(--pf-line);margin-bottom:8px;padding:12px 16px;{{ 'opacity:.55' if not t.active }}">
+      <summary style="cursor:pointer">
+        <b>{{ weekdays[t.weekday] }} {{ t.start_time_local.strftime('%I:%M %p').lstrip('0') }}</b>
+        — {{ t.class_type.name }}{% if t.cohort_label %} · {{ t.cohort_label }}{% endif %}{% if t.trainer %} · {{ t.trainer.name }}{% endif %}
+        <span class="pf-chip {{ 'pf-chip--success' if t.active else 'pf-chip--warn' }}" style="margin-left:6px">{{ 'active' if t.active else 'off' }}</span>
+      </summary>
+      <div style="margin-top:12px">
+        <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="template_id" value="{{ t.id }}" />
+          <div><label class="pf-label">Day</label>
+            <select class="pf-select" name="weekday">{% for d in weekdays %}<option value="{{ loop.index0 }}" {{ 'selected' if t.weekday == loop.index0 }}>{{ d }}</option>{% endfor %}</select></div>
+          <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="{{ t.start_time_local.strftime('%H:%M') }}" required /></div>
+          <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" value="{{ t.cohort_label or '' }}" placeholder="—" style="width:110px" /></div>
+          <div><label class="pf-label">Capacity</label><input class="pf-input" type="number" name="capacity" value="{{ t.capacity or '' }}" placeholder="{{ t.class_type.default_capacity }}" style="width:84px" /></div>
+          <div><label class="pf-label">Coach</label>
+            <select class="pf-select" name="trainer_id"><option value="">—</option>
+            {% for tr in trainers %}<option value="{{ tr.id }}" {{ 'selected' if t.trainer_id == tr.id }}>{{ tr.name }}</option>{% endfor %}</select></div>
+          <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="save_template">Save changes</button>
+        </form>
+        <form method="post" style="margin-top:10px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="template_id" value="{{ t.id }}" />
+          <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="toggle_template">{{ 'Deactivate (removes upcoming classes)' if t.active else 'Reactivate (puts classes back)' }}</button>
+        </form>
+      </div>
+    </details>
+    {% endfor %}
+
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px;padding-top:14px;border-top:1px solid var(--pf-line)">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div><label class="pf-label">Class</label>
         <select class="pf-select" name="class_type_id" style="min-width:170px">{% for c in class_types %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-      <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="Group C" style="width:110px" /></div>
+      <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="—" style="width:110px" /></div>
       <div><label class="pf-label">Day</label>
         <select class="pf-select" name="weekday">{% for d in weekdays %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}</select></div>
       <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="16:00" required /></div>
-      <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="12" style="width:80px" /></div>
-      <div><label class="pf-label">Trainer</label>
+      <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="—" style="width:80px" /></div>
+      <div><label class="pf-label">Coach</label>
         <select class="pf-select" name="trainer_id"><option value="">—</option>{% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
-      <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add template</button>
+      <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add to schedule</button>
     </form>
   </div>
 
@@ -50,11 +118,10 @@
   {% set ns = namespace(day=None) %}
   {% for i in instances %}
     {% if i.local_date != ns.day %}{% set ns.day = i.local_date %}<div class="day-lbl">{{ i.local_date.strftime('%A · %b %d') }}</div>{% endif %}
-    <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px;{{ 'opacity:.5' if i.status == 'cancelled' }}">
+    <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px">
       <span style="min-width:82px;font-weight:800;font-variant-numeric:tabular-nums">{{ i.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
       <span style="flex:1"><b>{{ i.class_type.name }}</b>{% if i.cohort_label %} · {{ i.cohort_label }}{% endif %}{% if i.trainer %} · {{ i.trainer.name }}{% endif %}{% if i.room %} · {{ i.room }}{% endif %}</span>
-      {% if i.status == 'cancelled' %}<span class="pf-chip pf-chip--warn">cancelled</span>
-      {% else %}<span class="pf-chip">{{ counts.get(i.id, 0) }}/{{ i.capacity }}</span>{% endif %}
+      <span class="pf-chip">{{ counts.get(i.id, 0) }}/{{ i.capacity }}</span>
       <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.instance_edit', instance_id=i.id) }}">Edit</a>
     </div>
   {% endfor %}

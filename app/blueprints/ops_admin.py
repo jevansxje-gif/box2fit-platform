@@ -146,6 +146,10 @@ def schedule_builder():
                     "keep generating automatically.",
                     "success",
                 )
+        elif action == "save_type":
+            _save_class_type()
+        elif action == "save_template":
+            _save_template()
         elif action == "toggle_template":
             tpl = db.session.get(
                 ScheduleTemplate, request.form.get("template_id", type=int)
@@ -195,6 +199,12 @@ def schedule_builder():
     class_types = (
         db.session.query(ClassType).filter_by(client_account_id=_cid(), active=True).all()
     )
+    all_class_types = (
+        db.session.query(ClassType)
+        .filter_by(client_account_id=_cid())
+        .order_by(ClassType.name)
+        .all()
+    )
     trainers = (
         db.session.query(Trainer).filter_by(client_account_id=_cid(), active=True).all()
     )
@@ -227,12 +237,146 @@ def schedule_builder():
         "ops/schedule_builder.html",
         templates=templates,
         class_types=class_types,
+        all_class_types=all_class_types,
         trainers=trainers,
         closures=closures,
         instances=instances,
         counts=counts,
         weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        segment_choices=[
+            ("", "None (portal/schedule only)"),
+            ("youth", "Youth (/youth + /reset pages)"),
+            ("strong", "Active Adults (/strong)"),
+            ("focus", "Professionals (/focus)"),
+            ("shehits", "She Hits (/shehits)"),
+            ("beast", "Beast Camp (/beast)"),
+        ],
     )
+
+
+def _save_class_type() -> None:
+    """Create or edit a class in the catalog. Deactivating a class also
+    deactivates its weekly slots and clears its future occurrences."""
+    import re as _re
+
+    tid = request.form.get("type_id", type=int)
+    ct = db.session.get(ClassType, tid) if tid else None
+    if ct is not None and ct.client_account_id != _cid():
+        abort(404)
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("The class needs a name.", "error")
+        return
+    if ct is None:
+        base = _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "class"
+        key, n = base, 2
+        while (
+            db.session.query(ClassType)
+            .filter_by(client_account_id=_cid(), key=key)
+            .first()
+        ):
+            key, n = f"{base}_{n}", n + 1
+        ct = ClassType(client_account_id=_cid(), key=key)
+        db.session.add(ct)
+    ct.name = name
+    ct.age_min = request.form.get("age_min", type=int)
+    ct.age_max = request.form.get("age_max", type=int)
+    ct.duration_min = request.form.get("duration_min", type=int) or 45
+    ct.default_capacity = request.form.get("default_capacity", type=int) or 12
+    ct.segment_tag = (request.form.get("segment_tag") or "").strip() or None
+    ct.accepts_trials = request.form.get("accepts_trials") == "on"
+    was_active = ct.active if tid else True
+    ct.active = request.form.get("active") == "on"
+    db.session.flush()
+
+    removed = 0
+    if was_active and not ct.active:
+        for tpl in db.session.query(ScheduleTemplate).filter_by(
+            client_account_id=_cid(), class_type_id=ct.id, active=True
+        ):
+            tpl.active = False
+            r, _c = _remove_future_instances(tpl.id)
+            removed += r
+    db.session.commit()
+    if removed:
+        flash(
+            f"{ct.name} saved and deactivated — {removed} upcoming classes "
+            "removed from the schedule.",
+            "success",
+        )
+    elif tid is None:
+        flash(
+            f'"{ct.name}" added to the class catalog — now place it on the '
+            "schedule below.",
+            "success",
+        )
+    else:
+        flash(f"{ct.name} saved.", "success")
+
+
+def _save_template() -> None:
+    """Edit a weekly class: day, time, group, capacity, coach. Moving day or
+    time MOVES future occurrences with bookings intact and notifies booked
+    members; a coach change sends the substitution notice."""
+    from datetime import time as _time
+
+    from ..services.class_admin import reschedule_template
+
+    tpl = db.session.get(ScheduleTemplate, request.form.get("template_id", type=int))
+    if tpl is None or tpl.client_account_id != _cid():
+        abort(404)
+    new_weekday = request.form.get("weekday", type=int)
+    new_start = _time.fromisoformat(request.form.get("start_time"))
+    new_trainer_id = request.form.get("trainer_id", type=int) or None
+    new_cohort = (request.form.get("cohort") or "").strip() or None
+    new_capacity = request.form.get("capacity", type=int) or None
+
+    conflict = _trainer_conflict(
+        new_trainer_id, new_weekday, new_start, exclude_template_id=tpl.id
+    )
+    if conflict:
+        flash(
+            f"Not saved — that coach already leads {conflict} at an "
+            "overlapping time.",
+            "error",
+        )
+        return
+
+    moved = reschedule_template(tpl, new_weekday, new_start)
+
+    trainer_changed = new_trainer_id != tpl.trainer_id
+    tpl.cohort_label = new_cohort
+    tpl.capacity = new_capacity
+    tpl.trainer_id = new_trainer_id
+    future = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.template_id == tpl.id,
+            ClassInstance.local_date >= today_local(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+        )
+        .all()
+    )
+    for inst in future:
+        inst.cohort_label = new_cohort
+        if new_capacity:
+            inst.capacity = new_capacity
+        if trainer_changed:
+            old_id = inst.trainer_id
+            inst.trainer_id = new_trainer_id
+            if any(b.status == BookingStatus.booked.value for b in inst.bookings):
+                _log_substitution(inst, old_id, new_trainer_id)
+                _notify_substitution(inst)
+    db.session.commit()
+    generate_instances(_cid())
+    db.session.commit()
+    msg = f"{tpl.class_type.name} saved."
+    if moved:
+        msg += (
+            f" {moved} upcoming classes moved to the new day/time — booked "
+            "members were notified and their bookings moved with them."
+        )
+    flash(msg, "success")
 
 
 def _trainer_conflict(

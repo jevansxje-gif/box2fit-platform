@@ -23,8 +23,16 @@
         <span style="min-width:84px;font-weight:800;font-variant-numeric:tabular-nums">{{ o.instance.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
         <div class="who">
           <b>{{ o.instance.class_type.name }}{% if o.instance.cohort_label %} · {{ o.instance.cohort_label }}{% endif %}</b>
-          <span>{{ o.instance.class_type.age_bracket_label() or 'All levels' }}{% if o.instance.trainer and o.instance.trainer.active %} · {{ o.instance.trainer.name }}{% else %} · <em>coach TBA</em>{% endif %}{% if o.instance.room %} · {{ o.instance.room }}{% endif %}</span>
+          <span>{{ o.instance.class_type.age_bracket_label() or 'All levels' }}{% if o.instance.room %} · {{ o.instance.room }}{% endif %}</span>
         </div>
+        <form method="post" action="{{ url_for('ops_admin.instance_coach', instance_id=o.instance.id) }}" style="display:flex;gap:6px;align-items:center">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <select class="pf-select" name="trainer_id" style="min-height:38px;padding:6px 28px 6px 10px;font-size:13px" title="Coach for this day only">
+            <option value="">Coach TBA</option>
+            {% for tr in trainers %}<option value="{{ tr.id }}" {{ 'selected' if o.instance.trainer_id == tr.id }}>{{ tr.name }}</option>{% endfor %}
+          </select>
+          <button class="pf-btn pf-btn--ghost pf-btn--sm" title="Change coach for this day only — booked members are notified">Set</button>
+        </form>
         {% if o.remaining == 0 %}<span class="pf-chip pf-chip--warn">Full</span>
         {% elif o.remaining <= 3 %}<span class="pf-chip pf-chip--red">{{ o.remaining }} left</span>
         {% else %}<span class="pf-chip pf-chip--success">{{ o.instance.capacity - o.remaining }}/{{ o.instance.capacity }} booked</span>{% endif %}

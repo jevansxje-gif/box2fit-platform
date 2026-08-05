@@ -93,7 +93,14 @@ def live_schedule():
     by_day: dict = {}
     for o in occurrences:
         by_day.setdefault(o["instance"].local_date, []).append(o)
-    return render_template("ops/live_schedule.html", by_day=by_day)
+    trainers = (
+        db.session.query(Trainer)
+        .filter_by(client_account_id=_cid(), active=True)
+        .all()
+    )
+    return render_template(
+        "ops/live_schedule.html", by_day=by_day, trainers=trainers
+    )
 
 
 # ------------------------------------------------------- schedule builder ---
@@ -164,6 +171,8 @@ def schedule_builder():
                 flash(msg, "success")
             elif skipped:
                 flash("Nothing added — " + "; ".join(skipped) + ".", "error")
+        elif action == "bulk_assign":
+            _bulk_assign_coach()
         elif action == "save_type":
             _save_class_type()
         elif action == "save_template":
@@ -270,6 +279,64 @@ def schedule_builder():
             ("beast", "Beast Camp (/beast)"),
         ],
     )
+
+
+def _bulk_assign_coach() -> None:
+    """Assign one coach across many weekly classes at once. Scope: every
+    class, only unassigned classes, or all rows of one class type. Overlap
+    conflicts are skipped and reported. Future occurrences follow; booked
+    members are notified when their day's coach actually changes."""
+    trainer_id = request.form.get("bulk_trainer_id", type=int)
+    scope = request.form.get("scope", "unassigned")
+    trainer = db.session.get(Trainer, trainer_id) if trainer_id else None
+    if trainer is None or trainer.client_account_id != _cid() or not trainer.active:
+        flash("Pick an active coach to assign.", "error")
+        return
+
+    q = db.session.query(ScheduleTemplate).filter_by(
+        client_account_id=_cid(), active=True
+    )
+    if scope == "unassigned":
+        q = q.filter(ScheduleTemplate.trainer_id.is_(None))
+    elif scope.startswith("type:"):
+        q = q.filter(ScheduleTemplate.class_type_id == int(scope.split(":")[1]))
+    # scope == "all": no extra filter
+
+    assigned, skipped = 0, []
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    for tpl in q.all():
+        if tpl.trainer_id == trainer.id:
+            continue
+        conflict = _trainer_conflict(
+            trainer.id, tpl.weekday, tpl.start_time_local, exclude_template_id=tpl.id
+        )
+        if conflict:
+            skipped.append(
+                f"{tpl.class_type.name} {day_names[tpl.weekday]} "
+                f"{tpl.start_time_local.strftime('%I:%M %p').lstrip('0')} "
+                f"(overlaps {conflict})"
+            )
+            continue
+        tpl.trainer_id = trainer.id
+        db.session.flush()
+        for inst in db.session.query(ClassInstance).filter(
+            ClassInstance.template_id == tpl.id,
+            ClassInstance.local_date >= today_local(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+        ):
+            old_id = inst.trainer_id
+            inst.trainer_id = trainer.id
+            if old_id not in (None, trainer.id) and any(
+                b.status == BookingStatus.booked.value for b in inst.bookings
+            ):
+                _log_substitution(inst, old_id, trainer.id)
+                _notify_substitution(inst)
+        assigned += 1
+    db.session.commit()
+    msg = f"{trainer.name} assigned to {assigned} weekly classes."
+    if skipped:
+        msg += " Skipped (time overlaps): " + "; ".join(skipped) + "."
+    flash(msg, "success" if assigned else "error")
 
 
 def _save_class_type() -> None:
@@ -418,6 +485,33 @@ def _trainer_conflict(
         ):
             return tpl.class_type.name
     return None
+
+
+@bp.post("/instances/<int:instance_id>/coach")
+@staff_required
+def instance_coach(instance_id: int):
+    """Per-day coach swap from the Schedule tab: changes THIS occurrence
+    only (the weekly default stays), notifies booked members."""
+    inst = db.session.get(ClassInstance, instance_id) or abort(404)
+    if inst.client_account_id != _cid():
+        abort(404)
+    new_id = request.form.get("trainer_id", type=int) or None
+    if new_id == inst.trainer_id:
+        return redirect(url_for("ops_admin.live_schedule"))
+    old_id = inst.trainer_id
+    inst.trainer_id = new_id
+    _log_substitution(inst, old_id, new_id)
+    if any(b.status == BookingStatus.booked.value for b in inst.bookings):
+        _notify_substitution(inst)
+    db.session.commit()
+    coach = db.session.get(Trainer, new_id).name if new_id else "TBA"
+    flash(
+        f"{inst.class_type.name} on {inst.local_date.strftime('%a %b %d')}: "
+        f"coach set to {coach} for that day only"
+        + (" — booked members notified." if inst.bookings else "."),
+        "success",
+    )
+    return redirect(url_for("ops_admin.live_schedule"))
 
 
 @bp.route("/instances/<int:instance_id>", methods=["GET", "POST"])

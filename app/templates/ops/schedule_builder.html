@@ -79,6 +79,20 @@
       <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add to schedule</button>
     </form>
 
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:0 0 18px;padding:14px;border:1px dashed var(--pf-line-2);border-radius:var(--pf-r-md);background:var(--pf-paper-2)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Assign coach in bulk</label>
+        <select class="pf-select" name="bulk_trainer_id">{% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+      <div><label class="pf-label">To</label>
+        <select class="pf-select" name="scope">
+          <option value="unassigned">All classes without a coach</option>
+          <option value="all">Every weekly class</option>
+          {% for c in all_class_types if c.active %}<option value="type:{{ c.id }}">All {{ c.name }} classes</option>{% endfor %}
+        </select></div>
+      <button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="bulk_assign">Assign</button>
+      <span style="font-size:12px;color:var(--pf-text-3)">Day-to-day swaps happen on the Schedule tab — they never change these defaults.</span>
+    </form>
+
     <h3 class="pf-h3" style="margin:0 0 4px;font-size:16px">Current weekly classes</h3>
     <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Each row repeats every week. Open a row to change its day, time, group, capacity or coach — moving a class moves its future dates, keeps bookings, and emails booked members automatically.</p>
 

@@ -230,6 +230,77 @@ def test_add_weekly_class_on_multiple_days(app, client, client_account):
     assert b"Pick at least one day" in r.data
 
 
+def test_bulk_assign_coach_and_daily_override(app, client, client_account):
+    from app.models import ScheduleTemplate, Trainer
+
+    staff = _admin(app)
+    frankie = Trainer(
+        client_account_id=client_account.id, name="Coach Frankie", active=True
+    )
+    db.session.add(frankie)
+    # clear existing assignments so "unassigned" scope covers everything
+    for tpl in db.session.query(ScheduleTemplate).all():
+        tpl.trainer_id = None
+    for inst in db.session.query(ClassInstance).all():
+        inst.trainer_id = None
+    db.session.commit()
+
+    # 1. bulk assign to all unassigned classes — conflicts (same-time kids/
+    #    teens templates) are skipped and reported, not silently doubled
+    r = staff.post(
+        "/ops/schedule-builder",
+        data={
+            "action": "bulk_assign",
+            "bulk_trainer_id": str(frankie.id),
+            "scope": "unassigned",
+        },
+        follow_redirects=True,
+    )
+    assert b"Coach Frankie assigned to 1 weekly classes" in r.data
+    assert b"Skipped (time overlaps)" in r.data  # the overlapping second slot
+    assigned = [
+        t for t in db.session.query(ScheduleTemplate).all() if t.trainer_id == frankie.id
+    ]
+    assert len(assigned) == 1
+    inst = (
+        db.session.query(ClassInstance)
+        .filter_by(template_id=assigned[0].id)
+        .first()
+    )
+    assert inst.trainer_id == frankie.id  # future occurrences follow
+
+    # 2. daily override: swap the coach for ONE day only, with a booking
+    sub = Trainer(client_account_id=client_account.id, name="Coach Daysub", active=True)
+    db.session.add(sub)
+    db.session.commit()
+    target = _first_instance(client_account, "kids_7_10")
+    _book_child(client, target)
+    tpl_id = target.template_id
+    tpl_trainer_before = db.session.get(ScheduleTemplate, tpl_id).trainer_id
+
+    r = staff.post(
+        f"/ops/instances/{target.id}/coach",
+        data={"trainer_id": str(sub.id)},
+        follow_redirects=True,
+    )
+    assert b"for that day only" in r.data
+    db.session.refresh(target)
+    assert target.trainer_id == sub.id
+    # the weekly default did NOT change
+    assert db.session.get(ScheduleTemplate, tpl_id).trainer_id == tpl_trainer_before
+    # other occurrences of the same template untouched
+    others = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.template_id == tpl_id, ClassInstance.id != target.id
+        )
+        .all()
+    )
+    assert all(i.trainer_id != sub.id for i in others)
+    # booked member notified of the substitution
+    assert db.session.query(Message).filter_by(template="sub_notice").count() >= 1
+
+
 def test_move_weekly_class_time_keeps_bookings_and_notifies(
     app, client, client_account
 ):
@@ -339,8 +410,8 @@ def test_deactivate_trainer_unassigns_everywhere(app, client, client_account):
         for t in db.session.query(ScheduleTemplate).all()
     )
     page = staff.get("/ops/schedule").data
-    assert b"Coach Alex T." not in page
-    assert b"coach TBA" in page
+    assert b"Coach Alex T." not in page  # inactive coaches never render
+    assert b"Coach TBA" in page  # slots fall back to the TBA option
 
 
 def test_substitution_notifies_members(app, client, client_account):

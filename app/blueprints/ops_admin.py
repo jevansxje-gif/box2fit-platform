@@ -114,22 +114,38 @@ def schedule_builder():
                     "error",
                 )
             else:
-                db.session.add(
-                    ScheduleTemplate(
-                        client_account_id=_cid(),
-                        class_type_id=request.form.get("class_type_id", type=int),
-                        cohort_label=(request.form.get("cohort") or "").strip() or None,
-                        weekday=weekday,
-                        start_time_local=start,
-                        capacity=request.form.get("capacity", type=int) or None,
-                        trainer_id=trainer_id,
-                        active=True,
-                    )
+                tpl = ScheduleTemplate(
+                    client_account_id=_cid(),
+                    class_type_id=request.form.get("class_type_id", type=int),
+                    cohort_label=(request.form.get("cohort") or "").strip() or None,
+                    weekday=weekday,
+                    start_time_local=start,
+                    capacity=request.form.get("capacity", type=int) or None,
+                    trainer_id=trainer_id,
+                    active=True,
                 )
+                db.session.add(tpl)
                 db.session.commit()
                 generate_instances(_cid())
                 db.session.commit()
-                flash("Template added and instances generated.", "success")
+                placed = (
+                    db.session.query(ClassInstance)
+                    .filter_by(template_id=tpl.id)
+                    .order_by(ClassInstance.local_date)
+                    .all()
+                )
+                weekday_name = [
+                    "Monday", "Tuesday", "Wednesday", "Thursday",
+                    "Friday", "Saturday", "Sunday",
+                ][weekday]
+                dates = ", ".join(i.local_date.strftime("%b %d") for i in placed)
+                flash(
+                    f"{tpl.class_type.name} now repeats every {weekday_name} at "
+                    f"{start.strftime('%I:%M %p').lstrip('0')} — {len(placed)} "
+                    f"classes placed on the calendar ({dates}), and future weeks "
+                    "keep generating automatically.",
+                    "success",
+                )
         elif action == "toggle_template":
             tpl = db.session.get(
                 ScheduleTemplate, request.form.get("template_id", type=int)

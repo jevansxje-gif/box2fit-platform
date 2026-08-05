@@ -7,7 +7,8 @@
   <h1 class="pf-h1" style="margin:0 0 18px">Schedule builder</h1>
 
   <div class="pf-card pf-card--pad" style="margin-bottom:18px">
-    <h2 class="pf-h3" style="margin:0 0 12px">Weekly templates</h2>
+    <h2 class="pf-h3" style="margin:0 0 4px">Weekly classes</h2>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Each row repeats every week — adding one places it on every matching day of the calendar automatically.</p>
     {% for t in templates %}
     <div class="roster-row">
       <span style="min-width:44px;font-weight:800">{{ weekdays[t.weekday] }}</span>

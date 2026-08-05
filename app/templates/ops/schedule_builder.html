@@ -54,7 +54,32 @@
   </div>
 
   <div class="pf-card pf-card--pad" style="margin-bottom:18px">
-    <h2 class="pf-h3" style="margin:0 0 4px">2 · Weekly schedule</h2>
+    <h2 class="pf-h3" style="margin:0 0 4px">2 · Schedule a class</h2>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Pick a class, tick the days it runs, set the time — every ticked day becomes a weekly slot.</p>
+
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:18px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div><label class="pf-label">Class</label>
+        <select class="pf-select" name="class_type_id" style="min-width:170px">{% for c in class_types %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="—" style="width:110px" /></div>
+      <div>
+        <label class="pf-label">Days (pick one or several)</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          {% for d in weekdays %}
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--pf-line-2);border-radius:var(--pf-r-sm);padding:9px 10px;cursor:pointer;font-weight:700;font-size:14px;background:#fff">
+            <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" style="accent-color:var(--pf-red);width:16px;height:16px" /> {{ d }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="16:00" required /></div>
+      <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="—" style="width:80px" /></div>
+      <div><label class="pf-label">Coach</label>
+        <select class="pf-select" name="trainer_id"><option value="">—</option>{% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add to schedule</button>
+    </form>
+
+    <h3 class="pf-h3" style="margin:0 0 4px;font-size:16px">Current weekly classes</h3>
     <p style="margin:0 0 12px;font-size:13px;color:var(--pf-text-2)">Each row repeats every week. Open a row to change its day, time, group, capacity or coach — moving a class moves its future dates, keeps bookings, and emails booked members automatically.</p>
 
     {% for t in templates %}
@@ -86,28 +111,6 @@
       </div>
     </details>
     {% endfor %}
-
-    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px;padding-top:14px;border-top:1px solid var(--pf-line)">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <div><label class="pf-label">Class</label>
-        <select class="pf-select" name="class_type_id" style="min-width:170px">{% for c in class_types %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-      <div><label class="pf-label">Group</label><input class="pf-input" name="cohort" placeholder="—" style="width:110px" /></div>
-      <div>
-        <label class="pf-label">Days (pick one or several)</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          {% for d in weekdays %}
-          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--pf-line-2);border-radius:var(--pf-r-sm);padding:9px 10px;cursor:pointer;font-weight:700;font-size:14px;background:#fff">
-            <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" style="accent-color:var(--pf-red);width:16px;height:16px" /> {{ d }}
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-      <div><label class="pf-label">Time</label><input class="pf-input" type="time" name="start_time" value="16:00" required /></div>
-      <div><label class="pf-label">Cap</label><input class="pf-input" type="number" name="capacity" placeholder="—" style="width:80px" /></div>
-      <div><label class="pf-label">Coach</label>
-        <select class="pf-select" name="trainer_id"><option value="">—</option>{% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
-      <button class="pf-btn pf-btn--primary" name="action" value="add_template">Add to schedule</button>
-    </form>
   </div>
 
   <div class="pf-card pf-card--pad" style="margin-bottom:18px">

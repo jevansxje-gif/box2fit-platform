@@ -9,6 +9,14 @@ def create_app(config_class=Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Behind nginx, trust one hop of X-Forwarded-For/Proto/Host so
+    # request.is_secure, secure cookies and _external URLs see the real
+    # scheme and host. Harmless in dev (no proxy sets these headers... but a
+    # spoofed client header would; acceptable for this deployment shape).
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     configure_logging(app)
 
     db.init_app(app)

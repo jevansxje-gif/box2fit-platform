@@ -19,7 +19,13 @@ def _int(name: str, default: int) -> int:
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-change-me")
-    SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:5001")
+    # Canonical public origin for signed cancel links and email links.
+    # SITE_BASE_URL preferred; BASE_URL accepted per the deploy brief.
+    SITE_BASE_URL = (
+        os.environ.get("SITE_BASE_URL")
+        or os.environ.get("BASE_URL")
+        or "http://localhost:5001"
+    )
 
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL", f"sqlite:///{BASE_DIR / 'platform_dev.db'}"

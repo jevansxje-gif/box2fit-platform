@@ -54,6 +54,7 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(agency_bp, url_prefix="/agency")
 
     csrf.exempt(api_bp)  # the API authenticates with JWT, not session cookies
+    csrf.exempt(app.view_functions["funnel.stripe_webhook_root"])
 
     from .tasks import celery_init_app
 

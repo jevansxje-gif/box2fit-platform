@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{% block title %}Box2Fit White Rock{% endblock %}</title>
 <meta name="description" content="{% block meta_description %}Boxing and fitness in White Rock. Your first class is free.{% endblock %}" />
+<link rel="canonical" href="{{ config.SITE_BASE_URL.rstrip('/') ~ request.path }}" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}" />

@@ -98,6 +98,16 @@ def healthz():
     return {"status": "ok"}
 
 
+@bp.post("/webhooks/stripe")
+def stripe_webhook_root():
+    """Top-level webhook path per the deploy brief; same handler as
+    /api/v1/webhooks/stripe. CSRF-exempted in create_app (Stripe signs its
+    own requests)."""
+    from .api import stripe_webhook
+
+    return stripe_webhook()
+
+
 @bp.get("/")
 def index():
     """Public homepage (health.box2fit.com) — calm, health-led."""

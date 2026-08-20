@@ -42,6 +42,17 @@ def _webhook(client, event_type: str, obj: dict):
     )
 
 
+def test_webhook_root_alias(client):
+    """/webhooks/stripe (deploy-brief path) hits the same handler."""
+    r = client.post(
+        "/webhooks/stripe",
+        data=json.dumps({"type": "noop.event", "data": {"object": {}}}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    assert r.get_json()["received"] is True
+
+
 def _setup_member(app, client, client_account):
     """Funnel booking + vaulted card + attended class → ready to activate."""
     instance = _first_instance(client_account)

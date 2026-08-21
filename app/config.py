@@ -42,6 +42,20 @@ class Config:
     SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
     SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "hello@box2fit.com")
     SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "Box2Fit White Rock")
+
+    # Generic SMTP (Brevo etc.) — takes precedence over SendGrid when set.
+    SMTP_HOST = os.environ.get("SMTP_HOST", "")
+    SMTP_PORT = _int("SMTP_PORT", 587)
+    SMTP_USER = os.environ.get("SMTP_USER", "")
+    SMTP_PASS = os.environ.get("SMTP_PASS", "")
+    MAIL_FROM_EMAIL = os.environ.get(
+        "MAIL_FROM_EMAIL", os.environ.get("SENDGRID_FROM_EMAIL", "hello@box2fit.com")
+    )
+    MAIL_FROM_NAME = os.environ.get(
+        "MAIL_FROM_NAME", os.environ.get("SENDGRID_FROM_NAME", "Box2Fit White Rock")
+    )
+    # Staff mailbox for new-sign-up alerts (empty = alerts off)
+    ADMIN_NOTIFY_EMAIL = os.environ.get("ADMIN_NOTIFY_EMAIL", "")
     TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
@@ -85,3 +99,4 @@ class TestConfig(Config):
     WTF_CSRF_ENABLED = False
     CELERY_TASK_ALWAYS_EAGER = True
     RATELIMIT_ENABLED = False
+    ADMIN_NOTIFY_EMAIL = "staff-alerts@test.local"

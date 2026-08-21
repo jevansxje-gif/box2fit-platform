@@ -107,9 +107,13 @@ def test_e2e_ad_click_to_attendance(app, client, client_account, monkeypatch):
     assert {"Lead", "Schedule"} <= events
 
     # Confirmation email + SMS to the GUARDIAN, logged for CASL
-    msgs = db.session.query(Message).all()
+    msgs = (
+        db.session.query(Message).filter_by(template="booking_confirmation").all()
+    )
     assert {m.channel for m in msgs} == {"email", "sms"}
     assert all(m.user_id == guardian.id for m in msgs)
+    # plus the staff new-sign-up alert
+    assert db.session.query(Message).filter_by(template="admin_new_signup").count() == 1
 
     # 3. Card vault — stub Stripe (test mode, no network)
     class FakeSI:

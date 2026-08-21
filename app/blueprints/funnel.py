@@ -349,6 +349,7 @@ def step_details(segment: str):
             walkin=request.args.get("source") == "walkin",
         )
         booking_flow.send_booking_confirmation(booking)
+        booking_flow.send_admin_signup_alert(booking)
         db.session.commit()
 
         state.update(
@@ -512,6 +513,24 @@ def cancel_membership(token: str):
     db.session.commit()
     return render_template(
         "funnel/membership_cancelled.html", charged_yet=charged_yet
+    )
+
+
+@bp.get("/calendar/<token>.ics")
+def booking_ics(token: str):
+    """Signed .ics download for the add-to-calendar button."""
+    from flask import Response
+
+    from ..services.calendar_links import SALT_CALENDAR, ics_content
+
+    booking_id = read_token(token, SALT_CALENDAR)
+    if booking_id is None:
+        abort(404)
+    booking = db.session.get(Booking, booking_id) or abort(404)
+    return Response(
+        ics_content(booking),
+        mimetype="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=box2fit-class.ics"},
     )
 
 

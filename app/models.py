@@ -202,6 +202,7 @@ class Trainer(db.Model):
     )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))  # login link
     name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str | None] = mapped_column(String(255))  # assignment notices
     role_title: Mapped[str | None] = mapped_column(String(120))
     bio: Mapped[str | None] = mapped_column(Text)
     photo: Mapped[str | None] = mapped_column(String(255))

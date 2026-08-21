@@ -14,6 +14,7 @@
       <input type="hidden" name="trainer_id" value="{{ t.id }}" />
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:180px"><label class="pf-label">Name</label><input class="pf-input" name="name" value="{{ t.name }}" required /></div>
+        <div style="flex:1;min-width:180px"><label class="pf-label">Email (assignment notices)</label><input class="pf-input" name="email" type="email" value="{{ t.email or '' }}" /></div>
         <div style="flex:1;min-width:180px"><label class="pf-label">Role</label><input class="pf-input" name="role_title" value="{{ t.role_title or '' }}" /></div>
       </div>
       <div><label class="pf-label">Certifications (comma-separated — shown on the public site)</label>
@@ -39,6 +40,7 @@
     <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div><label class="pf-label">Name</label><input class="pf-input" name="name" required /></div>
+      <div><label class="pf-label">Email</label><input class="pf-input" name="email" type="email" placeholder="for assignment notices" /></div>
       <div><label class="pf-label">Role</label><input class="pf-input" name="role_title" /></div>
       <div style="flex:1;min-width:200px"><label class="pf-label">Certifications</label><input class="pf-input" name="certs" placeholder="NCCP Boxing, CPR/AED" /></div>
       <input type="hidden" name="active" value="on" /><label class="pf-check" style="border:0;padding:0"><input type="checkbox" name="active" checked /><span class="t">Active</span></label>

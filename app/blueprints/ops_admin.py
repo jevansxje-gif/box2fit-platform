@@ -156,6 +156,17 @@ def schedule_builder():
                     .all()
                 )
                 first = db.session.get(ScheduleTemplate, new_ids[0])
+                if trainer_id:
+                    _notify_coach_assignment(
+                        trainer_id,
+                        [
+                            f"{first.class_type.name}: every "
+                            f"{day_names[db.session.get(ScheduleTemplate, i).weekday]}"
+                            f" at {start.strftime('%I:%M %p').lstrip('0')}"
+                            for i in new_ids
+                        ],
+                    )
+                    db.session.commit()
                 added_days = ", ".join(
                     day_names[db.session.get(ScheduleTemplate, i).weekday]
                     for i in new_ids
@@ -281,6 +292,23 @@ def schedule_builder():
     )
 
 
+def _notify_coach_assignment(trainer_id: int | None, lines: list[str]) -> None:
+    """Email a coach their new assignment(s). Silently skips coaches without
+    an email on file."""
+    trainer = db.session.get(Trainer, trainer_id) if trainer_id else None
+    if trainer is None or not trainer.email or not lines:
+        return
+    html = render_template(
+        "emails/coach_assignment.html", trainer=trainer, lines=lines
+    )
+    send_email(
+        None, trainer.email,
+        f"You're on the schedule — {len(lines)} assignment"
+        + ("s" if len(lines) != 1 else ""),
+        html, "coach_assignment", _cid(),
+    )
+
+
 def _bulk_assign_coach() -> None:
     """Assign one coach across many weekly classes at once. Scope: every
     class, only unassigned classes, or all rows of one class type. Overlap
@@ -302,7 +330,7 @@ def _bulk_assign_coach() -> None:
         q = q.filter(ScheduleTemplate.class_type_id == int(scope.split(":")[1]))
     # scope == "all": no extra filter
 
-    assigned, skipped = 0, []
+    assigned, skipped, _bulk_lines = 0, [], []
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     for tpl in q.all():
         if tpl.trainer_id == trainer.id:
@@ -332,6 +360,12 @@ def _bulk_assign_coach() -> None:
                 _log_substitution(inst, old_id, trainer.id)
                 _notify_substitution(inst)
         assigned += 1
+        _bulk_lines.append(
+            f"{tpl.class_type.name}: every "
+            f"{['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][tpl.weekday]}"
+            f" at {tpl.start_time_local.strftime('%I:%M %p').lstrip('0')}"
+        )
+    _notify_coach_assignment(trainer.id, _bulk_lines)
     db.session.commit()
     msg = f"{trainer.name} assigned to {assigned} weekly classes."
     if skipped:
@@ -430,6 +464,15 @@ def _save_template() -> None:
     moved = reschedule_template(tpl, new_weekday, new_start)
 
     trainer_changed = new_trainer_id != tpl.trainer_id
+    if trainer_changed and new_trainer_id:
+        _notify_coach_assignment(
+            new_trainer_id,
+            [
+                f"{tpl.class_type.name}: every "
+                f"{['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][new_weekday]}"
+                f" at {new_start.strftime('%I:%M %p').lstrip('0')}"
+            ],
+        )
     tpl.cohort_label = new_cohort
     tpl.capacity = new_capacity
     tpl.trainer_id = new_trainer_id
@@ -503,6 +546,15 @@ def instance_coach(instance_id: int):
     _log_substitution(inst, old_id, new_id)
     if any(b.status == BookingStatus.booked.value for b in inst.bookings):
         _notify_substitution(inst)
+    if new_id:
+        _notify_coach_assignment(
+            new_id,
+            [
+                f"{inst.class_type.name} on "
+                f"{inst.local_date.strftime('%A %b %d')} at "
+                f"{inst.local_time.strftime('%I:%M %p').lstrip('0')} (this day only)"
+            ],
+        )
     db.session.commit()
     coach = db.session.get(Trainer, new_id).name if new_id else "TBA"
     flash(
@@ -606,6 +658,7 @@ def trainers():
         if t.client_account_id != _cid():
             abort(404)
         t.name = request.form.get("name", "").strip()
+        t.email = request.form.get("email", "").strip() or None
         t.role_title = request.form.get("role_title", "").strip() or None
         t.bio = request.form.get("bio", "").strip() or None
         t.certifications = [

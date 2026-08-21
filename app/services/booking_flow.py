@@ -162,7 +162,41 @@ def create_trial_booking(
     return booking
 
 
+def send_admin_signup_alert(booking: Booking) -> None:
+    """New free-class sign-up → email the staff mailbox (ADMIN_NOTIFY_EMAIL)."""
+    from flask import current_app
+
+    admin_email = current_app.config["ADMIN_NOTIFY_EMAIL"]
+    if not admin_email:
+        return
+    attendee = booking.attendee
+    guardian = attendee.guardian
+    instance = booking.class_instance
+    is_child = attendee.kind == AttendeeKind.child.value
+    html = render_template(
+        "emails/admin_new_signup.html",
+        attendee=attendee,
+        guardian=guardian,
+        is_child=is_child,
+        class_name=instance.class_type.name,
+        cohort=instance.cohort_label,
+        when=fmt_local(instance.starts_at_utc),
+        ops_url=absolute_url("ops.today"),
+    )
+    subject = (
+        f"New sign-up: {attendee.first_name}"
+        + (f" (child of {guardian.name})" if is_child else f" ({guardian.name})")
+        + f" — {instance.class_type.name} {fmt_local(instance.starts_at_utc, '%a %b %d')}"
+    )
+    send_email(
+        None, admin_email, subject, html, "admin_new_signup",
+        booking.client_account_id, attendee_id=attendee.id,
+    )
+
+
 def send_booking_confirmation(booking: Booking) -> None:
+    from .calendar_links import google_calendar_url, ics_download_url
+
     attendee = booking.attendee
     guardian = attendee.guardian
     instance = booking.class_instance
@@ -180,6 +214,8 @@ def send_booking_confirmation(booking: Booking) -> None:
         when=when,
         address=STUDIO_ADDRESS,
         cancel_url=cancel_url,
+        gcal_url=google_calendar_url(booking),
+        ics_url=ics_download_url(booking),
     )
     subject = (
         f"{attendee.first_name} is booked — free first class at Box2Fit"

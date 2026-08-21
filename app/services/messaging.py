@@ -38,19 +38,24 @@ def send_email(
         db.session.add(msg)
         return msg
 
+    smtp_host = current_app.config["SMTP_HOST"]
     api_key = current_app.config["SENDGRID_API_KEY"]
-    if not api_key:
-        msg.delivery_status = "skipped_not_configured"
-        log.info("email (dev, not sent) to=%s subject=%s", to_email, subject)
-    else:
+    if smtp_host:
+        try:
+            _send_via_smtp(to_email, subject, html)
+            msg.delivery_status = "sent"
+        except Exception as exc:  # provider failure must never break the flow
+            log.exception("smtp send failed")
+            msg.delivery_status = f"error:{type(exc).__name__}"
+    elif api_key:
         try:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail
 
             mail = Mail(
                 from_email=(
-                    current_app.config["SENDGRID_FROM_EMAIL"],
-                    current_app.config["SENDGRID_FROM_NAME"],
+                    current_app.config["MAIL_FROM_EMAIL"],
+                    current_app.config["MAIL_FROM_NAME"],
                 ),
                 to_emails=to_email,
                 subject=subject,
@@ -58,11 +63,36 @@ def send_email(
             )
             SendGridAPIClient(api_key).send(mail)
             msg.delivery_status = "sent"
-        except Exception as exc:  # provider failure must never break the flow
+        except Exception as exc:
             log.exception("sendgrid send failed")
             msg.delivery_status = f"error:{type(exc).__name__}"
+    else:
+        msg.delivery_status = "skipped_not_configured"
+        log.info("email (dev, not sent) to=%s subject=%s", to_email, subject)
     db.session.add(msg)
     return msg
+
+
+def _send_via_smtp(to_email: str, subject: str, html: str) -> None:
+    """Provider-agnostic SMTP (Brevo, or any relay) with STARTTLS."""
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formataddr
+
+    m = EmailMessage()
+    m["Subject"] = subject
+    m["From"] = formataddr(
+        (current_app.config["MAIL_FROM_NAME"], current_app.config["MAIL_FROM_EMAIL"])
+    )
+    m["To"] = to_email
+    m.set_content("This message requires an HTML-capable email client.")
+    m.add_alternative(html, subtype="html")
+    with smtplib.SMTP(
+        current_app.config["SMTP_HOST"], current_app.config["SMTP_PORT"], timeout=20
+    ) as s:
+        s.starttls()
+        s.login(current_app.config["SMTP_USER"], current_app.config["SMTP_PASS"])
+        s.send_message(m)
 
 
 def send_sms(

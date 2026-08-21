@@ -230,6 +230,84 @@ def test_add_weekly_class_on_multiple_days(app, client, client_account):
     assert b"Pick at least one day" in r.data
 
 
+def test_coach_login_invite_and_phone_view(app, client, client_account):
+    """Trainers become gatekeepers: invite from the Trainers page, sign in,
+    land on their own class view, mark attendance — but the wider back
+    office stays desk-only."""
+    import re
+
+    from datetime import time as dtime
+
+    from app.models import ClassType, Role, ScheduleTemplate, Trainer, User
+    from app.services.tzutil import local_to_utc, today_local
+
+    staff = _admin(app)
+    trainer = db.session.query(Trainer).first()
+    trainer.email = "coach.gate@test.local"
+    db.session.commit()
+
+    # invite creates the trainer login + emails a set-password link
+    r = staff.post(
+        "/ops/trainers",
+        data={"action": "invite", "trainer_id": str(trainer.id)},
+        follow_redirects=True,
+    )
+    assert b"Login invite sent" in r.data
+    coach_user = db.session.query(User).filter_by(email="coach.gate@test.local").one()
+    assert coach_user.role == Role.trainer.value
+    db.session.refresh(trainer)
+    assert trainer.user_id == coach_user.id
+    invite = db.session.query(Message).filter_by(template="coach_invite").one()
+    set_url = re.search(r"/portal/set-password/[\w\-\.]+", invite.body_preview).group(0)
+
+    # coach sets password → logs in at ops → redirected to coach view
+    cbrowser = app.test_client()
+    cbrowser.post(set_url, data={"password": "coachpass123"})
+    cbrowser.get("/portal/logout")
+    r = cbrowser.post(
+        "/ops/login",
+        data={"email": "coach.gate@test.local", "password": "coachpass123"},
+        follow_redirects=False,
+    )
+    assert "/ops/coach" in r.headers["Location"]
+
+    # give the coach a class TODAY with a booking
+    kids = db.session.query(ClassType).filter_by(key="kids_7_10").one()
+    inst = ClassInstance(
+        client_account_id=client_account.id, class_type_id=kids.id,
+        trainer_id=trainer.id, cohort_label="Group A",
+        starts_at_utc=local_to_utc(today_local(), dtime(23, 50)),
+        local_date=today_local(), local_time=dtime(23, 50),
+        duration_min=45, capacity=12,
+    )
+    db.session.add(inst)
+    db.session.commit()
+    other = _first_instance(client_account, "kids_7_10")
+    _book_child(client, other)  # creates guardian+child; rebook onto today
+    booking = db.session.query(Booking).one()
+    booking.class_instance_id = inst.id
+    db.session.commit()
+
+    r = cbrowser.get("/ops/coach")
+    assert b"Maya" in r.data
+    assert b"Here" in r.data  # the big attendance button
+
+    # coach marks attendance → bounced back to coach view, booking attended
+    r = cbrowser.post(
+        f"/ops/bookings/{booking.id}/attendance",
+        data={"action": "attended"},
+        follow_redirects=False,
+    )
+    assert "/ops/coach" in r.headers["Location"]
+    db.session.refresh(booking)
+    assert booking.status == BookingStatus.attended.value
+
+    # the rest of the back office is closed to coaches
+    for path in ("/ops/today", "/ops/members", "/ops/schedule-builder",
+                 "/ops/kiosk", "/ops/announcements"):
+        assert cbrowser.get(path).status_code == 403, path
+
+
 def test_delete_trainer_unassigns_and_removes(app, client, client_account):
     from app.models import ScheduleTemplate, Trainer
 

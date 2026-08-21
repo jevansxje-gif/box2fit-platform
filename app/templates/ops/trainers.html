@@ -26,6 +26,12 @@
         <button class="pf-btn pf-btn--primary pf-btn--sm">Save</button>
       </div>
     </form>
+    <form method="post" style="margin-top:10px;display:inline-block;margin-right:8px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="trainer_id" value="{{ t.id }}" />
+      <input type="hidden" name="action" value="invite" />
+      <button class="pf-btn pf-btn--dark pf-btn--sm" {{ 'disabled title="Add an email first"' if not t.email }}>Send coach login invite</button>
+    </form>
     <form method="post" onsubmit="return confirm('Delete {{ t.name }} completely? They are removed from all classes and past records show no coach. Use Deactivate instead if you want to keep their history.')" style="margin-top:10px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="trainer_id" value="{{ t.id }}" />

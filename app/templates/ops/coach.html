@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}My classes — Box2Fit Coach{% endblock %}
+
+{% block header_cta %}
+<a class="pf-btn pf-btn--ghost pf-btn--sm" style="color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.4)" href="{{ url_for('ops.logout') }}">Log out</a>
+{% endblock %}
+
+{% block content %}
+<div class="ops-shell" style="max-width:560px">
+  <div class="pf-kicker">Coach view{% if me %} · {{ me.name }}{% endif %}</div>
+  <h1 class="pf-h1" style="margin:6px 0 4px">{{ today.strftime('%A, %B %d') }}</h1>
+  {% if showing_all and me %}
+  <p style="color:var(--pf-text-2);font-size:14px;margin:0 0 16px">No classes assigned to you today — showing all of today's classes.</p>
+  {% elif not me %}
+  <p style="color:var(--pf-text-2);font-size:14px;margin:0 0 16px">Your login isn't linked to a coach profile yet — showing all of today's classes. Ask the front desk to add your email on the Trainers page.</p>
+  {% else %}
+  <p style="color:var(--pf-text-2);font-size:14px;margin:0 0 16px">Tap the big button as each person walks in. Anyone in the room who isn't on this list needs to sign up first.</p>
+  {% endif %}
+
+  {% if not instances %}
+  <div class="pf-panel"><h2>No classes today</h2><p class="note">Enjoy the day off.</p></div>
+  {% endif %}
+
+  {% for inst in instances %}
+  <div class="pf-card" style="margin-bottom:16px">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--pf-line);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+      <span style="font-weight:800;font-size:19px;font-variant-numeric:tabular-nums">{{ inst.local_time.strftime('%I:%M %p').lstrip('0') }}</span>
+      <b>{{ inst.class_type.name }}</b>
+      {% if inst.cohort_label %}<span class="pf-chip pf-chip--ink">{{ inst.cohort_label }}</span>{% endif %}
+      <span class="pf-chip" style="margin-left:auto">{{ rosters.get(inst.id, [])|selectattr('status', 'equalto', 'attended')|list|length }}/{{ rosters.get(inst.id, [])|length }} in</span>
+    </div>
+    <div style="padding:6px 14px 12px">
+      {% for b in rosters.get(inst.id, []) %}
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--pf-line)">
+        <div style="flex:1;min-width:0">
+          <b style="font-size:16px">{{ b.attendee.first_name }}</b>
+          {% if b.kind == 'trial' %}<span class="pf-chip pf-chip--red" style="font-size:10px;padding:3px 7px">first-timer</span>{% endif %}
+          {% if b.confirmed_at and b.status == 'booked' %}<span class="pf-chip pf-chip--info" style="font-size:10px;padding:3px 7px">confirmed ✓</span>{% endif %}
+        </div>
+        {% if b.status == 'attended' %}
+          <span class="pf-chip pf-chip--success" style="font-size:13px">In ✓</span>
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="undo">Undo</button>
+          </form>
+        {% elif b.status == 'no_show' %}
+          <span class="pf-chip pf-chip--warn" style="font-size:13px">No-show</span>
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="undo">Undo</button>
+          </form>
+        {% else %}
+          <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="pf-btn pf-btn--primary" name="action" value="attended" style="min-height:48px;padding:12px 22px">Here</button>
+          </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <p style="color:var(--pf-text-3);font-size:14px;padding:10px 0">No bookings for this class.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

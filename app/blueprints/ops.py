@@ -38,6 +38,13 @@ STAFF_ROLES = {
     Role.gym_admin.value,
     Role.agency_admin.value,
 }
+# Coaches get their own view + attendance marking; the rest of the back
+# office is desk/admin territory.
+DESK_ROLES = {
+    Role.front_desk.value,
+    Role.gym_admin.value,
+    Role.agency_admin.value,
+}
 
 
 def staff_required(fn):
@@ -45,6 +52,17 @@ def staff_required(fn):
     @login_required
     def wrapper(*args, **kwargs):
         if current_user.role not in STAFF_ROLES:
+            abort(403)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def desk_required(fn):
+    @wraps(fn)
+    @login_required
+    def wrapper(*args, **kwargs):
+        if current_user.role not in DESK_ROLES:
             abort(403)
         return fn(*args, **kwargs)
 
@@ -62,6 +80,8 @@ def login():
         )
         if user and user.role in STAFF_ROLES and user.check_password(form.password.data):
             login_user(user)
+            if user.role == Role.trainer.value:
+                return redirect(url_for("ops.coach"))
             return redirect(url_for("ops.today"))
         flash("Invalid email or password.", "error")
     return render_template("ops/login.html", form=form)
@@ -77,9 +97,68 @@ def logout():
 SIGNUP_WINDOW_DAYS = 7  # how far back the Today view's sign-ups panel looks
 
 
+@bp.get("/coach")
+@staff_required
+def coach():
+    """The coach's phone view: today's classes (theirs when linked, all as a
+    fallback), roster with confirmed chips, big attendance buttons. This is
+    the door gate now — no tablet needed."""
+    from sqlalchemy import or_
+
+    from ..models import ScheduleTemplate, Trainer
+
+    d = today_local()
+    me = (
+        db.session.query(Trainer)
+        .filter(
+            Trainer.client_account_id == current_user.client_account_id,
+            or_(Trainer.user_id == current_user.id, Trainer.email == current_user.email),
+        )
+        .first()
+    )
+    q = (
+        db.session.query(ClassInstance)
+        .outerjoin(ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id)
+        .filter(
+            ClassInstance.client_account_id == current_user.client_account_id,
+            ClassInstance.local_date == d,
+            ClassInstance.status == InstanceStatus.scheduled.value,
+            or_(
+                ClassInstance.template_id.is_(None),
+                ScheduleTemplate.active.is_(True),
+            ),
+        )
+        .order_by(ClassInstance.local_time)
+    )
+    instances = q.all()
+    mine = [i for i in instances if me and i.trainer_id == me.id]
+    shown = mine if mine else instances
+    rosters = {
+        inst.id: [
+            b
+            for b in inst.bookings
+            if b.status
+            in (
+                BookingStatus.booked.value,
+                BookingStatus.attended.value,
+                BookingStatus.no_show.value,
+            )
+        ]
+        for inst in shown
+    }
+    return render_template(
+        "ops/coach.html",
+        instances=shown,
+        rosters=rosters,
+        today=d,
+        me=me,
+        showing_all=not mine,
+    )
+
+
 @bp.get("/")
 @bp.get("/today")
-@staff_required
+@desk_required
 def today():
     from datetime import timedelta
 
@@ -156,7 +235,7 @@ def mark_attendance(booking_id: int):
         db.session.commit()
         if booking.kind in ("trial", "walkin"):
             _post_class_followup(booking)
-        return redirect(url_for("ops.today"))
+        return redirect(url_for(_attendance_return_endpoint()))
     elif action == "no_show":
         booking.status = BookingStatus.no_show.value
     elif action == "undo":
@@ -166,11 +245,18 @@ def mark_attendance(booking_id: int):
         abort(400)
     booking.attendance_marked_by = current_user.email
     db.session.commit()
-    return redirect(url_for("ops.today"))
+    return redirect(url_for(_attendance_return_endpoint()))
+
+
+def _attendance_return_endpoint() -> str:
+    """Coaches bounce back to their own view after marking attendance."""
+    if current_user.role == Role.trainer.value:
+        return "ops.coach"
+    return "ops.today"
 
 
 @bp.get("/kiosk")
-@staff_required
+@desk_required
 def kiosk():
     """Door tablet: big search, tap to check in, huge green confirmation.
     Operable by a sweaty person in seven seconds."""
@@ -178,7 +264,7 @@ def kiosk():
 
 
 @bp.post("/kiosk/search")
-@staff_required
+@desk_required
 def kiosk_search():
     from ..models import ClassInstance, InstanceStatus
     from ..services.tzutil import today_local
@@ -219,7 +305,7 @@ def kiosk_search():
 
 
 @bp.post("/kiosk/checkin/<int:booking_id>")
-@staff_required
+@desk_required
 def kiosk_checkin(booking_id: int):
     booking = db.session.get(Booking, booking_id) or abort(404)
     if booking.client_account_id != current_user.client_account_id:

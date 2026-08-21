@@ -57,7 +57,7 @@ from ..services.class_admin import (
 from ..services.messaging import send_email, send_sms
 from ..services.scheduling import booked_counts, generate_instances
 from ..services.tzutil import fmt_local, now_utc, today_local
-from .ops import STAFF_ROLES, staff_required
+from .ops import STAFF_ROLES, desk_required as staff_required
 
 bp = Blueprint("ops_admin", __name__)
 log = logging.getLogger(__name__)
@@ -637,6 +637,49 @@ def _notify_substitution(inst: ClassInstance) -> None:
 @bp.route("/trainers", methods=["GET", "POST"])
 @staff_required
 def trainers():
+    if request.method == "POST" and request.form.get("action") == "invite":
+        t = db.session.get(Trainer, request.form.get("trainer_id", type=int))
+        if t is None or t.client_account_id != _cid():
+            abort(404)
+        if not t.email:
+            flash("Add an email to this trainer first, then invite.", "error")
+            return redirect(url_for("ops_admin.trainers"))
+        from ..services.signed_links import SALT_SET_PASSWORD, make_token
+        from ..services.urls import absolute_url
+
+        u = (
+            db.session.query(User)
+            .filter_by(client_account_id=_cid(), email=t.email.lower())
+            .one_or_none()
+        )
+        if u is None:
+            u = User(
+                client_account_id=_cid(),
+                email=t.email.lower(),
+                name=t.name,
+                role=Role.trainer.value,
+            )
+            db.session.add(u)
+            db.session.flush()
+        if u.role == Role.member.value:
+            u.role = Role.trainer.value  # promote a coach who was a member
+        t.user_id = u.id
+        u.invited_at = utcnow()
+        url = absolute_url(
+            "portal.set_password", token=make_token(u.id, SALT_SET_PASSWORD)
+        )
+        send_email(
+            None, t.email, "Your Box2Fit coach login",
+            render_template("emails/magic_link.html", user=u, url=url),
+            "coach_invite", _cid(),
+        )
+        db.session.commit()
+        flash(
+            f"Login invite sent to {t.email} — after setting a password they "
+            "sign in at /ops/login and land on their coach view.",
+            "success",
+        )
+        return redirect(url_for("ops_admin.trainers"))
     if request.method == "POST" and request.form.get("action") == "delete":
         t = db.session.get(Trainer, request.form.get("trainer_id", type=int))
         if t is None or t.client_account_id != _cid():

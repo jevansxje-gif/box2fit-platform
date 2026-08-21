@@ -122,8 +122,9 @@ def test_e2e_ad_click_to_attendance(app, client, client_account, monkeypatch):
 
     r = client.get("/book/youth/card")
     # Master Plan §6 disclosure with confirmed $189 / 4-week billing cadence
+    # + 5% GST (client 2026-08-21) — total must be stated for accuracy
     assert b"No charge today" in r.data
-    assert b"$189 membership, billed every 4 weeks, starts after your free class on" in r.data
+    assert b"$189 + 5% GST ($198.45 billed every 4 weeks)" in r.data
     customer = db.session.query(StripeCustomer).filter_by(user_id=guardian.id).one()
     customer.stripe_setup_intent_id = "seti_test_123"
 

@@ -134,9 +134,12 @@ def activate_subscription(
     if stripe_service.is_configured():
         stripe = stripe_service.stripe_client()
         price_id = ensure_stripe_price(plan)
+        from .tax import ensure_stripe_gst_rate
+
         ssub = stripe.Subscription.create(
             customer=customer.stripe_customer_id,
             items=[{"price": price_id}],
+            default_tax_rates=[ensure_stripe_gst_rate(stripe)],  # +5% GST
             default_payment_method=customer.stripe_payment_method_id,
             # first_charge_at is naive UTC; convert to epoch for Stripe
             trial_end=int((first_charge_at - datetime(1970, 1, 1)).total_seconds()),
@@ -180,7 +183,9 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
         "funnel.cancel_membership",
         token=make_token(sub.id, SALT_CANCEL_BEFORE_CHARGE),
     )
-    price = f"${plan.price_cents // 100}" if plan.price_cents % 100 == 0 else f"${plan.price_cents / 100:.2f}"
+    from .tax import price_with_gst_label
+
+    price = price_with_gst_label(plan.price_cents)
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     is_child = attendee.kind == AttendeeKind.child.value
     html = render_template(
@@ -293,6 +298,7 @@ def handle_invoice_paid(obj: dict) -> Payment | None:
     invoice_id = obj.get("id")
     sub_id = obj.get("subscription")
     amount = obj.get("amount_paid", 0)
+    tax = obj.get("tax") or 0  # GST portion of amount — never commissionable
     if not sub_id:
         return None
     sub = (
@@ -317,9 +323,10 @@ def handle_invoice_paid(obj: dict) -> Payment | None:
         stripe_invoice_id=invoice_id,
         stripe_charge_id=obj.get("charge"),
         amount_cents=amount,
+        tax_cents=tax,
         currency=(obj.get("currency") or "cad").upper(),
         status="paid",
-        agency_share_cents=round(amount * client.commission_rate),
+        agency_share_cents=round(max(0, amount - tax) * client.commission_rate),
         paid_at=utcnow(),
     )
     db.session.add(payment)
@@ -423,7 +430,14 @@ def handle_charge_refunded(obj: dict) -> None:
     payment.refunded_cents = obj.get("amount_refunded", 0)
     client = db.session.get(ClientAccount, payment.client_account_id)
     net = max(0, payment.amount_cents - payment.refunded_cents)
-    payment.agency_share_cents = round(net * client.commission_rate)
+    # share is on the pre-tax slice of what was kept: scale net by the
+    # invoice's pre-tax fraction so refunded GST never inflates the share
+    pretax_fraction = (
+        (payment.amount_cents - (payment.tax_cents or 0)) / payment.amount_cents
+        if payment.amount_cents
+        else 0
+    )
+    payment.agency_share_cents = round(net * pretax_fraction * client.commission_rate)
     if payment.refunded_cents >= payment.amount_cents:
         payment.status = "refunded"
 

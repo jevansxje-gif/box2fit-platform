@@ -63,6 +63,9 @@ class Config:
     TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 
+    # GST registration number — shown on receipts/reminders once the client
+    # provides it (also add it as a Tax ID in the Stripe dashboard).
+    GST_NUMBER = os.environ.get("GST_NUMBER", "")
     META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "")
     GA4_MEASUREMENT_ID = os.environ.get("GA4_MEASUREMENT_ID", "")
     SENTRY_DSN = os.environ.get("SENTRY_DSN", "")

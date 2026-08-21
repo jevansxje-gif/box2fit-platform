@@ -12,7 +12,7 @@
         {{ plans[s.plan_id].name if s.plan_id in plans }}{% if s.cohort_label %} · {{ s.cohort_label }}{% endif %}
         <span class="pf-chip pf-chip--{{ 'success' if s.status == 'active' else ('warn' if s.status == 'past_due' else 'info') }}" style="margin-left:8px">{{ s.status.replace('_',' ') }}</span>
         <p style="margin:6px 0 0;color:var(--pf-text-2);font-size:14px">
-          ${{ s.mrr_cents // 100 }} every 4 weeks
+          ${{ s.mrr_cents // 100 }} + 5% GST (${{ '%.2f' % (s.mrr_cents * 1.05 / 100) }}) every 4 weeks
           {% if s.cancel_effective_at and s.status != 'cancelled' %} · <b style="color:var(--pf-warn)">cancellation notice given — ends {{ fmt_local(s.cancel_effective_at, '%b %d, %Y') }}</b>
           {% elif s.current_period_end %} · renews {{ fmt_local(s.current_period_end, '%b %d') }}{% endif %}
           {% if s.status == 'pending' and s.first_charge_at %} · first charge {{ fmt_local(s.first_charge_at) }}{% endif %}

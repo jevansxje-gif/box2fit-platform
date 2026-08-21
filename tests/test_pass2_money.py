@@ -67,6 +67,46 @@ def _setup_member(app, client, client_account):
     return staff, booking, guardian
 
 
+def test_gst_on_invoices_and_commission_on_pretax(app, client, client_account):
+    """5% GST (client requirement 2026-08-21): Stripe adds tax on top of the
+    $189 price; the platform records the tax portion and computes the 25%
+    agency share on PRE-TAX revenue only — collected GST is never
+    commissionable, on payment or on refund reversal."""
+    staff, booking, guardian = _setup_member(app, client, client_account)
+    sub = db.session.query(Subscription).one()
+    sub.stripe_subscription_id = "sub_gst_1"
+    db.session.commit()
+
+    # invoice as Stripe sends it with a 5% TaxRate applied
+    _webhook(client, "invoice.paid", {
+        "id": "in_gst_1", "subscription": "sub_gst_1",
+        "amount_paid": 19845, "tax": 945,  # $189 + $9.45 GST
+        "currency": "cad", "charge": "ch_gst_1",
+    })
+    payment = db.session.query(Payment).one()
+    assert payment.amount_cents == 19845
+    assert payment.tax_cents == 945
+    assert payment.agency_share_cents == round(18900 * 0.25)  # 4725, not 4961
+
+    # full refund → share fully reversed
+    _webhook(client, "charge.refunded", {
+        "id": "ch_gst_1", "invoice": "in_gst_1", "amount_refunded": 19845,
+    })
+    db.session.refresh(payment)
+    assert payment.agency_share_cents == 0
+
+    # the pre-charge reminder quoted price + GST + total
+    reminder = db.session.query(Message).filter_by(
+        template="pre_charge_reminder", channel="email"
+    ).first()
+    assert "5% GST" in reminder.body_preview
+    assert "198.45" in reminder.body_preview
+
+    # the card step's legal disclosure shows the GST-inclusive total
+    from app.blueprints.funnel import DISCLOSURE
+    assert "{total}" in DISCLOSURE and "GST" in DISCLOSURE
+
+
 def test_e2e_money_lifecycle(app, client, client_account):
     staff, booking, guardian = _setup_member(app, client, client_account)
 

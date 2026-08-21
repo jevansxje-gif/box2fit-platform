@@ -65,9 +65,10 @@ CHILD_FIRST_SEGMENTS = {"kids", "youth"}  # a parent books; the child attends
 # $189 per 4-week cycle (client 2026-07-24), so "/month" would be inaccurate
 # (13 charges/year) and disclosure accuracy is a card-network requirement.
 DISCLOSURE = (
-    "No charge today. Your {price} membership, billed every 4 weeks, starts "
-    "after your free class on {date}, unless you cancel. We'll remind you "
-    "before any charge. Cancel before the first charge in one click."
+    "No charge today. Your membership is {price} + 5% GST ({total} billed "
+    "every 4 weeks), starting after your free class on {date}, unless you "
+    "cancel. We'll remind you before any charge. Cancel before the first "
+    "charge in one click."
 )
 
 
@@ -449,10 +450,15 @@ def step_card(segment: str):
         .order_by(Plan.class_type_id.desc())
         .first()
     )
+    from ..services.tax import fmt_cents, total_with_gst_cents
+
     cents = plan_row.price_cents if plan_row else 18900
-    price_str = f"${cents // 100}" if cents % 100 == 0 else f"${cents / 100:.2f}"
     class_date_str = fmt_local(booking.class_instance.starts_at_utc, "%A, %B %d")
-    disclosure = DISCLOSURE.format(price=price_str, date=class_date_str)
+    disclosure = DISCLOSURE.format(
+        price=fmt_cents(cents),
+        total=fmt_cents(total_with_gst_cents(cents)),
+        date=class_date_str,
+    )
 
     return render_template(
         "funnel/step_card.html",

@@ -526,10 +526,11 @@ class Payment(db.Model):
     subscription_id: Mapped[int | None] = mapped_column(ForeignKey("subscriptions.id"))
     stripe_invoice_id: Mapped[str | None] = mapped_column(String(64), unique=True)
     stripe_charge_id: Mapped[str | None] = mapped_column(String(64))
-    amount_cents: Mapped[int] = mapped_column(Integer)
+    amount_cents: Mapped[int] = mapped_column(Integer)  # total collected, tax incl.
+    tax_cents: Mapped[int] = mapped_column(Integer, default=0)  # GST portion
     currency: Mapped[str] = mapped_column(String(3), default="CAD")
     status: Mapped[str] = mapped_column(String(15), default="paid")
-    agency_share_cents: Mapped[int] = mapped_column(Integer, default=0)  # 25%
+    agency_share_cents: Mapped[int] = mapped_column(Integer, default=0)  # 25% of pre-tax
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
     refunded_cents: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

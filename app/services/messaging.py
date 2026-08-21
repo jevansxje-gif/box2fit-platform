@@ -38,9 +38,17 @@ def send_email(
         db.session.add(msg)
         return msg
 
+    brevo_key = current_app.config["BREVO_API_KEY"]
     smtp_host = current_app.config["SMTP_HOST"]
     api_key = current_app.config["SENDGRID_API_KEY"]
-    if smtp_host:
+    if brevo_key:
+        try:
+            _send_via_brevo_api(to_email, subject, html)
+            msg.delivery_status = "sent"
+        except Exception as exc:
+            log.exception("brevo api send failed")
+            msg.delivery_status = f"error:{type(exc).__name__}"
+    elif smtp_host:
         try:
             _send_via_smtp(to_email, subject, html)
             msg.delivery_status = "sent"
@@ -71,6 +79,31 @@ def send_email(
         log.info("email (dev, not sent) to=%s subject=%s", to_email, subject)
     db.session.add(msg)
     return msg
+
+
+def _send_via_brevo_api(to_email: str, subject: str, html: str) -> None:
+    """Brevo transactional API over HTTPS:443 — works where SMTP egress is
+    blocked (DigitalOcean default). Raises on non-2xx."""
+    import requests
+
+    resp = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": current_app.config["BREVO_API_KEY"],
+            "content-type": "application/json",
+        },
+        json={
+            "sender": {
+                "name": current_app.config["MAIL_FROM_NAME"],
+                "email": current_app.config["MAIL_FROM_EMAIL"],
+            },
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html,
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
 
 
 def _send_via_smtp(to_email: str, subject: str, html: str) -> None:

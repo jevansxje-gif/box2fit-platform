@@ -43,7 +43,10 @@ class Config:
     SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "hello@box2fit.com")
     SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "Box2Fit White Rock")
 
-    # Generic SMTP (Brevo etc.) — takes precedence over SendGrid when set.
+    # Brevo transactional HTTP API (preferred on hosts that block SMTP ports,
+    # e.g. DigitalOcean). Key looks like xkeysib-...
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+    # Generic SMTP (Brevo etc.) — used when no Brevo API key is set.
     SMTP_HOST = os.environ.get("SMTP_HOST", "")
     SMTP_PORT = _int("SMTP_PORT", 587)
     SMTP_USER = os.environ.get("SMTP_USER", "")

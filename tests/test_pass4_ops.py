@@ -260,9 +260,13 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
     invite = db.session.query(Message).filter_by(template="coach_invite").one()
     set_url = re.search(r"/portal/set-password/[\w\-\.]+", invite.body_preview).group(0)
 
-    # coach sets password → logs in at ops → redirected to coach view
+    # setting the password signs the coach in and lands on the COACH view,
+    # never the member portal
     cbrowser = app.test_client()
-    cbrowser.post(set_url, data={"password": "coachpass123"})
+    r = cbrowser.post(set_url, data={"password": "coachpass123"}, follow_redirects=False)
+    assert "/ops/coach" in r.headers["Location"]
+    r = cbrowser.get("/portal/", follow_redirects=False)
+    assert "/ops/coach" in r.headers["Location"]  # portal bounces staff home
     cbrowser.get("/portal/logout")
     r = cbrowser.post(
         "/ops/login",

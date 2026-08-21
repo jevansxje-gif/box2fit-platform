@@ -30,6 +30,7 @@ from ..models import (
     ClassInstance,
     Payment,
     Plan,
+    Role,
     StripeCustomer,
     Subscription,
     SubscriptionStatus,
@@ -60,6 +61,18 @@ log = logging.getLogger(__name__)
 MAGIC_MAX_AGE = 30 * 60  # magic links live 30 minutes
 
 
+def _home_url(user) -> str:
+    """Where a freshly signed-in user belongs. Staff accounts (coach invites
+    reuse the member set-password flow) go to their ops home, not the portal."""
+    from .ops import STAFF_ROLES
+
+    if user.role == Role.trainer.value:
+        return url_for("ops.coach")
+    if user.role in STAFF_ROLES:
+        return url_for("ops.today")
+    return url_for("portal.dashboard")
+
+
 # ------------------------------------------------------------------- auth ---
 @bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("20/hour", methods=["POST"])
@@ -86,7 +99,7 @@ def login():
             flash("If that email has an account, a sign-in link is on its way.", "success")
         elif user and user.check_password(password):
             login_user(user)
-            return redirect(url_for("portal.dashboard"))
+            return redirect(_home_url(user))
         else:
             flash("Invalid email or password. No password yet? Use the email link option.", "error")
     return render_template("portal/login.html")
@@ -102,7 +115,7 @@ def magic_login(token: str):
     if user is None or not user.active:
         abort(404)
     login_user(user)
-    return redirect(url_for("portal.dashboard"))
+    return redirect(_home_url(user))
 
 
 @bp.route("/set-password/<token>", methods=["GET", "POST"])
@@ -120,7 +133,7 @@ def set_password(token: str):
             db.session.commit()
             login_user(user)
             flash("Password set — welcome!", "success")
-            return redirect(url_for("portal.dashboard"))
+            return redirect(_home_url(user))
     return render_template("portal/set_password.html", user=user)
 
 
@@ -164,6 +177,8 @@ def _ensure_referral_code(user: User) -> str:
 @bp.get("/")
 @login_required
 def dashboard():
+    if current_user.role != Role.member.value:
+        return redirect(_home_url(current_user))
     attendees = _my_attendees()
     subs = _my_subscriptions()
     sub_by_attendee = {s.attendee_id: s for s in subs}

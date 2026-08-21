@@ -100,6 +100,23 @@ def healthz():
     return {"status": "ok"}
 
 
+@bp.get("/sitemap.xml")
+def sitemap():
+    base = current_app.config["SITE_BASE_URL"].rstrip("/")
+    paths = [
+        "/", "/kids", "/youth", "/technical", "/bootcamp", "/shehits",
+        "/beast", "/schedule", "/pricing", "/trainers", "/contact",
+        "/privacy", "/terms",
+    ]
+    urls = "".join(f"<url><loc>{base}{p}</loc></url>" for p in paths)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return body, 200, {"Content-Type": "application/xml"}
+
+
 @bp.get("/robots.txt")
 def robots():
     body = (
@@ -109,6 +126,7 @@ def robots():
         "Disallow: /api/\n"
         "Disallow: /book/\n"
         "Allow: /\n"
+        f"Sitemap: {current_app.config['SITE_BASE_URL'].rstrip('/')}/sitemap.xml\n"
     )
     return body, 200, {"Content-Type": "text/plain"}
 

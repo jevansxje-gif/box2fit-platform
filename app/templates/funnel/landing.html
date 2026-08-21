@@ -6,6 +6,7 @@
 
 {% block title %}{{ copy.page_title }}{% endblock %}
 {% block meta_description %}{{ copy.subhead }}{% endblock %}
+{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
 
 {% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}

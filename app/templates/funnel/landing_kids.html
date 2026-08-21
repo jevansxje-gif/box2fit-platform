@@ -4,6 +4,7 @@
 
 {% block title %}Kids Boxing — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Confidence, focus, and real skills for kids ages 6 to 10. Their first class is free at Box2Fit White Rock.{% endblock %}
+{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/youth-kids-bags.jpg') }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
 
 {% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}

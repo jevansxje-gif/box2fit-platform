@@ -7,6 +7,11 @@
 <meta name="description" content="{% block meta_description %}Boxing and fitness in White Rock. Your first class is free.{% endblock %}" />
 <link rel="canonical" href="{{ config.SITE_BASE_URL.rstrip('/') ~ request.path }}" />
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo-ink.png') }}" />
+<meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}" />
+<meta property="og:description" content="{{ self.meta_description() }}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ config.SITE_BASE_URL.rstrip('/') ~ request.path }}" />
+<meta property="og:image" content="{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/adults-sparring.jpg') }}{% endblock %}" />
 {% if config.META_PIXEL_ID %}
 <script>
 !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?

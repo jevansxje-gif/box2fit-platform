@@ -5,6 +5,28 @@
 <div class="ops-shell" style="max-width:860px">
   {{ ops_nav() }}
   <h1 class="pf-h1" style="margin:0 0 18px">Announcements</h1>
+
+  <div class="pf-panel" style="margin-top:0">
+    <h2>New sign-up alerts</h2>
+    <p class="note">These mailboxes get an email every time someone books a free first class. Add as many as you like.</p>
+    {% for e in alert_emails %}
+    <div class="roster-row">
+      <span style="flex:1">{{ e }}</span>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="alert_email" value="{{ e }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="remove_alert_email">Remove</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="roster-row"><span style="color:var(--pf-warn);font-weight:700">No recipients — nobody is getting sign-up alerts.</span></div>
+    {% endfor %}
+    <form method="post" style="display:flex;gap:10px;align-items:end;margin-top:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div style="flex:1"><label class="pf-label">Add email</label><input class="pf-input" name="alert_email" type="email" required placeholder="name@example.com" /></div>
+      <button class="pf-btn pf-btn--primary" name="action" value="add_alert_email">Add</button>
+    </form>
+  </div>
   <div class="pf-panel" style="margin-top:0">
     <h2>New announcement</h2>
     <p class="note">Shows as a banner in the member portal immediately. Emailing respects the news preference and CASL consent.</p>

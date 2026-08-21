@@ -1049,8 +1049,33 @@ def export_csv(name: str):
 @bp.route("/announcements", methods=["GET", "POST"])
 @staff_required
 def announcements():
+    from ..services.booking_flow import admin_alert_recipients
+
     if request.method == "POST":
         action = request.form.get("action")
+        if action == "add_alert_email":
+            email = (request.form.get("alert_email") or "").strip().lower()
+            if "@" not in email or "." not in email.split("@")[-1]:
+                flash("Enter a valid email address.", "error")
+            else:
+                emails = admin_alert_recipients()
+                if email not in emails:
+                    emails.append(email)
+                    SiteSetting.set("admin_notify_emails", ",".join(emails))
+                    db.session.commit()
+                flash(f"{email} now receives new sign-up alerts.", "success")
+            return redirect(url_for("ops_admin.announcements"))
+        elif action == "remove_alert_email":
+            email = (request.form.get("alert_email") or "").strip().lower()
+            emails = [e for e in admin_alert_recipients() if e != email]
+            SiteSetting.set("admin_notify_emails", ",".join(emails))
+            db.session.commit()
+            flash(
+                f"{email} removed"
+                + (" — no alert recipients remain!" if not emails else "."),
+                "success" if emails else "error",
+            )
+            return redirect(url_for("ops_admin.announcements"))
         if action == "create":
             db.session.add(
                 Announcement(
@@ -1084,7 +1109,11 @@ def announcements():
     class_types = db.session.query(ClassType).filter_by(client_account_id=_cid()).all()
     type_names = {c.id: c.name for c in class_types}
     return render_template(
-        "ops/announcements.html", rows=rows, class_types=class_types, type_names=type_names
+        "ops/announcements.html",
+        rows=rows,
+        class_types=class_types,
+        type_names=type_names,
+        alert_emails=admin_alert_recipients(),
     )
 
 

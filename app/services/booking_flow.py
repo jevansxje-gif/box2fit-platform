@@ -162,12 +162,25 @@ def create_trial_booking(
     return booking
 
 
-def send_admin_signup_alert(booking: Booking) -> None:
-    """New free-class sign-up → email the staff mailbox (ADMIN_NOTIFY_EMAIL)."""
+def admin_alert_recipients() -> list[str]:
+    """Staff alert mailboxes: the ops-managed list (site setting), falling
+    back to the ADMIN_NOTIFY_EMAIL env value if the list was never set."""
     from flask import current_app
 
-    admin_email = current_app.config["ADMIN_NOTIFY_EMAIL"]
-    if not admin_email:
+    from ..models import SiteSetting
+
+    raw = SiteSetting.get("admin_notify_emails", "")
+    emails = [e.strip() for e in raw.split(",") if e.strip()]
+    if emails:
+        return emails
+    env = current_app.config["ADMIN_NOTIFY_EMAIL"]
+    return [env] if env else []
+
+
+def send_admin_signup_alert(booking: Booking) -> None:
+    """New free-class sign-up → email every configured staff mailbox."""
+    recipients = admin_alert_recipients()
+    if not recipients:
         return
     attendee = booking.attendee
     guardian = attendee.guardian
@@ -188,10 +201,11 @@ def send_admin_signup_alert(booking: Booking) -> None:
         + (f" (child of {guardian.name})" if is_child else f" ({guardian.name})")
         + f" — {instance.class_type.name} {fmt_local(instance.starts_at_utc, '%a %b %d')}"
     )
-    send_email(
-        None, admin_email, subject, html, "admin_new_signup",
-        booking.client_account_id, attendee_id=attendee.id,
-    )
+    for admin_email in recipients:
+        send_email(
+            None, admin_email, subject, html, "admin_new_signup",
+            booking.client_account_id, attendee_id=attendee.id,
+        )
 
 
 def send_booking_confirmation(booking: Booking) -> None:

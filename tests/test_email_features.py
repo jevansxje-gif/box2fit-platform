@@ -42,6 +42,39 @@ def test_confirmation_has_calendar_buttons_and_ics_works(client, client_account)
     assert client.get(ics_path.replace(".ics", "x.ics")).status_code == 404
 
 
+def test_alert_recipient_list_managed_in_ops(app, client, client_account):
+    from app.models import SiteSetting
+
+    staff = _admin(app)
+    # add two recipients via the UI
+    staff.post(
+        "/ops/announcements",
+        data={"action": "add_alert_email", "alert_email": "owner@example.com"},
+    )
+    staff.post(
+        "/ops/announcements",
+        data={"action": "add_alert_email", "alert_email": "second@example.com"},
+    )
+    r = staff.get("/ops/announcements")
+    assert b"owner@example.com" in r.data and b"second@example.com" in r.data
+
+    # a sign-up alerts BOTH (env fallback no longer used once the list exists)
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    alerts = db.session.query(Message).filter_by(template="admin_new_signup").all()
+    assert sorted(a.recipient for a in alerts) == [
+        "owner@example.com",
+        "second@example.com",
+    ]
+
+    # remove one
+    staff.post(
+        "/ops/announcements",
+        data={"action": "remove_alert_email", "alert_email": "second@example.com"},
+    )
+    assert SiteSetting.get("admin_notify_emails") == "owner@example.com"
+
+
 def test_coach_assignment_email_on_bulk_and_day_swap(app, client, client_account):
     staff = _admin(app)
     coach = Trainer(

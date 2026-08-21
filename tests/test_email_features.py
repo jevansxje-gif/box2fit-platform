@@ -58,13 +58,15 @@ def test_alert_recipient_list_managed_in_ops(app, client, client_account):
     r = staff.get("/ops/announcements")
     assert b"owner@example.com" in r.data and b"second@example.com" in r.data
 
-    # a sign-up alerts BOTH (env fallback no longer used once the list exists)
+    # a sign-up alerts EVERY listed mailbox — including the pre-existing env
+    # recipient, which the first edit folds into the managed list
     instance = _first_instance(client_account)
     _book_child(client, instance)
     alerts = db.session.query(Message).filter_by(template="admin_new_signup").all()
     assert sorted(a.recipient for a in alerts) == [
         "owner@example.com",
         "second@example.com",
+        "staff-alerts@test.local",
     ]
 
     # remove one
@@ -72,7 +74,9 @@ def test_alert_recipient_list_managed_in_ops(app, client, client_account):
         "/ops/announcements",
         data={"action": "remove_alert_email", "alert_email": "second@example.com"},
     )
-    assert SiteSetting.get("admin_notify_emails") == "owner@example.com"
+    assert SiteSetting.get("admin_notify_emails") == (
+        "staff-alerts@test.local,owner@example.com"
+    )
 
 
 def test_coach_assignment_email_on_bulk_and_day_swap(app, client, client_account):

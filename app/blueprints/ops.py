@@ -152,8 +152,11 @@ def mark_attendance(booking_id: int):
     if action == "attended":
         booking.status = BookingStatus.attended.value
         booking.checked_in_at = utcnow()
+        booking.attendance_marked_by = current_user.email
+        db.session.commit()
         if booking.kind in ("trial", "walkin"):
-            _send_post_class_email(booking)
+            _post_class_followup(booking)
+        return redirect(url_for("ops.today"))
     elif action == "no_show":
         booking.status = BookingStatus.no_show.value
     elif action == "undo":
@@ -226,13 +229,90 @@ def kiosk_checkin(booking_id: int):
         booking.status = BookingStatus.attended.value
         booking.checked_in_at = utcnow()
         booking.attendance_marked_by = "kiosk"
-        if booking.kind in ("trial", "walkin"):
-            _send_post_class_email(booking)
         db.session.commit()
+        if booking.kind in ("trial", "walkin"):
+            _post_class_followup(booking)
     return render_template(
         "ops/kiosk.html",
         result={"attendee": booking.attendee, "first_time": first_time},
         query="",
+    )
+
+
+def _post_class_followup(booking: Booking) -> None:
+    """Auto-start policy (client decision 2026-08-27): a trial attendance
+    starts the membership automatically on the vaulted card — the pre-charge
+    reminder (48h, one-click cancel) is the member's notice, matching the
+    disclosure they agreed to at booking. Falls back to the 'Loved it?'
+    activation email when no card is on file. Never breaks attendance
+    marking."""
+    from flask import flash
+
+    from ..models import (
+        PaymentMethodStatus,
+        StripeCustomer,
+        Subscription,
+        SubscriptionStatus,
+    )
+    from ..services import billing
+
+    attendee = booking.attendee
+    existing = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.attendee_id == attendee.id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            ),
+        )
+        .first()
+    )
+    if existing:
+        return  # already a member — nothing to start, nothing to email
+
+    customer = (
+        db.session.query(StripeCustomer)
+        .filter_by(user_id=attendee.user_id)
+        .one_or_none()
+    )
+    vaulted = (
+        customer is not None
+        and customer.payment_method_status == PaymentMethodStatus.vaulted.value
+    )
+    if vaulted:
+        try:
+            billing.activate_subscription(
+                attendee,
+                cohort_label=booking.class_instance.cohort_label,
+                actor="auto_post_class",
+            )
+            db.session.commit()
+            flash(
+                f"{attendee.first_name} attended — membership starts "
+                "automatically in 48 hours (reminder with one-click cancel sent).",
+                "success",
+            )
+            return
+        except billing.ActivationError:
+            db.session.rollback()
+        except Exception:
+            db.session.rollback()
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "auto-activation failed for booking %s", booking.id
+            )
+    # fallback: no card (or activation failed) → the activate-link email
+    _send_post_class_email(booking)
+    db.session.commit()
+    flash(
+        f"{attendee.first_name} attended — no card on file for auto-start, "
+        "sent the membership email instead.",
+        "success",
     )
 
 

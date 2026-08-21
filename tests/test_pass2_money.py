@@ -70,13 +70,10 @@ def _setup_member(app, client, client_account):
 def test_e2e_money_lifecycle(app, client, client_account):
     staff, booking, guardian = _setup_member(app, client, client_account)
 
-    # post-class 'loved it' email went to the guardian with the activate link
-    post_class = db.session.query(Message).filter_by(template="post_class").one()
-    assert "/activate/" in post_class.body_preview
-
-    # 1. Front-desk activation → pending sub + pre-charge reminder (48h lead)
-    r = staff.post(f"/ops/bookings/{booking.id}/activate")
-    assert r.status_code == 302
+    # 1. AUTO-START (client policy 2026-08-27): marking attendance with a
+    # vaulted card starts the membership automatically — no post-class
+    # email, the pre-charge reminder IS the notice.
+    assert db.session.query(Message).filter_by(template="post_class").count() == 0
     sub = db.session.query(Subscription).one()
     assert sub.status == SubscriptionStatus.pending.value
     assert sub.user_id == guardian.id
@@ -170,28 +167,36 @@ def test_e2e_money_lifecycle(app, client, client_account):
     assert sub.cancelled_at is not None
 
 
-def test_activation_requires_vaulted_card(app, client, client_account):
+def test_no_card_falls_back_to_activation_email(app, client, client_account):
+    """Without a vaulted card, attendance can't auto-start — the 'Loved it?'
+    email with the activate link goes out instead, and the link works once a
+    card exists."""
+    import re
+
     instance = _first_instance(client_account)
     _book_child(client, instance)
     booking = db.session.query(Booking).one()
     staff = app.test_client()
     staff.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
-    staff.post(f"/ops/bookings/{booking.id}/attendance", data={"action": "attended"})
-    r = staff.post(f"/ops/bookings/{booking.id}/activate", follow_redirects=True)
-    assert b"No card on file" in r.data
-    assert db.session.query(Subscription).count() == 0
-
-
-def test_member_self_activation_link(app, client, client_account):
-    staff, booking, guardian = _setup_member(app, client, client_account)
-    import re
+    r = staff.post(
+        f"/ops/bookings/{booking.id}/attendance",
+        data={"action": "attended"},
+        follow_redirects=True,
+    )
+    assert b"no card on file" in r.data
+    assert db.session.query(Subscription).count() == 0  # nothing auto-started
     post_class = db.session.query(Message).filter_by(template="post_class").one()
     token = re.search(r"/activate/([\w\-\.]+)", post_class.body_preview).group(1)
 
-    r = client.get(f"/activate/{token}")
-    assert r.status_code == 200
-    assert b"$189" in r.data and b"every 4 weeks" in r.data
+    # manual ops activation also blocked without a card
+    r = staff.post(f"/ops/bookings/{booking.id}/activate", follow_redirects=True)
+    assert b"No card on file" in r.data
 
+    # once the guardian vaults a card, the emailed link activates
+    guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
+    _vault_card(guardian)
+    r = client.get(f"/activate/{token}")
+    assert b"$189" in r.data and b"every 4 weeks" in r.data
     r = client.post(f"/activate/{token}")
     assert b"crew" in r.data
     sub = db.session.query(Subscription).one()

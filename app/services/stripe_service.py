@@ -62,6 +62,9 @@ def ensure_customer_with_setup_intent(
     si = stripe.SetupIntent.create(
         customer=customer.stripe_customer_id,
         usage="off_session",
+        # Card only: suppresses the Stripe Link signup upsell inside the
+        # Payment Element — guardians already gave us their details.
+        payment_method_types=["card"],
         metadata=metadata,
     )
     customer.stripe_setup_intent_id = si.id

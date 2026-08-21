@@ -19,7 +19,15 @@
     <script>
       const stripe = Stripe({{ stripe_publishable_key | tojson }});
       const elements = stripe.elements({ clientSecret: {{ client_secret | tojson }} });
-      elements.create('payment').mount('#payment-element');
+      elements.create('payment', {
+        defaultValues: {
+          billingDetails: {
+            name: {{ attendee.guardian.name | tojson }},
+            email: {{ attendee.guardian.email | tojson }},
+            phone: {{ attendee.guardian.phone | tojson }},
+          },
+        },
+      }).mount('#payment-element');
       document.getElementById('payment-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('submit-btn');

@@ -392,6 +392,9 @@ class Booking(db.Model):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
     late_cancel: Mapped[bool] = mapped_column(Boolean, default=False)  # staff-only
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Pre-class "I'm coming" from the reminder email — NOT attendance;
+    # attendance is marked at the door (kiosk/staff).
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
     attendance_marked_by: Mapped[str | None] = mapped_column(String(120))
     ipad_walkin: Mapped[bool] = mapped_column(Boolean, default=False)
     reminder_24h_sent_at: Mapped[datetime | None] = mapped_column(DateTime)

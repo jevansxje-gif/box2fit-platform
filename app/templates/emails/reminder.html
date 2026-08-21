@@ -9,6 +9,12 @@
       {{ address }} — arrive 10 minutes early.<br />
       Athletic clothing, indoor shoes, water bottle. Gloves &amp; wraps provided.
     </p>
+    {% if confirm_url %}
+    <p style="margin:0 0 6px">
+      <a href="{{ confirm_url }}" style="display:inline-block;background:#C8132B;color:#fff;font-weight:800;padding:14px 26px;border-radius:10px;text-decoration:none">Check In Now</a>
+    </p>
+    <p style="font-size:13px;color:#767C86;line-height:1.6;margin:0 0 10px">One tap tells the coaches you're coming — it helps us plan the class.</p>
+    {% endif %}
     <p style="font-size:13px;color:#767C86;line-height:1.6;margin:16px 0 0">
       Plans changed? <a href="{{ cancel_url }}" style="color:#C8132B">Cancel in one click</a> and we'll release the spot. No penalties.
     </p>

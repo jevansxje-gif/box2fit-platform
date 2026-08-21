@@ -20,7 +20,11 @@ from ..models import (
 from ..services.booking_flow import STUDIO_ADDRESS
 from ..services.messaging import send_email, send_sms
 from ..services.scheduling import generate_instances
-from ..services.signed_links import SALT_CANCEL_BOOKING, make_token
+from ..services.signed_links import (
+    SALT_CANCEL_BOOKING,
+    SALT_CONFIRM_ATTEND,
+    make_token,
+)
 from ..services.tzutil import fmt_local, now_utc
 from ..services.urls import absolute_url
 
@@ -66,6 +70,10 @@ def _send_reminder(booking: Booking, template: str) -> None:
     cancel_url = absolute_url(
         "funnel.cancel_booking", token=make_token(booking.id, SALT_CANCEL_BOOKING)
     )
+    confirm_url = absolute_url(
+        "funnel.confirm_attendance",
+        token=make_token(booking.id, SALT_CONFIRM_ATTEND),
+    )
     is_child = attendee.kind == AttendeeKind.child.value
     is_2h = template == "reminder_2h"
     html = render_template(
@@ -78,6 +86,7 @@ def _send_reminder(booking: Booking, template: str) -> None:
         when=when,
         address=STUDIO_ADDRESS,
         cancel_url=cancel_url,
+        confirm_url=None if booking.confirmed_at else confirm_url,
     )
     who = f"{attendee.first_name}'s" if is_child else "Your"
     subject = (
@@ -87,12 +96,17 @@ def _send_reminder(booking: Booking, template: str) -> None:
         guardian, guardian.email, subject, html, template,
         booking.client_account_id, attendee_id=attendee.id,
     )
+    sms_body = (
+        f"Box2Fit: {who.lower()} {instance.class_type.name} class is "
+        f"{'in about 2 hours' if is_2h else 'tomorrow'} ({when}). "
+    )
+    if booking.confirmed_at is None:
+        sms_body += f"Tap to check in: {confirm_url} "
+    sms_body += f"Can't make it? {cancel_url}"
     send_sms(
         guardian,
         guardian.phone,
-        f"Box2Fit: {who.lower()} {instance.class_type.name} class is "
-        f"{'in about 2 hours' if is_2h else 'tomorrow'} ({when}). "
-        f"{STUDIO_ADDRESS}. Need to cancel? {cancel_url}",
+        sms_body,
         template,
         booking.client_account_id,
         attendee_id=attendee.id,

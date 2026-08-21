@@ -59,6 +59,47 @@ def test_confirmation_has_calendar_buttons_and_ics_works(client, client_account)
     assert client.get(ics_path.replace(".ics", "x.ics")).status_code == 404
 
 
+def test_reminder_checkin_button_and_confirm_flow(app, client, client_account):
+    import re
+
+    from app.tasks.jobs import send_due_reminders
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+
+    sent = send_due_reminders.apply().get()
+    assert sent == 1
+    reminder = (
+        db.session.query(Message)
+        .filter_by(template="reminder_24h", channel="email")
+        .one()
+    )
+    assert "Check In Now" in reminder.body_preview
+    confirm_url = re.search(r"/confirm/[\w\-\.]+", reminder.body_preview).group(0)
+
+    r = client.get(confirm_url)
+    assert b"checked in for class" in r.data
+    db.session.refresh(booking)
+    assert booking.confirmed_at is not None
+    assert booking.status == "booked"  # confirmed is NOT attended
+
+    # roster shows the confirmed chip to staff
+    from app.services.tzutil import local_to_utc, today_local
+    from datetime import time as dtime
+
+    inst = booking.class_instance
+    inst.local_date = today_local()
+    inst.local_time = dtime(23, 55)
+    inst.starts_at_utc = local_to_utc(today_local(), dtime(23, 55))
+    db.session.commit()
+    staff = _admin(app)
+    assert "confirmed ✓".encode() in staff.get("/ops/today").data
+
+    # tampered token 404s
+    assert client.get(confirm_url + "x").status_code == 404
+
+
 def test_alert_recipient_list_managed_in_ops(app, client, client_account):
     from app.models import SiteSetting
 

@@ -104,6 +104,7 @@
             <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="undo">Undo</button>
           </form>
         {% else %}
+          {% if b.confirmed_at %}<span class="pf-chip pf-chip--info" title="Confirmed from the reminder email">confirmed ✓</span>{% endif %}
           <form method="post" action="{{ url_for('ops.mark_attendance', booking_id=b.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="attended">Attended</button>

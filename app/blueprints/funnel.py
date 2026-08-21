@@ -537,6 +537,28 @@ def booking_ics(token: str):
     )
 
 
+@bp.get("/confirm/<token>")
+def confirm_attendance(token: str):
+    """One-click 'I'm coming' from the reminder email. Marks the booking
+    confirmed (staff see it on the roster); real attendance still happens at
+    the door."""
+    from ..services.signed_links import SALT_CONFIRM_ATTEND
+
+    booking_id = read_token(token, SALT_CONFIRM_ATTEND)
+    if booking_id is None:
+        abort(404)
+    booking = db.session.get(Booking, booking_id) or abort(404)
+    already_cancelled = booking.status == BookingStatus.cancelled.value
+    if booking.status == BookingStatus.booked.value and booking.confirmed_at is None:
+        booking.confirmed_at = utcnow()
+        db.session.commit()
+    return render_template(
+        "funnel/confirm_attendance.html",
+        booking=booking,
+        already_cancelled=already_cancelled,
+    )
+
+
 @bp.get("/book/cancel/<token>")
 def cancel_booking(token: str):
     booking_id = read_token(token, SALT_CANCEL_BOOKING)

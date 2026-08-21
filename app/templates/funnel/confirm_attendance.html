@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Checked in — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    {% if already_cancelled %}
+      <div class="pf-kicker">Heads up</div>
+      <div class="big">This booking was cancelled.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Want back in? <a href="{{ url_for('portal.login') }}">Book again from your account</a> or grab a spot from the schedule.</p>
+    {% else %}
+      <div class="pf-kicker">You're confirmed</div>
+      <div class="big">{{ booking.attendee.first_name }} is checked in for class.</div>
+      <div class="when">{{ booking.class_instance.class_type.name }} · {{ fmt_local(booking.class_instance.starts_at_utc) }}</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">See you there — just give your name at the front desk tablet when you arrive.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

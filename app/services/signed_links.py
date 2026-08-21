@@ -11,6 +11,7 @@ SALT_MAGIC_LOGIN = "magic-login"
 SALT_WAITLIST_CONFIRM = "waitlist-confirm"
 SALT_UPDATE_CARD = "update-card"
 SALT_ACTIVATE = "activate-membership"
+SALT_CONFIRM_ATTEND = "confirm-attendance"
 
 MAX_AGE = 60 * 60 * 24 * 90  # 90 days default
 

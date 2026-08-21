@@ -1,16 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Cancelled — Box2Fit White Rock{% endblock %}
+{% block title %}Cancellation — Box2Fit White Rock{% endblock %}
 
 {% block content %}
 <div class="flow">
   <div class="confirm-card">
     <div class="pf-kicker">All done</div>
-    <div class="big">{% if not charged_yet %}You won't be charged.{% else %}Membership cancelled.{% endif %}</div>
-    <p style="margin:18px 0 4px;color:var(--pf-text-2)">
-      {% if not charged_yet %}The membership was cancelled before any charge.{% else %}No further charges will happen.{% endif %}
-      The ring's here whenever you're ready.
-    </p>
+    {% if not charged_yet %}
+      <div class="big">You won't be charged.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">The membership was cancelled before any charge — the free trial carries no obligation. The ring's here whenever you're ready.</p>
+    {% else %}
+      <div class="big">Cancellation notice received.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">
+        This counts as your written notice. Per the membership terms, billing and full class access continue through the 30-day notice period{% if sub.cancel_effective_at %}, and the membership ends on <b>{{ fmt_local(sub.cancel_effective_at, '%B %d, %Y') }}</b>{% endif %}. See you in class until then.
+      </p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

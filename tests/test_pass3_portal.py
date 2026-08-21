@@ -221,16 +221,26 @@ def test_cancel_membership_with_reason(client, client_account):
     sub = db.session.query(Subscription).one()
     r = client.get(f"/portal/membership/{sub.id}/cancel")
     assert b"pause" in r.data.lower()  # the pause-would-have-saved-me option
+    assert b"30-day notice" in r.data  # terms disclosed before cancelling
     r = client.post(
         f"/portal/membership/{sub.id}/cancel",
         data={"reason": "pause_would_have_saved", "note": "back in the fall"},
         follow_redirects=True,
     )
     assert r.status_code == 200
+    assert b"30-day notice period" in r.data
     db.session.refresh(sub)
-    assert sub.status == SubscriptionStatus.cancelled.value
+    # ACTIVE membership → 30-day notice: stays active, effective date set,
+    # dues continue (per the client's membership terms)
+    assert sub.status == SubscriptionStatus.active.value
+    assert sub.cancel_requested_at is not None
+    days = (sub.cancel_effective_at - sub.cancel_requested_at).days
+    assert days == 30
     assert sub.cancel_reason == "pause_would_have_saved"
     assert sub.cancel_reason_note == "back in the fall"
+    # membership page shows the scheduled end and hides the cancel button
+    r = client.get("/portal/membership")
+    assert b"cancellation notice given" in r.data
 
 
 def test_kiosk_checkin_first_timer(app, client, client_account):

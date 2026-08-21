@@ -73,18 +73,44 @@
       <label class="pf-check">{{ form.consent_sms() }} <span class="t">{{ form.consent_sms.label.text }}</span></label>
     </div>
 
-    <div class="pf-panel">
-      <h2>Liability waiver</h2>
+    <div class="pf-panel" id="waiver-panel">
+      <h2>Waiver &amp; membership terms</h2>
       <p class="note">
         <span x-show="kind === 'child'">As parent or legal guardian, you sign on your child's behalf. </span>
-        I understand that participation in boxing and fitness activities at Box2Fit involves inherent risks, and I voluntarily assume those risks<span x-show="kind === 'child'"> on behalf of the child named above</span>. I release Box2Fit, its coaches and staff from liability for injuries arising from ordinary negligence, to the fullest extent permitted by BC law. This is a summary. The full waiver text will be supplied for launch.
+        Open and read each section below — consent unlocks once all three have been opened.
       </p>
-      <label class="pf-check">{{ form.waiver_agree() }} <span class="t">{{ form.waiver_agree.label.text }}</span></label>
+      {% for title, body in waiver_sections %}
+      <details class="waiver-sec" style="border:1px solid var(--pf-line);border-radius:var(--pf-r-md);margin-bottom:8px;background:var(--pf-paper-2)">
+        <summary style="cursor:pointer;padding:13px 16px;font-weight:700;font-size:15px;color:var(--pf-ink)">{{ title }}</summary>
+        <div style="padding:0 16px 14px;font-size:13.5px;line-height:1.65;color:var(--pf-text-2);white-space:pre-line">{{ body }}</div>
+      </details>
+      {% endfor %}
+      <label class="pf-check" style="margin-top:14px">
+        {{ form.waiver_agree(disabled=True, **{"data-waiver-consent": "1"}) }}
+        <span class="t">{{ form.waiver_agree.label.text }} <em id="waiver-hint" style="color:var(--pf-text-3);font-style:normal;font-size:13px">(open all three sections above first)</em></span>
+      </label>
       {{ errs(form.waiver_agree) }}
       <div class="pf-field" style="margin:14px 0 0">
         {{ form.signature.label(class="pf-label") }}{{ form.signature(class="pf-input", autocomplete="off") }}{{ errs(form.signature) }}
       </div>
     </div>
+    <script>
+      (function () {
+        var secs = Array.prototype.slice.call(document.querySelectorAll('.waiver-sec'));
+        var box = document.querySelector('[data-waiver-consent]');
+        var hint = document.getElementById('waiver-hint');
+        var opened = new Set();
+        secs.forEach(function (d, i) {
+          d.addEventListener('toggle', function () {
+            if (d.open) opened.add(i);
+            if (opened.size === secs.length) {
+              box.disabled = false;
+              if (hint) hint.textContent = '';
+            }
+          });
+        });
+      })();
+    </script>
 
     <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Continue</button>
   </form>

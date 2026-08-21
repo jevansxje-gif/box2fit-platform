@@ -501,6 +501,10 @@ class Subscription(db.Model):
     pre_charge_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # 30-day notice (client's membership terms): when the member asked, and
+    # when the cancellation takes effect. Dues continue until effective.
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cancel_effective_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancel_reason: Mapped[str | None] = mapped_column(String(80))
     cancel_reason_note: Mapped[str | None] = mapped_column(Text)
     # Pause is NOT offered in v1 — schema stays ready (client may enable later)

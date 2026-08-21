@@ -65,7 +65,7 @@ CHILD_FIRST_SEGMENTS = {"youth"}  # child is the default attendee here
 DISCLOSURE = (
     "No charge today. Your {price} membership, billed every 4 weeks, starts "
     "after your free class on {date}, unless you cancel. We'll remind you "
-    "before any charge. Cancel anytime in one click."
+    "before any charge. Cancel before the first charge in one click."
 )
 
 
@@ -358,11 +358,14 @@ def step_details(segment: str):
         _save(state)
         return redirect(url_for("funnel.step_card", segment=segment))
 
+    from ..legal import WAIVER_SECTIONS
+
     return render_template(
         "funnel/step_details.html",
         form=form,
         instance=instance,
         health_questions=HEALTH_QUESTIONS,
+        waiver_sections=WAIVER_SECTIONS,
         segment=segment,
         step=2,
     )
@@ -512,7 +515,7 @@ def cancel_membership(token: str):
     )
     db.session.commit()
     return render_template(
-        "funnel/membership_cancelled.html", charged_yet=charged_yet
+        "funnel/membership_cancelled.html", charged_yet=charged_yet, sub=sub
     )
 
 

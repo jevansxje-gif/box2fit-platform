@@ -85,17 +85,7 @@ AUDIENCE_TO_TAGS = {
     "beast-mode": "beast",
 }
 
-MINOR_WAIVER_MD = (
-    "**Youth Participation Waiver (v1 placeholder).** As parent or legal "
-    "guardian, I consent to the named child's participation in boxing and "
-    "fitness activities at Box2Fit, understand the inherent risks, and "
-    "release Box2Fit, its coaches and staff from liability for injuries "
-    "arising from ordinary negligence, to the extent permitted by BC law. "
-    "Full legal text to be supplied before launch."
-)
-ADULT_WAIVER_MD = MINOR_WAIVER_MD.replace(
-    "As parent or legal guardian, I consent to the named child's", "I consent to my"
-)
+from app.legal import WAIVER_FULL_TEXT, WAIVER_VERSION  # client-supplied text
 
 
 def seed():
@@ -188,17 +178,20 @@ def seed():
             )
         print(f"schedule templates: {len(SCHEDULE)}")
 
-    for kind, body in (("minor", MINOR_WAIVER_MD), ("adult", ADULT_WAIVER_MD)):
+    for kind in ("minor", "adult"):
         exists = db.session.query(WaiverDocument).filter_by(
-            client_account_id=client.id, kind=kind, active=True
+            client_account_id=client.id, kind=kind, version=WAIVER_VERSION
         ).first()
         if not exists:
             db.session.add(
                 WaiverDocument(
-                    client_account_id=client.id, kind=kind, version=1, body_md=body
+                    client_account_id=client.id,
+                    kind=kind,
+                    version=WAIVER_VERSION,
+                    body_md=WAIVER_FULL_TEXT,
                 )
             )
-    print("waiver documents: minor + adult v1")
+    print(f"waiver documents: minor + adult v{WAIVER_VERSION} (client legal text)")
 
     # Ops staff (dev credentials — change on staging)
     for email, name, role, pw in (

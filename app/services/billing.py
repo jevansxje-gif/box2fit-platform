@@ -203,27 +203,52 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
     send_sms(
         guardian, guardian.phone,
         f"Box2Fit: {who.lower()} membership ({price} every 4 weeks) starts in "
-        f"{lead_hours} hours. Cancel anytime in one click: {cancel_url}",
+        f"{lead_hours} hours. Cancel before the charge in one click: {cancel_url}",
         "pre_charge_reminder", sub.client_account_id, attendee_id=attendee.id,
     )
     sub.pre_charge_reminder_sent_at = utcnow()
 
 
+NOTICE_DAYS = 30  # mandatory cancellation notice per the membership terms
+
+
 def cancel_subscription(sub: Subscription, reason: str, note: str | None = None) -> None:
-    """Cancel locally + on Stripe. Used by cancel-before-charge (no charge
-    ever happens) and later by the portal cancel flow."""
-    if sub.status == SubscriptionStatus.cancelled.value:
+    """Cancel per the client's membership terms:
+    - BEFORE the first charge (free-trial window): immediate, no obligation.
+    - AFTER activation: a 30-day notice is recorded; dues continue through
+      the notice period and the subscription ends at the effective date
+      (Stripe cancel_at; the subscription.deleted webhook finalizes it).
+    """
+    if sub.status == SubscriptionStatus.cancelled.value or sub.cancel_requested_at:
         return
+    sub.cancel_reason = reason
+    sub.cancel_reason_note = note
+
+    never_charged = sub.activated_at is None
+    if never_charged:
+        if sub.stripe_subscription_id and stripe_service.is_configured():
+            stripe = stripe_service.stripe_client()
+            try:
+                stripe.Subscription.cancel(sub.stripe_subscription_id)
+            except Exception:
+                log.exception("stripe subscription cancel failed (id=%s)", sub.id)
+        sub.status = SubscriptionStatus.cancelled.value
+        sub.cancelled_at = utcnow()
+        return
+
+    sub.cancel_requested_at = utcnow()
+    sub.cancel_effective_at = utcnow() + timedelta(days=NOTICE_DAYS)
     if sub.stripe_subscription_id and stripe_service.is_configured():
         stripe = stripe_service.stripe_client()
         try:
-            stripe.Subscription.cancel(sub.stripe_subscription_id)
+            stripe.Subscription.modify(
+                sub.stripe_subscription_id,
+                cancel_at=int(
+                    (sub.cancel_effective_at - datetime(1970, 1, 1)).total_seconds()
+                ),
+            )
         except Exception:
-            log.exception("stripe subscription cancel failed (id=%s)", sub.id)
-    sub.status = SubscriptionStatus.cancelled.value
-    sub.cancelled_at = utcnow()
-    sub.cancel_reason = reason
-    sub.cancel_reason_note = note
+            log.exception("stripe cancel_at scheduling failed (id=%s)", sub.id)
 
 
 def guardian_is_past_due(guardian_user_id: int) -> bool:

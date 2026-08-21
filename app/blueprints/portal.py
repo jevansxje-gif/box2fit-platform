@@ -483,11 +483,23 @@ def cancel_membership(sub_id: int):
                 sub, reason=reason, note=(request.form.get("note") or "").strip() or None
             )
             db.session.commit()
-            flash(
-                f"{attendee.first_name}'s membership is cancelled — no further "
-                "charges. The ring's here whenever you're ready.",
-                "success",
-            )
+            if sub.status == "cancelled":
+                flash(
+                    f"{attendee.first_name}'s membership is cancelled before any "
+                    "charge — nothing owed. The ring's here whenever you're ready.",
+                    "success",
+                )
+            else:
+                from ..services.tzutil import fmt_local
+
+                flash(
+                    "Cancellation notice received (in writing, per the membership "
+                    f"terms). {attendee.first_name}'s membership and billing "
+                    f"continue through the 30-day notice period and end on "
+                    f"{fmt_local(sub.cancel_effective_at, '%B %d, %Y')}. Classes "
+                    "remain bookable until then.",
+                    "success",
+                )
             return redirect(url_for("portal.membership"))
     return render_template(
         "portal/cancel_membership.html",

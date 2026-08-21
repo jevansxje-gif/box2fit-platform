@@ -4,7 +4,11 @@
   <div style="max-width:560px">
   <div class="pf-kicker">Cancel membership</div>
   <h1 class="pf-h1" style="margin:6px 0 8px">Sorry to see {{ attendee.first_name }} go.</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 20px">No hard feelings and no fine print: cancelling stops all future charges. One quick question so we keep getting better.</p>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">
+    Submitting this form is your written cancellation notice.
+    {% if sub.activated_at %}Per the membership terms, a 30-day notice applies: billing continues through the notice period, and the membership (with full class access) ends 30 days from today.{% else %}Your membership hasn't been charged yet, so cancelling now ends it immediately with nothing owed.{% endif %}
+    One quick question so we keep getting better.
+  </p>
 
   <form method="post" class="pf-panel" style="margin-top:0">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />

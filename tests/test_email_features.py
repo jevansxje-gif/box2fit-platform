@@ -8,6 +8,23 @@ from test_pass1_e2e import _book_child, _first_instance
 from test_pass4_ops import _admin
 
 
+def test_waiver_accordions_and_locked_consent(client, client_account):
+    instance = _first_instance(client_account)
+    client.post("/book/youth", data={"instance_id": str(instance.id)})
+    r = client.get("/book/youth/details")
+    # all three client legal sections render as accordions
+    assert b"Waiver &amp; Release of Liability" in r.data
+    assert b"Electronic Signatures" in r.data
+    assert b"Membership Terms, Cancellation Policy" in r.data
+    assert b"Frankie LaSasso" in r.data
+    assert b"30-day cancellation notice" in r.data
+    # consent checkbox starts locked until sections are opened (JS gate)
+    assert b'data-waiver-consent="1"' in r.data
+    assert b"disabled" in r.data
+    # no stale "no contracts" claims anywhere on the page
+    assert b"No contracts" not in r.data
+
+
 def test_admin_alert_on_new_signup(client, client_account):
     instance = _first_instance(client_account)
     _book_child(client, instance)

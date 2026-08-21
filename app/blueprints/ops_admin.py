@@ -283,9 +283,10 @@ def schedule_builder():
         weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         segment_choices=[
             ("", "None (portal/schedule only)"),
-            ("youth", "Youth (/youth + /reset pages)"),
-            ("strong", "Active Adults (/strong)"),
-            ("focus", "Professionals (/focus)"),
+            ("kids", "Kids 6-10 (/kids)"),
+            ("youth", "Youth 11-18 (/youth)"),
+            ("technical", "Technical Boxing (/technical)"),
+            ("bootcamp", "Boxing Bootcamp (/bootcamp)"),
             ("shehits", "She Hits (/shehits)"),
             ("beast", "Beast Camp (/beast)"),
         ],

@@ -2,10 +2,10 @@
 is the PRIMARY journey, not an edge case: the parent is the customer, the
 child is the attendee.
 
-/youth                      landing page
-/book/youth                 step 1: pick a class (live capacity, age brackets)
-/book/youth/details         step 2: who's attending + health + consents + waiver
-/book/youth/card            step 3: SetupIntent card vault (no charge today)
+/kids (custom) + /<slug>    landing pages (youth/technical/bootcamp/shehits/beast)
+/book/<segment>             step 1: pick a class (live capacity, age brackets)
+/book/<segment>/details     step 2: who's attending + health + consents + waiver
+/book/<segment>/card        step 3: SetupIntent card vault (no charge today)
 /book/complete              Stripe Elements return
 /book/confirmed             confirmation
 /book/cancel/<token>        signed one-click cancel
@@ -54,10 +54,12 @@ bp = Blueprint("funnel", __name__)
 log = logging.getLogger(__name__)
 
 SESSION_KEY = "b2f_flow"
-# Booking-flow segments = class segment_tags. "reset" (parents landing) books
-# into the youth flow, so it is not its own booking segment.
-SEGMENTS = {"youth", "strong", "focus", "shehits", "beast"}
-CHILD_FIRST_SEGMENTS = {"youth"}  # child is the default attendee here
+# Booking-flow segments = class segment_tags (client schedule 2026-08-20):
+# kids 6-10 (4pm groups), youth 11-18 (7pm confidence), technical (6pm),
+# bootcamp (5pm), shehits (10am), beast (6am). Retired landings /reset,
+# /focus, /strong 301 to their nearest successor.
+SEGMENTS = {"kids", "youth", "technical", "bootcamp", "shehits", "beast"}
+CHILD_FIRST_SEGMENTS = {"kids", "youth"}  # a parent books; the child attends
 
 # Master Plan §6 wording, adjusted ONLY for the confirmed billing cadence:
 # $189 per 4-week cycle (client 2026-07-24), so "/month" would be inaccurate
@@ -189,8 +191,10 @@ def public_terms():
     return render_template("site/terms.html")
 
 
-@bp.get("/youth")
-def landing_youth():
+@bp.get("/kids")
+def landing_kids():
+    """Custom kids page (ages 6-10) — was /youth until the 2026-08-20
+    program split; /youth is now the 11-18 confidence class landing."""
     client = get_client()
     reviews = (
         db.session.query(Review)
@@ -198,23 +202,39 @@ def landing_youth():
         .order_by(Review.display_order, Review.id)
         .all()
     )
-    reviews = [r for r in reviews if "youth" in r.tags() or "parents" in r.tags()][:4]
+    reviews = [r for r in reviews if r.tags() & {"kids", "youth", "parents"}][:4]
     variant = request.args.get("v", "a")[:20]
     resp = make_response(
         render_template(
-            "funnel/landing_youth.html",
+            "funnel/landing_kids.html",
             google_rating=SiteSetting.get("google_rating", "5.0"),
             google_review_count=SiteSetting.get("google_review_count", "28"),
             reviews=reviews,
         )
     )
-    capture_first_touch(request, resp, landing_variant=f"youth:{variant}")
+    capture_first_touch(request, resp, landing_variant=f"kids:{variant}")
     return resp
+
+
+# Retired landings — ads or bookmarks may still point here.
+@bp.get("/reset")
+def landing_reset_retired():
+    return redirect(url_for("funnel.landing_kids"), 301)
+
+
+@bp.get("/focus")
+def landing_focus_retired():
+    return redirect(url_for("funnel.landing", slug="bootcamp"), 301)
+
+
+@bp.get("/strong")
+def landing_strong_retired():
+    return redirect(url_for("funnel.landing", slug="technical"), 301)
 
 
 @bp.get("/<slug>")
 def landing(slug: str):
-    """The five copy-config landing pages (/youth keeps its custom page)."""
+    """The copy-config landing pages (/kids keeps its custom page)."""
     from ..services.copy_loader import load_copy
 
     copy = load_copy(slug)

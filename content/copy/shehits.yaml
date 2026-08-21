@@ -1,10 +1,12 @@
-# Women — /shehits
+# Women — /shehits (10 AM weekdays)
+# ANGLE: the mid-morning hour that's actually yours. Drop-off done, the house
+# quiet, the day not yet loud — a women-only room at 10 AM every weekday.
 page_title: "She Hits · Women-only boxing — Box2Fit White Rock"
 register: warm
-eyebrow: "She Hits · Women-only boxing"
+eyebrow: "She Hits · Women-only · Weekdays 10 AM"
 headline: "Strong looks"
 headline_accent: "good on you."
-subhead: "She Hits is our women-only boxing class. Build real strength and real confidence in a room that has your back. Beginners welcome, always."
+subhead: "She Hits is our women-only boxing class, every weekday at 10 AM — the hour after drop-off that's actually yours. Real strength and real confidence in a room that has your back. Beginners welcome, always."
 hero_photo: adult-woman-cables.jpg
 hero_photo_alt: "She Hits training at Box2Fit"
 benefits_eyebrow: "Why She Hits"
@@ -14,10 +16,10 @@ benefits:
     title: "Women-only room"
     body: "Train hard in a supportive space led by our She Hits coach."
     source: "She Hits · women-only class"
-  - num: "3×"
-    title: "A week is all it takes"
-    body: "A sustainable routine that builds real, lasting strength."
-    source: "Recommended class cadence"
+  - num: "10 AM"
+    title: "Your hour, every weekday"
+    body: "Kids at school, inbox can wait. Five mornings a week to build a routine that actually sticks."
+    source: "Mon–Fri at 10 AM"
   - num: "5.0★"
     title: "From 28 Google reviews"
     body: "A challenge every session, while keeping the fun."

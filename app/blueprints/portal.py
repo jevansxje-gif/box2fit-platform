@@ -597,7 +597,7 @@ def referrals():
         .order_by(Lead.created_at.desc())
         .all()
     )
-    share_url = absolute_url("funnel.landing_youth") + f"?ref={code}"
+    share_url = absolute_url("funnel.landing_kids") + f"?ref={code}"
     return render_template(
         "portal/referrals.html", code=code, referred=referred, share_url=share_url
     )

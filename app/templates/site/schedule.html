@@ -4,7 +4,7 @@
 <div class="ops-shell">
   <div class="pf-kicker">This week</div>
   <h1 class="pf-h1" style="margin:6px 0 6px">Class schedule</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 22px">Members book from <a href="{{ url_for('portal.login') }}">their account</a>. New here? <a href="{{ url_for('funnel.landing_youth') }}">Your first class is free</a>.</p>
+  <p style="color:var(--pf-text-2);margin:0 0 22px">Members book from <a href="{{ url_for('portal.login') }}">their account</a>. New here? <a href="{{ url_for('funnel.landing_kids') }}">Your first class is free</a>.</p>
   {% for day, occs in by_day.items() %}
   <div class="pf-card ops-class">
     <div class="head"><b>{{ day.strftime('%A · %B %d') }}</b></div>

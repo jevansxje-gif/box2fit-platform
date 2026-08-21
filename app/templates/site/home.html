@@ -15,7 +15,7 @@
 </script>
 {% endblock %}
 
-{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.landing_youth') }}">Book a free class</a>{% endblock %}
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.landing_kids') }}">Book a free class</a>{% endblock %}
 
 {% block content %}
   <section class="hero">
@@ -29,7 +29,7 @@
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
         </div>
         <div class="hero-cta">
-          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ url_for('funnel.landing_youth') }}">Claim your free first class</a>
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ url_for('funnel.landing_kids') }}">Claim your free first class</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Free first class. Month to month.</span>
         </div>
       </div>
@@ -44,22 +44,23 @@
         <h2>Find your room.</h2>
       </div>
       <div class="cards-3">
-        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing_youth') }}" style="text-decoration:none;color:inherit">
-          <span class="pf-program pf-program--youth" style="font-size:20px">YOUTH BOXING</span>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing_kids') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--youth" style="font-size:20px">KIDS BOXING</span>
           <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Ages 6 to 10. Confidence, focus and real skills, three sessions a week in their group.</p>
         </a>
-        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='shehits') }}" style="text-decoration:none;color:inherit">
-          <span class="pf-program pf-program--shehits" style="font-size:20px">SHE HITS</span>
-          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Women-only boxing. Real strength and real confidence in a room that has your back.</p>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='youth') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--youth" style="font-size:20px">YOUTH CONFIDENCE</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Ages 11 to 18. Confidence, discipline and real boxing, every weekday at 7 PM.</p>
         </a>
-        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='beast') }}" style="text-decoration:none;color:inherit">
-          <span class="pf-program pf-program--beast" style="font-size:20px">BEAST CAMP</span>
-          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">The hardest hour in White Rock. Boxing, strength and conditioning at full send.</p>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='technical') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--beast" style="font-size:20px">TECHNICAL BOXING</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Learn to actually box. Stance, footwork, defence and real pad work, weekdays at 6 PM.</p>
         </a>
       </div>
       <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap">
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='strong') }}">Fitness Boxing</a>
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='focus') }}">Lunch-hour Boxing</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='bootcamp') }}">Boxing Bootcamp · 5 PM</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='shehits') }}">She Hits · 10 AM</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='beast') }}">Beast Camp · 6 AM</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_schedule') }}">Full schedule</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_pricing') }}">Memberships &amp; pricing</a>
       </div>
@@ -132,7 +133,7 @@
     <div class="wrap">
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Train Smarter. Get Results.</div>
       <h2>Your first class is on us.</h2>
-      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ url_for('funnel.landing_youth') }}">Claim your free first class</a>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ url_for('funnel.landing_kids') }}">Claim your free first class</a>
       <div class="fine">1522 Finlay St Unit 216 · White Rock · <a href="{{ url_for('funnel.public_contact') }}" style="color:#fff">Contact</a> · <a href="https://box2fit.com" style="color:#fff">box2fit.com</a></div>
     </div>
   </section>

@@ -71,14 +71,21 @@ def _login(client, email, password="password123"):
 # ---------------------------------------------------- landing + public ------
 def test_public_and_landing_pages_render(client):
     for path in ("/", "/schedule", "/trainers", "/pricing", "/contact",
-                 "/privacy", "/terms", "/youth", "/strong", "/reset",
-                 "/focus", "/shehits", "/beast"):
+                 "/privacy", "/terms", "/kids", "/youth", "/technical",
+                 "/bootcamp", "/shehits", "/beast"):
         r = client.get(path)
         assert r.status_code == 200, path
 
-    # parents landing routes into the YOUTH booking flow
-    r = client.get("/reset")
-    assert b"/book/youth" in r.data
+    # retired landings 301 to their successors
+    for old, new in (("/reset", "/kids"), ("/focus", "/bootcamp"),
+                     ("/strong", "/technical")):
+        r = client.get(old, follow_redirects=False)
+        assert r.status_code == 301 and new in r.headers["Location"], old
+
+    # each landing books its own segment
+    assert b"/book/kids" in client.get("/kids").data
+    assert b"/book/youth" in client.get("/youth").data
+    assert b"/book/technical" in client.get("/technical").data
     # beast register renders
     r = client.get("/beast")
     assert b"hardest hour" in r.data.lower()

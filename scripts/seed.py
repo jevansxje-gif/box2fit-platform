@@ -26,49 +26,48 @@ from app.services.scheduling import generate_instances
 ROOT = Path(__file__).resolve().parent.parent
 
 # ---- class types --------------------------------------------------------
-# Youth launches with cohort GROUPS (client-confirmed 2026-07-24): members
-# enroll in a group (3 sessions/week for 4 weeks) and RSVP per session.
-# The bracket types (7-10/11-14/15-17) stay in the catalog, unscheduled,
-# ready for when groups split by age.
+# CLIENT SCHEDULE 2026-08-20. Kids keeps cohort GROUPS (client-confirmed
+# 2026-07-24): enroll in a group (3 sessions/week for 4 weeks), RSVP per
+# session. Youth Confidence is the 11-18 program (its own class + landing).
 # key, name, segment, age_min, age_max, duration, capacity
 CLASS_TYPES = [
-    ("youth", "Youth Boxing", "youth", 6, 10, 45, 12),  # client-corrected 2026-08-20: kids 6-10
-    ("kids_7_10", "Kids Boxing", "youth", 7, 10, 45, 12),
-    ("youth_11_14", "Youth Boxing 11-14", "youth", 11, 14, 45, 12),
-    ("teen_15_17", "Teen Boxing", "youth", 15, 17, 45, 12),
-    # segment 'focus': the professionals landing (/focus) books these midday
-    # classes; the /reset parents landing routes into the youth flow instead.
-    ("reset", "Reset Midday Boxing", "focus", None, None, 45, 16),
+    ("kids", "Kids Boxing", "kids", 6, 10, 45, 12),
+    ("youth", "Youth Confidence", "youth", 11, 18, 45, 14),
+    ("technical", "Technical Boxing", "technical", None, None, 60, 16),
+    ("bootcamp", "Boxing Bootcamp", "bootcamp", None, None, 45, 16),
     ("she_hits", "She Hits", "shehits", None, None, 60, 16),
     ("beast", "Beast Camp", "beast", None, None, 50, 16),
-    ("active", "Active Adults Boxing", "strong", None, None, 45, 16),
 ]
 
-# ---- weekly schedule (weekday 0=Mon, local time, trainer idx, cohort) ------
-# THE REAL STARTING SCHEDULE (client, 2026-07-24) — expand by adding rows:
-#   Group A: Mon/Wed/Fri 4pm · Group B: Tue/Thu/Sat 4pm
+# Retired catalog entries: deleted on reseed IF nothing references them.
+# (reset/active keep their rows where history exists — their templates are
+# deactivated by the schedule reconcile below.)
+RETIRED_TYPE_KEYS = ["kids_7_10", "youth_11_14", "teen_15_17", "reset", "active"]
+
+# ---- weekly schedule (weekday 0=Mon, local time, cohort) -------------------
+# THE REAL SCHEDULE (client, 2026-08-20):
+#   Kids: Group A Mon/Wed/Fri 4pm · Group B Tue/Thu/Sat 4pm (unchanged)
+#   Mon-Fri daily: 6am Beast · 10am She Hits · 5pm Bootcamp · 6pm Technical
+#                  · 7pm Youth Confidence
+# Bump SCHEDULE_VERSION whenever this table changes — the reconcile runs
+# once per version so Builder edits made between versions are respected.
+SCHEDULE_VERSION = "2026-08-20"
 SCHEDULE = [
-    ("youth", 0, time(16, 0), 0, "Group A"),
-    ("youth", 2, time(16, 0), 0, "Group A"),
-    ("youth", 4, time(16, 0), 0, "Group A"),
-    ("youth", 1, time(16, 0), 0, "Group B"),
-    ("youth", 3, time(16, 0), 0, "Group B"),
-    ("youth", 5, time(16, 0), 0, "Group B"),
-    # Secondary adult slots (kickoff placeholders, unchanged)
-    ("reset", 1, time(12, 0), 1, None),
-    ("reset", 3, time(12, 0), 1, None),
-    ("she_hits", 1, time(18, 0), 2, None),
-    ("she_hits", 3, time(18, 0), 2, None),
-    ("beast", 0, time(6, 0), 1, None),
-    ("beast", 2, time(6, 0), 1, None),
-    ("beast", 4, time(6, 0), 1, None),
-    ("beast", 0, time(19, 0), 1, None),
-    ("beast", 2, time(19, 0), 1, None),
-    ("beast", 4, time(19, 0), 1, None),
-    ("active", 0, time(10, 0), 2, None),
-    ("active", 2, time(10, 0), 2, None),
-    ("active", 4, time(10, 0), 2, None),
+    ("kids", 0, time(16, 0), "Group A"),
+    ("kids", 2, time(16, 0), "Group A"),
+    ("kids", 4, time(16, 0), "Group A"),
+    ("kids", 1, time(16, 0), "Group B"),
+    ("kids", 3, time(16, 0), "Group B"),
+    ("kids", 5, time(16, 0), "Group B"),
 ]
+for _wd in range(5):  # Mon-Fri
+    SCHEDULE += [
+        ("beast", _wd, time(6, 0), None),
+        ("she_hits", _wd, time(10, 0), None),
+        ("bootcamp", _wd, time(17, 0), None),
+        ("technical", _wd, time(18, 0), None),
+        ("youth", _wd, time(19, 0), None),
+    ]
 
 TRAINERS = [  # PLACEHOLDER roster; certifications field populated per brief
     ("Coach Alex T.", "Youth & Foundations", ["NCCP Boxing", "High Five", "CPR/AED"]),
@@ -77,9 +76,9 @@ TRAINERS = [  # PLACEHOLDER roster; certifications field populated per brief
 ]
 
 AUDIENCE_TO_TAGS = {
-    "active-adults": "strong",
-    "parents": "reset,youth",
-    "professionals": "focus",
+    "active-adults": "technical,bootcamp",
+    "parents": "kids,youth",
+    "professionals": "bootcamp,technical",
     "women": "shehits",
     "teens": "youth",
     "beast-mode": "beast",
@@ -114,6 +113,22 @@ def seed():
         print(f"trainers: {len(trainers)} placeholders (empty roster)")
     else:
         print(f"trainers: {len(trainers)} existing, none added")
+
+    # One-time rename (2026-08-20 program split): the original key "youth"
+    # WAS the kids class. Move it to "kids" so the new 11-18 Youth Confidence
+    # type can own the "youth" key. Idempotent: once "kids" exists, any
+    # "youth" row is the new type and must not be touched.
+    kids_row = db.session.query(ClassType).filter_by(
+        client_account_id=client.id, key="kids"
+    ).one_or_none()
+    old_youth = db.session.query(ClassType).filter_by(
+        client_account_id=client.id, key="youth"
+    ).one_or_none()
+    if kids_row is None and old_youth is not None:
+        old_youth.key = "kids"
+        old_youth.name = "Kids Boxing"
+        db.session.flush()
+        print("renamed class type: youth -> kids (Kids Boxing)")
 
     types = {}
     for key, name, seg, amin, amax, dur, cap in CLASS_TYPES:
@@ -161,27 +176,68 @@ def seed():
     plan.is_placeholder = False
     print("plans: Membership $189 / 4-week cycle (confirmed)")
 
-    if (
-        db.session.query(ScheduleTemplate)
-        .filter_by(client_account_id=client.id)
-        .count()
-        == 0
-    ):
-        for key, weekday, t_local, trainer_idx, cohort in SCHEDULE:
+    # Retired catalog entries: delete only when nothing references them.
+    from app.models import ClassInstance
+
+    for rkey in RETIRED_TYPE_KEYS:
+        ct = db.session.query(ClassType).filter_by(
+            client_account_id=client.id, key=rkey
+        ).one_or_none()
+        if ct is None:
+            continue
+        refs = (
+            db.session.query(ScheduleTemplate).filter_by(class_type_id=ct.id).count()
+            + db.session.query(ClassInstance).filter_by(class_type_id=ct.id).count()
+        )
+        if refs == 0:
+            db.session.delete(ct)
+            print(f"retired class type deleted: {rkey}")
+
+    # Schedule reconcile — runs ONCE per SCHEDULE_VERSION so day-to-day
+    # Builder edits aren't clobbered by later reseeds. Templates matching the
+    # map are (re)activated, missing ones created (Coach TBA — assign via
+    # Trainers page), and everything else is deactivated with its future
+    # bookingless instances pruned.
+    if SiteSetting.get("schedule_version", "") != SCHEDULE_VERSION:
+        from app.services.class_admin import prune_inactive_template_instances
+
+        wanted = {
+            (types[key].id, weekday, t_local, cohort)
+            for key, weekday, t_local, cohort in SCHEDULE
+        }
+        seen = set()
+        n_off = 0
+        for tpl in db.session.query(ScheduleTemplate).filter_by(
+            client_account_id=client.id
+        ):
+            sig = (tpl.class_type_id, tpl.weekday, tpl.start_time_local,
+                   tpl.cohort_label)
+            if sig in wanted:
+                tpl.active = True
+                seen.add(sig)
+            elif tpl.active:
+                tpl.active = False
+                n_off += 1
+        for sig in wanted - seen:
+            ct_id, weekday, t_local, cohort = sig
             db.session.add(
                 ScheduleTemplate(
                     client_account_id=client.id,
-                    class_type_id=types[key].id,
+                    class_type_id=ct_id,
                     cohort_label=cohort,
                     weekday=weekday,
                     start_time_local=t_local,
-                    trainer_id=trainers[trainer_idx].id
-                    if trainer_idx < len(trainers)
-                    else None,
+                    trainer_id=None,
                     active=True,
                 )
             )
-        print(f"schedule templates: {len(SCHEDULE)}")
+        db.session.flush()
+        pruned = prune_inactive_template_instances(client.id)
+        SiteSetting.set("schedule_version", SCHEDULE_VERSION)
+        print(
+            f"schedule reconciled to {SCHEDULE_VERSION}: "
+            f"{len(wanted - seen)} added, {n_off} deactivated, {pruned} pruned"
+        )
 
     for kind in ("minor", "adult"):
         exists = db.session.query(WaiverDocument).filter_by(
@@ -225,6 +281,8 @@ def seed():
                 client_account_id=client.id, reviewer_name=r["name"]
             ).one_or_none()
             tags = ",".join(AUDIENCE_TO_TAGS[a] for a in r["audience"])
+            if existing is not None:
+                existing.segment_tags = tags  # re-tag when the map changes
             if existing is None:
                 db.session.add(
                     Review(

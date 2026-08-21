@@ -1,19 +1,21 @@
-# Beast mode — /beast (bold register)
+# Beast mode — /beast (6 AM weekdays, bold register)
+# ANGLE: the before-work crew. Train while the town sleeps, done by 7,
+# and nothing the day brings will be the hardest thing you did.
 page_title: "Beast Camp — Box2Fit White Rock"
 register: beast
-eyebrow: "Beast Camp · White Rock"
+eyebrow: "Beast Camp · Weekdays 6 AM"
 headline: "The hardest hour"
 headline_accent: "in White Rock."
-subhead: "Boxing, strength, and conditioning in one high-energy hour. Free first class. All levels. The training that built this gym."
+subhead: "6 AM, Monday to Friday. Boxing, strength and conditioning in one high-energy hour — done before the rest of the town wakes up. Free first class. All levels. The training that built this gym."
 hero_photo: hero-battle-ropes-logo.jpg
 hero_photo_alt: "Beast Camp at Box2Fit"
 benefits_eyebrow: "Why Beast Camp"
 benefits_headline: "Get strong. Get fit. Get results."
 benefits:
-  - num: "60"
-    title: "Minutes of work"
-    body: "Boxing, strength and conditioning packed into one high-energy hour."
-    source: "Beast Camp class format"
+  - num: "6 AM"
+    title: "Done before the day starts"
+    body: "Boxing, strength and conditioning packed into one high-energy hour — finished before your first meeting."
+    source: "Mon–Fri at 6 AM"
   - num: "~800"
     title: "Calories per hour"
     body: "Boxing training can burn up to ~800 cal/hr at full effort."

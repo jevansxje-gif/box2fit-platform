@@ -7,14 +7,14 @@ import yaml
 
 COPY_DIR = Path(__file__).resolve().parent.parent.parent / "content" / "copy"
 
-# slug -> class segment_tag the booking flow filters on. "reset" (parents) is
-# a second front door for the youth funnel — its CTA books youth classes.
+# slug -> class segment_tag the booking flow filters on. /kids has its own
+# custom page; retired slugs (reset/focus/strong) 301 in the funnel blueprint.
 SEGMENT_ROUTES = {
-    "strong": "strong",
-    "reset": "youth",
-    "focus": "focus",
-    "shehits": "shehits",
-    "beast": "beast",
+    "youth": "youth",          # 7pm confidence class, ages 11-18
+    "technical": "technical",  # 6pm learn-to-box
+    "bootcamp": "bootcamp",    # 5pm conditioning
+    "shehits": "shehits",      # 10am women-only
+    "beast": "beast",          # 6am strength & conditioning
 }
 
 _cache: dict[str, tuple[float, float, dict]] = {}

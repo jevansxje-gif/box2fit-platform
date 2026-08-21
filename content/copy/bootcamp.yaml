@@ -1,0 +1,44 @@
+# After-work crowd — /bootcamp (5 PM weekdays)
+# ANGLE: the 5 o'clock divider. For the 9-to-5er who wants the hardest,
+# most efficient conditioning hour straight off work — burn the day off on
+# the bags and walk into the evening done. Effort class, zero skill barrier.
+page_title: "Boxing Bootcamp — Box2Fit White Rock"
+register: beast
+eyebrow: "Boxing Bootcamp · Weekdays 5 PM"
+headline: "Clock out."
+headline_accent: "Glove up."
+subhead: "The 5 PM class that ends your workday properly. Boxing-based conditioning that torches stress and builds real fitness — no experience needed, just show up straight from work."
+hero_photo: adult-kettlebell.jpg
+hero_photo_alt: "Boxing Bootcamp conditioning at Box2Fit"
+benefits_eyebrow: "Why Boxing Bootcamp"
+benefits_headline: "Leave the day on the bags."
+benefits:
+  - num: "5 PM"
+    title: "Straight off work"
+    body: "Every weekday. The hard line between the workday and your evening — done by 6."
+    source: "Mon–Fri at 5 PM"
+  - num: "~800"
+    title: "Calories per hour"
+    body: "Boxing training can burn up to ~800 cal/hr at full effort. This class chases that number."
+    source: "Up to · varies by individual"
+  - num: "0"
+    title: "Skill barrier"
+    body: "Bags, ropes, bodyweight and effort. If you can show up tired from work, you can do this."
+    source: "All levels · no experience needed"
+coach_eyebrow: "Coached for effort"
+coach_headline: "The best stress management in White Rock."
+coach_body: "There is nothing a rough Tuesday can throw at you that an hour on the bags doesn't fix. Coaches run the room hot, scale every station to your level, and send you home with the day burned off."
+coach_photo: hero-battle-ropes-logo.jpg
+faqs:
+  - q: "I sit at a desk all day. Am I fit enough for this?"
+    a: "Yes — everything scales. You work at your pace against your own numbers, and coaches adjust every station to your level."
+  - q: "Do I need boxing experience?"
+    a: "None. Bootcamp is conditioning built on boxing movements — if you want to learn the sport itself, that's our 6 PM Technical Boxing class."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+final_kicker: "Work Ends At Five. You Start."
+final_headline: "Your first class is on us."
+booking_lede: "Pick a Bootcamp session. Your first one is free."
+review_tags: ["bootcamp"]

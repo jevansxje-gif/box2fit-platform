@@ -1,0 +1,44 @@
+# Learn-to-box adults — /technical (6 PM weekdays · 60 min)
+# ANGLE: skill, not sweat-with-gloves. For the adult who has always wanted
+# to actually learn boxing — the stance, the footwork, the defence — and is
+# bored by "boxercise". Progress you can measure in skill, not just calories.
+page_title: "Technical Boxing — Box2Fit White Rock"
+register: warm
+eyebrow: "Technical Boxing · Weekdays 6 PM"
+headline: "Learn to box."
+headline_accent: "Properly."
+subhead: "Not a fitness class with gloves on — a real boxing class that happens to be a great workout. Stance, footwork, defence and pad work, taught from the ground up. Anyone who wants to learn to box belongs here."
+hero_photo: adults-sparring.jpg
+hero_photo_alt: "Technical boxing training at Box2Fit"
+benefits_eyebrow: "Why Technical Boxing"
+benefits_headline: "Progress you can measure in skill."
+benefits:
+  - num: "60"
+    title: "Minutes of real boxing"
+    body: "Stance, guard, footwork, combinations, defence, pad work. The actual sport, taught properly."
+    source: "Technical Boxing class format"
+  - num: "0"
+    title: "Experience required"
+    body: "Every session is levelled. Total beginners learn the fundamentals while experienced boxers refine theirs."
+    source: "All levels · non-contact for beginners"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "Top-notch coaching from people who box, not just teach classes."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Taught, not just trained"
+coach_headline: "The class for people who love the sport."
+coach_body: "If you've watched boxing for years and always wondered whether you could do it — this is where you find out. Coaches break the sweet science down piece by piece and build it back up in you, one session at a time."
+coach_photo: pro-battle-ropes.jpg
+faqs:
+  - q: "I've never boxed. Is this over my head?"
+    a: "No — beginners are the point. Everything starts from the fundamentals, and the coaches level every drill to where you are."
+  - q: "Will I get hit?"
+    a: "No. Technical Boxing is bags, pads and drills. Sparring is never part of this class and nothing here is contact for beginners."
+  - q: "How is this different from Boxing Bootcamp?"
+    a: "Bootcamp is conditioning first — the workout. Technical is skill first — the sport. Plenty of members do both."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+final_kicker: "Real Boxing. Really Taught."
+final_headline: "Find out what you've got."
+booking_lede: "Pick a Technical Boxing session. Your first class is free."
+review_tags: ["technical"]

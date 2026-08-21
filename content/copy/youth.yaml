@@ -1,0 +1,44 @@
+# Parents of 11-18s — /youth (7 PM weekdays · Youth Confidence)
+# ANGLE: confidence is the product. The teen years are where confidence is
+# won or lost — boxing gives structure, discipline and an hour a day where
+# the phone stays in the bag. Sold to the parent, aspirational to the teen.
+page_title: "Youth Confidence · Ages 11–18 — Box2Fit White Rock"
+register: warm
+eyebrow: "Youth Confidence · Ages 11–18 · Weekdays 7 PM"
+headline: "Confidence you can"
+headline_accent: "actually see."
+subhead: "A boxing program built for the years that shape them. Real training, real discipline, and a room where every kid gets stronger — in the mirror and in themselves. First class free."
+hero_photo: youth-teens-bags.jpg
+hero_photo_alt: "Teens training on the bags at Box2Fit"
+benefits_eyebrow: "Why Youth Confidence"
+benefits_headline: "Strong body. Stronger self."
+benefits:
+  - num: "11–18"
+    title: "Built for their age"
+    body: "Not a kids class, not an adult class. Training pitched exactly at the tween and teen years."
+    source: "Youth Confidence · ages 11–18"
+  - num: "7 PM"
+    title: "Every weekday"
+    body: "Homework done, dinner done — then an hour that's theirs. Phones stay in the bag."
+    source: "Mon–Fri at 7 PM"
+  - num: "5.0★"
+    title: "From 28 Google reviews"
+    body: "Parents tell us the confidence shows up at school first."
+    source: "Google · Box2Fit White Rock"
+coach_eyebrow: "Coached with standards"
+coach_headline: "Discipline they choose for themselves."
+coach_body: "Boxing has rules, rituals and respect built in. Teens rise to it — because the effort is theirs and the progress is visible. Coaches hold the standard high and every kid to it, from the shyest beginner up."
+coach_photo: youth-teens-stretch.jpg
+faqs:
+  - q: "My teen has never done a sport. Will they cope?"
+    a: "Yes. Everything is taught from zero and nobody spars or gets hit — beginners work bags, pads and footwork. Most of our members started with no sport background."
+  - q: "Is it safe?"
+    a: "Youth sessions are structured, supervised and non-contact for beginners. It's boxing training — fitness, skills and discipline — not fighting."
+  - q: "My kid is glued to their phone. Honestly, will this stick?"
+    a: "This is the hour the phone stays in the bag — and because progress is visible week to week, this is the class teens ask to come back to."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Book their free first class below."
+final_kicker: "Confidence. Discipline. Real Skills."
+final_headline: "Their first class is on us."
+booking_lede: "Pick a session. Their first class is free."
+review_tags: ["youth"]

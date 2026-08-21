@@ -65,7 +65,7 @@ def _seed():
         key="kids_7_10",
         name="Kids Boxing",
         segment_tag="youth",
-        age_min=7,
+        age_min=6,  # client-corrected 2026-08-20: kids class is 6-10
         age_max=10,
         duration_min=45,
         default_capacity=2,

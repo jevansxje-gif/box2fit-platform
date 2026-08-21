@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # ready for when groups split by age.
 # key, name, segment, age_min, age_max, duration, capacity
 CLASS_TYPES = [
-    ("youth", "Youth Boxing", "youth", 7, 17, 45, 12),
+    ("youth", "Youth Boxing", "youth", 6, 10, 45, 12),  # client-corrected 2026-08-20: kids 6-10
     ("kids_7_10", "Kids Boxing", "youth", 7, 10, 45, 12),
     ("youth_11_14", "Youth Boxing 11-14", "youth", 11, 14, 45, 12),
     ("teen_15_17", "Teen Boxing", "youth", 15, 17, 45, 12),
@@ -135,7 +135,12 @@ def seed():
             db.session.add(ct)
             db.session.flush()
         else:
-            ct.segment_tag = seg  # keep existing rows aligned with the map
+            # keep existing rows aligned with the map (this table is the
+            # source of truth for the catalog — Builder edits to these
+            # fields are reverted on reseed)
+            ct.segment_tag = seg
+            ct.age_min = amin
+            ct.age_max = amax
         types[key] = ct
     print(f"class types: {len(types)}")
 

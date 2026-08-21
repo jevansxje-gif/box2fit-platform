@@ -183,7 +183,7 @@ def test_age_bracket_validation(client, client_account):
     assert "/book/youth" in r.headers["Location"]
     assert db.session.query(Booking).count() == 0
     r = client.get("/book/youth")
-    assert b"is for ages 7" in r.data
+    assert b"is for ages 6" in r.data
 
 
 def test_capacity_and_fullness(client, app, client_account):

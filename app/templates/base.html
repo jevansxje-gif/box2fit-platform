@@ -33,7 +33,16 @@
   </main>
   <footer class="site-foot">
     <div class="wrap">
-      <img src="{{ url_for('static', filename='img/brand/logo-white.png') }}" alt="Box2Fit" />
+      <div>
+        <img src="{{ url_for('static', filename='img/brand/logo-white.png') }}" alt="Box2Fit" />
+        <nav style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:14px">
+          <a href="{{ url_for('funnel.public_schedule') }}">Schedule</a>
+          <a href="{{ url_for('funnel.public_pricing') }}">Pricing</a>
+          <a href="{{ url_for('funnel.public_trainers') }}">Coaches</a>
+          <a href="{{ url_for('funnel.public_contact') }}">Contact</a>
+          <a href="{{ url_for('portal.login') }}">Member sign-in</a>
+        </nav>
+      </div>
       <div class="info"><b>Box2Fit White Rock</b><br />1522 Finlay St, Unit 216, White Rock, BC<br /><a href="tel:+17783846284">(778) 384-6284</a></div>
     </div>
   </footer>

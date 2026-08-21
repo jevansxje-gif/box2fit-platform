@@ -152,10 +152,14 @@ def seed():
         else:
             # keep existing rows aligned with the map (this table is the
             # source of truth for the catalog — Builder edits to these
-            # fields are reverted on reseed)
+            # fields are reverted on reseed). active=True matters: a type
+            # deactivated in ops hides ALL its instances from every
+            # schedule view, even with active templates (bit us 2026-08-21
+            # when a July deactivation kept She Hits off the live site).
             ct.segment_tag = seg
             ct.age_min = amin
             ct.age_max = amax
+            ct.active = True
         types[key] = ct
     print(f"class types: {len(types)}")
 

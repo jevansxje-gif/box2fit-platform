@@ -292,9 +292,24 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
     booking.class_instance_id = inst.id
     db.session.commit()
 
+    # a class later in the week shows up collapsed under Upcoming
+    from datetime import timedelta
+
+    later = ClassInstance(
+        client_account_id=client_account.id, class_type_id=kids.id,
+        trainer_id=trainer.id, cohort_label="Group A",
+        starts_at_utc=local_to_utc(today_local() + timedelta(days=3), dtime(16, 0)),
+        local_date=today_local() + timedelta(days=3), local_time=dtime(16, 0),
+        duration_min=45, capacity=12,
+    )
+    db.session.add(later)
+    db.session.commit()
+
     r = cbrowser.get("/ops/coach")
     assert b"Maya" in r.data
     assert b"Here" in r.data  # the big attendance button
+    assert b"Upcoming" in r.data
+    assert later.local_date.strftime("%A").encode() in r.data
 
     # coach marks attendance → bounced back to coach view, booking attended
     r = cbrowser.post(

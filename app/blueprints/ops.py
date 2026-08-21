@@ -100,9 +100,11 @@ SIGNUP_WINDOW_DAYS = 7  # how far back the Today view's sign-ups panel looks
 @bp.get("/coach")
 @staff_required
 def coach():
-    """The coach's phone view: today's classes (theirs when linked, all as a
-    fallback), roster with confirmed chips, big attendance buttons. This is
-    the door gate now — no tablet needed."""
+    """The coach's phone view: today's classes expanded with big attendance
+    buttons (the door gate — no tablet needed), plus the next week of their
+    classes collapsed under Upcoming."""
+    from datetime import timedelta
+
     from sqlalchemy import or_
 
     from ..models import ScheduleTemplate, Trainer
@@ -116,23 +118,33 @@ def coach():
         )
         .first()
     )
-    q = (
+    instances = (
         db.session.query(ClassInstance)
         .outerjoin(ScheduleTemplate, ClassInstance.template_id == ScheduleTemplate.id)
         .filter(
             ClassInstance.client_account_id == current_user.client_account_id,
-            ClassInstance.local_date == d,
+            ClassInstance.local_date >= d,
+            ClassInstance.local_date <= d + timedelta(days=7),
             ClassInstance.status == InstanceStatus.scheduled.value,
             or_(
                 ClassInstance.template_id.is_(None),
                 ScheduleTemplate.active.is_(True),
             ),
         )
-        .order_by(ClassInstance.local_time)
+        .order_by(ClassInstance.local_date, ClassInstance.local_time)
+        .all()
     )
-    instances = q.all()
     mine = [i for i in instances if me and i.trainer_id == me.id]
     shown = mine if mine else instances
+    today_instances = [i for i in shown if i.local_date == d]
+    upcoming: list[tuple] = []  # [(date, [instances]), ...] in order
+    for inst in shown:
+        if inst.local_date == d:
+            continue
+        if upcoming and upcoming[-1][0] == inst.local_date:
+            upcoming[-1][1].append(inst)
+        else:
+            upcoming.append((inst.local_date, [inst]))
     rosters = {
         inst.id: [
             b
@@ -148,7 +160,8 @@ def coach():
     }
     return render_template(
         "ops/coach.html",
-        instances=shown,
+        instances=today_instances,
+        upcoming=upcoming,
         rosters=rosters,
         today=d,
         me=me,

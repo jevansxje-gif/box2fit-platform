@@ -100,6 +100,19 @@ def healthz():
     return {"status": "ok"}
 
 
+@bp.get("/robots.txt")
+def robots():
+    body = (
+        "User-agent: *\n"
+        "Disallow: /ops/\n"
+        "Disallow: /portal/\n"
+        "Disallow: /api/\n"
+        "Disallow: /book/\n"
+        "Allow: /\n"
+    )
+    return body, 200, {"Content-Type": "text/plain"}
+
+
 @bp.post("/webhooks/stripe")
 def stripe_webhook_root():
     """Top-level webhook path per the deploy brief; same handler as

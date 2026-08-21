@@ -399,7 +399,7 @@ def test_bulk_assign_coach_and_daily_override(app, client, client_account):
         data={"trainer_id": str(sub.id)},
         follow_redirects=True,
     )
-    assert b"for that day only" in r.data
+    assert b"this day only" in r.data
     db.session.refresh(target)
     assert target.trainer_id == sub.id
     # the weekly default did NOT change
@@ -415,6 +415,37 @@ def test_bulk_assign_coach_and_daily_override(app, client, client_account):
     assert all(i.trainer_id != sub.id for i in others)
     # booked member notified of the substitution
     assert db.session.query(Message).filter_by(template="sub_notice").count() >= 1
+
+    # 3. scope=all: same control makes the coach the weekly default going
+    # forward — template updated, all future occurrences follow
+    r = staff.post(
+        f"/ops/instances/{target.id}/coach",
+        data={"trainer_id": str(sub.id), "scope": "all"},
+        follow_redirects=True,
+    )
+    assert b"every" in r.data
+    assert db.session.get(ScheduleTemplate, tpl_id).trainer_id == sub.id
+    future = (
+        db.session.query(ClassInstance)
+        .filter(
+            ClassInstance.template_id == tpl_id,
+            ClassInstance.local_date >= target.local_date,
+        )
+        .all()
+    )
+    assert future and all(i.trainer_id == sub.id for i in future)
+
+    # 4. scope=all with Coach TBA removes the coach from every week
+    r = staff.post(
+        f"/ops/instances/{target.id}/coach",
+        data={"trainer_id": "", "scope": "all"},
+        follow_redirects=True,
+    )
+    assert b"coach set to TBA" in r.data
+    assert db.session.get(ScheduleTemplate, tpl_id).trainer_id is None
+    for i in future:
+        db.session.refresh(i)
+        assert i.trainer_id is None
 
 
 def test_move_weekly_class_time_keeps_bookings_and_notifies(

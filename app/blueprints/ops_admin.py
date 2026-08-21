@@ -534,34 +534,60 @@ def _trainer_conflict(
 @bp.post("/instances/<int:instance_id>/coach")
 @staff_required
 def instance_coach(instance_id: int):
-    """Per-day coach swap from the Schedule tab: changes THIS occurrence
-    only (the weekly default stays), notifies booked members."""
+    """Coach swap from the Schedule tab. scope=one changes THIS occurrence
+    only (the weekly default stays); scope=all makes the coach the weekly
+    default — this weekday from this date forward, template included, so
+    newly generated weeks inherit it. Coach TBA removes with either scope.
+    Booked members of every changed occurrence are notified."""
     inst = db.session.get(ClassInstance, instance_id) or abort(404)
     if inst.client_account_id != _cid():
         abort(404)
     new_id = request.form.get("trainer_id", type=int) or None
-    if new_id == inst.trainer_id:
+    scope_all = request.form.get("scope") == "all" and inst.template_id
+    if new_id == inst.trainer_id and not scope_all:
         return redirect(url_for("ops_admin.live_schedule"))
-    old_id = inst.trainer_id
-    inst.trainer_id = new_id
-    _log_substitution(inst, old_id, new_id)
-    if any(b.status == BookingStatus.booked.value for b in inst.bookings):
-        _notify_substitution(inst)
+
+    targets = [inst]
+    if scope_all:
+        tpl = db.session.get(ScheduleTemplate, inst.template_id)
+        tpl.trainer_id = new_id
+        targets = (
+            db.session.query(ClassInstance)
+            .filter(
+                ClassInstance.template_id == inst.template_id,
+                ClassInstance.local_date >= inst.local_date,
+                ClassInstance.status == InstanceStatus.scheduled.value,
+            )
+            .order_by(ClassInstance.local_date)
+            .all()
+        ) or [inst]
+
+    notified = 0
+    for t in targets:
+        if t.trainer_id == new_id:
+            continue
+        old_id = t.trainer_id
+        t.trainer_id = new_id
+        _log_substitution(t, old_id, new_id)
+        if any(b.status == BookingStatus.booked.value for b in t.bookings):
+            _notify_substitution(t)
+            notified += 1
+
+    day = inst.local_date.strftime("%A")
+    when = (
+        f"every {day} at {inst.local_time.strftime('%I:%M %p').lstrip('0')} "
+        f"from {inst.local_date.strftime('%b %d')} onward"
+        if scope_all
+        else f"{inst.local_date.strftime('%A %b %d')} at "
+        f"{inst.local_time.strftime('%I:%M %p').lstrip('0')} (this day only)"
+    )
     if new_id:
-        _notify_coach_assignment(
-            new_id,
-            [
-                f"{inst.class_type.name} on "
-                f"{inst.local_date.strftime('%A %b %d')} at "
-                f"{inst.local_time.strftime('%I:%M %p').lstrip('0')} (this day only)"
-            ],
-        )
+        _notify_coach_assignment(new_id, [f"{inst.class_type.name} — {when}"])
     db.session.commit()
     coach = db.session.get(Trainer, new_id).name if new_id else "TBA"
     flash(
-        f"{inst.class_type.name} on {inst.local_date.strftime('%a %b %d')}: "
-        f"coach set to {coach} for that day only"
-        + (" — booked members notified." if inst.bookings else "."),
+        f"{inst.class_type.name}: coach set to {coach} for {when}"
+        + (f" — booked members of {notified} session(s) notified." if notified else "."),
         "success",
     )
     return redirect(url_for("ops_admin.live_schedule"))

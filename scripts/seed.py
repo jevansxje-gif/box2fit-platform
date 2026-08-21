@@ -46,19 +46,19 @@ RETIRED_TYPE_KEYS = ["kids_7_10", "youth_11_14", "teen_15_17", "reset", "active"
 
 # ---- weekly schedule (weekday 0=Mon, local time, cohort) -------------------
 # THE REAL SCHEDULE (client, 2026-08-20):
-#   Kids: Group A Mon/Wed/Fri 4pm · Group B Tue/Thu/Sat 4pm (unchanged)
+#   Kids: Group A Mon/Wed/Fri 4pm · Group B Tue/Thu 4pm + Sat 9am
 #   Mon-Fri daily: 6am Beast · 10am She Hits · 5pm Bootcamp · 6pm Technical
 #                  · 7pm Youth Confidence
 # Bump SCHEDULE_VERSION whenever this table changes — the reconcile runs
 # once per version so Builder edits made between versions are respected.
-SCHEDULE_VERSION = "2026-08-20"
+SCHEDULE_VERSION = "2026-08-20.2"  # .2: Saturday kids moved 4pm -> 9am
 SCHEDULE = [
     ("kids", 0, time(16, 0), "Group A"),
     ("kids", 2, time(16, 0), "Group A"),
     ("kids", 4, time(16, 0), "Group A"),
     ("kids", 1, time(16, 0), "Group B"),
     ("kids", 3, time(16, 0), "Group B"),
-    ("kids", 5, time(16, 0), "Group B"),
+    ("kids", 5, time(9, 0), "Group B"),
 ]
 for _wd in range(5):  # Mon-Fri
     SCHEDULE += [
@@ -199,14 +199,17 @@ def seed():
     # Trainers page), and everything else is deactivated with its future
     # bookingless instances pruned.
     if SiteSetting.get("schedule_version", "") != SCHEDULE_VERSION:
-        from app.services.class_admin import prune_inactive_template_instances
+        from app.services.class_admin import (
+            prune_inactive_template_instances,
+            reschedule_template,
+        )
 
         wanted = {
             (types[key].id, weekday, t_local, cohort)
             for key, weekday, t_local, cohort in SCHEDULE
         }
         seen = set()
-        n_off = 0
+        leftovers = []
         for tpl in db.session.query(ScheduleTemplate).filter_by(
             client_account_id=client.id
         ):
@@ -215,10 +218,33 @@ def seed():
             if sig in wanted:
                 tpl.active = True
                 seen.add(sig)
-            elif tpl.active:
+            else:
+                leftovers.append(tpl)
+        # A leftover matching a missing slot on everything but the time is a
+        # TIME CHANGE: move it (bookings follow, members get the schedule-
+        # change email) rather than deactivate-and-recreate.
+        n_moved = 0
+        to_add = wanted - seen
+        for sig in sorted(to_add, key=lambda s: (s[0], s[1], str(s[2]), s[3] or "")):
+            ct_id, weekday, t_local, cohort = sig
+            match = next(
+                (t for t in leftovers
+                 if t.class_type_id == ct_id and t.weekday == weekday
+                 and t.cohort_label == cohort),
+                None,
+            )
+            if match is not None:
+                reschedule_template(match, weekday, t_local)
+                match.active = True
+                leftovers.remove(match)
+                to_add.discard(sig)
+                n_moved += 1
+        n_off = 0
+        for tpl in leftovers:
+            if tpl.active:
                 tpl.active = False
                 n_off += 1
-        for sig in wanted - seen:
+        for sig in to_add:
             ct_id, weekday, t_local, cohort = sig
             db.session.add(
                 ScheduleTemplate(
@@ -235,8 +261,8 @@ def seed():
         pruned = prune_inactive_template_instances(client.id)
         SiteSetting.set("schedule_version", SCHEDULE_VERSION)
         print(
-            f"schedule reconciled to {SCHEDULE_VERSION}: "
-            f"{len(wanted - seen)} added, {n_off} deactivated, {pruned} pruned"
+            f"schedule reconciled to {SCHEDULE_VERSION}: {len(to_add)} added, "
+            f"{n_moved} moved, {n_off} deactivated, {pruned} pruned"
         )
 
     for kind in ("minor", "adult"):

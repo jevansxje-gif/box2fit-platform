@@ -1,19 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Membership — Box2Fit White Rock{% endblock %}
+{% block title %}Memberships & Packs — Box2Fit White Rock{% endblock %}
 {% block content %}
-<div class="flow">
-  <div class="pf-kicker">Membership</div>
-  <h1>Simple pricing, month to month.</h1>
-  <div class="pf-card pf-card--pad" style="margin-top:16px">
-    <div class="bnum">${{ (plan.price_cents // 100) if plan else 189 }}</div>
-    <p style="margin:4px 0 12px;color:var(--pf-text-2);font-weight:700">billed every 4 weeks · auto-renews · 30-day cancellation notice</p>
-    <ul style="margin:0;padding-left:20px;color:var(--pf-text-2);line-height:1.9">
-      <li>Three sessions a week in your group</li>
-      <li>Free first class before anything is charged — no obligation</li>
-      <li>Month to month; cancel with 30 days' written notice</li>
-      <li>Gloves and wraps provided</li>
-    </ul>
-    <a class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" href="{{ url_for('funnel.landing_youth') }}" style="margin-top:18px">Start with a free class</a>
+<div class="ops-shell" style="max-width:860px">
+  <div style="text-align:center;margin-bottom:26px">
+    <div class="pf-kicker">Memberships &amp; Packs</div>
+    <h1 style="font-weight:800;letter-spacing:-.02em;font-size:clamp(1.9rem,4.4vw,2.6rem);margin:10px 0 6px">Simple Pricing, Month To Month.</h1>
+    <p style="color:var(--pf-text-2);margin:0;font-size:17px">Every membership starts with a free first class. No obligation.</p>
   </div>
+
+  <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:18px;align-items:start" class="price-grid">
+    <!-- GOLD: the default choice -->
+    <div class="pf-card" style="padding:28px;border:2px solid var(--pf-red);position:relative">
+      <span class="pf-chip pf-chip--red" style="position:absolute;top:-13px;left:24px;font-weight:800;letter-spacing:.06em">MOST POPULAR</span>
+      <div class="pf-kicker" style="color:var(--pf-text-3)">Gold Pack</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin:8px 0 2px">
+        <span class="bnum" style="font-size:3rem">${{ (plan.price_cents // 100) if plan else 189 }}</span>
+        <span style="color:var(--pf-text-2);font-weight:700">/ month</span>
+      </div>
+      <ul style="margin:14px 0 0;padding-left:20px;color:var(--pf-text-2);line-height:2">
+        <li>Unlimited classes for adults at all 3 Box2Fit gyms</li>
+        <li>Youth members train in their group: 3 sessions a week, same coach</li>
+        <li>Group enrollment included</li>
+        <li>Gloves and wraps provided</li>
+      </ul>
+      <a class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" href="{{ url_for('funnel.landing_youth') }}" style="margin-top:18px">Start With A Free Class</a>
+      <p style="margin:12px 0 0;font-size:12.5px;color:var(--pf-text-3);line-height:1.5">Month to month. Auto renews. 30 day written cancellation notice after the first month.</p>
+    </div>
+
+    <!-- PLATINUM: the premium anchor -->
+    <div class="pf-card" style="padding:26px;background:var(--pf-ink);color:var(--pf-on-dark)">
+      <div class="pf-kicker" style="color:#D8B65C">Platinum Pack</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin:8px 0 2px">
+        <span style="font-weight:900;font-size:2.5rem;letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums">$800</span>
+        <span style="color:var(--pf-on-dark-2);font-weight:700">one time</span>
+      </div>
+      <ul style="margin:14px 0 0;padding-left:20px;color:var(--pf-on-dark-2);line-height:2">
+        <li>Everything in Gold for 1 month, starting on your start date</li>
+        <li>10 private lessons with professional boxing coaches</li>
+        <li>Private lessons bookable anytime within 6 months</li>
+      </ul>
+      <a class="pf-btn pf-btn--light pf-btn--block" href="{{ url_for('funnel.landing_youth') }}" style="margin-top:18px">Start With A Free Class</a>
+      <p style="margin:12px 0 0;font-size:12.5px;color:var(--pf-on-dark-2);line-height:1.5">One time purchase. Private lessons expire 6 months from purchase date.</p>
+    </div>
+  </div>
+
+  <p style="text-align:center;margin:22px 0 0;font-size:13.5px;color:var(--pf-text-3)">Free first class before anything is charged. Card details handled by Stripe.</p>
 </div>
+<style>@media (max-width:760px){ .price-grid{ grid-template-columns:1fr !important; } }</style>
 {% endblock %}

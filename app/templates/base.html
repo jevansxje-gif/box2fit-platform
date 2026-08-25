@@ -7,6 +7,7 @@
 <meta name="description" content="{% block meta_description %}Boxing and fitness in White Rock. Your first class is free.{% endblock %}" />
 <link rel="canonical" href="{{ config.SITE_BASE_URL.rstrip('/') ~ request.path }}" />
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo-ink.png') }}" />
+{% if config.META_DOMAIN_VERIFICATION %}<meta name="facebook-domain-verification" content="{{ config.META_DOMAIN_VERIFICATION }}" />{% endif %}
 <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}" />
 <meta property="og:description" content="{{ self.meta_description() }}" />
 <meta property="og:type" content="website" />

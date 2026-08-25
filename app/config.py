@@ -67,6 +67,8 @@ class Config:
     # provides it (also add it as a Tax ID in the Stripe dashboard).
     GST_NUMBER = os.environ.get("GST_NUMBER", "")
     META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "")
+    # content= token from Business Settings > Brand safety > Domains
+    META_DOMAIN_VERIFICATION = os.environ.get("META_DOMAIN_VERIFICATION", "")
     GA4_MEASUREMENT_ID = os.environ.get("GA4_MEASUREMENT_ID", "")
     SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 

@@ -512,7 +512,33 @@ def confirmed():
         return redirect(url_for("funnel.index"))
     booking = db.session.get(Booking, booking_id) or abort(404)
     session.pop(SESSION_KEY, None)
-    return render_template("funnel/confirmed.html", booking=booking)
+
+    # Browser-side conversion events, sharing the outbox event_id so Meta
+    # dedups them against the CAPI mirror. Ads optimize on these.
+    pixel_events = []
+    if current_app.config["META_PIXEL_ID"] and booking.lead_id:
+        from ..models import EventOutbox
+
+        rows = (
+            db.session.query(EventOutbox)
+            .filter(
+                EventOutbox.client_account_id == booking.client_account_id,
+                EventOutbox.event_name.in_(("Lead", "Schedule")),
+            )
+            .order_by(EventOutbox.id.desc())
+            .limit(50)
+            .all()
+        )
+        seen: set[str] = set()
+        for r in rows:
+            if (r.payload or {}).get("lead_id") == booking.lead_id and (
+                r.event_name not in seen
+            ):
+                pixel_events.append({"name": r.event_name, "id": r.event_id})
+                seen.add(r.event_name)
+    return render_template(
+        "funnel/confirmed.html", booking=booking, pixel_events=pixel_events
+    )
 
 
 @bp.route("/activate/<token>", methods=["GET", "POST"])

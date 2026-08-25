@@ -203,6 +203,31 @@ def test_capacity_and_fullness(client, app, client_account):
     assert b"full" in r.data.lower()
 
 
+def test_confirmed_page_fires_deduped_pixel_events(app, client, client_account):
+    """The confirmation page mirrors Lead + Schedule to the browser pixel
+    with the SAME event_id as the CAPI outbox rows, so Meta dedups the
+    pair — this is what ad campaigns optimize on."""
+    from app.models import EventOutbox
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    app.config["META_PIXEL_ID"] = "123456789"
+    try:
+        r = client.get("/book/confirmed")
+        html = r.data.decode()
+        assert "fbq('track', 'Lead'" in html
+        assert "fbq('track', 'Schedule'" in html
+        outbox_ids = {
+            e.event_id
+            for e in db.session.query(EventOutbox).filter(
+                EventOutbox.event_name.in_(("Lead", "Schedule"))
+            )
+        }
+        assert sum(1 for i in outbox_ids if i in html) == 2  # exact id reuse
+    finally:
+        app.config["META_PIXEL_ID"] = ""
+
+
 def test_honeypot_blocks_bots(client, client_account):
     instance = _first_instance(client_account)
     client.post("/book/youth", data={"instance_id": str(instance.id)})

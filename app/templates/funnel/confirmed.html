@@ -16,4 +16,11 @@
     </p>
   </div>
 </div>
+{% if pixel_events %}
+<script>
+if (window.fbq) {
+{% for e in pixel_events %}  fbq('track', '{{ e.name }}', {}, {eventID: '{{ e.id }}'});
+{% endfor %}}
+</script>
+{% endif %}
 {% endblock %}

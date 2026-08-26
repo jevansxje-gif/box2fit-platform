@@ -91,6 +91,47 @@ def test_public_and_landing_pages_render(client):
     assert b"hardest hour" in r.data.lower()
 
 
+def test_forgot_password_and_admin_reset(app, client, client_account):
+    """Self-serve forgot-password emails a set-password link for any role,
+    doesn't leak whether an email exists, and the ops member page can send
+    the same link on a member's behalf."""
+    import re
+
+    guardian, _ = _make_member(client_account)
+
+    # unknown email → same message, no email sent
+    r = client.post(
+        "/portal/forgot-password", data={"email": "nobody@example.com"},
+        follow_redirects=True,
+    )
+    assert b"a password link is on its way" in r.data
+    assert db.session.query(Message).filter_by(template="password_reset").count() == 0
+
+    # real account → reset email with a working set-password link
+    r = client.post(
+        "/portal/forgot-password", data={"email": guardian.email},
+        follow_redirects=True,
+    )
+    assert b"a password link is on its way" in r.data
+    msg = db.session.query(Message).filter_by(template="password_reset").one()
+    set_url = re.search(r"/portal/set-password/[\w\-\.]+", msg.body_preview).group(0)
+    fresh = app.test_client()
+    r = fresh.post(set_url, data={"password": "brandnewpass1"}, follow_redirects=True)
+    assert b"Password set" in r.data
+    assert guardian.check_password("brandnewpass1")
+
+    # admin-triggered reset from the member page
+    staff = app.test_client()
+    staff.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
+    r = staff.post(
+        f"/ops/members/{guardian.id}",
+        data={"action": "password_reset"},
+        follow_redirects=True,
+    )
+    assert b"Password reset link emailed" in r.data
+    assert db.session.query(Message).filter_by(template="password_reset").count() == 2
+
+
 # ------------------------------------------------------------- portal -------
 def test_magic_link_login(client, client_account):
     guardian, _ = _make_member(client_account)

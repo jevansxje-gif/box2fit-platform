@@ -888,6 +888,12 @@ def member_detail(user_id: int):
             u.invited_at = utcnow()
             db.session.commit()
             flash("Invite re-sent.", "success")
+        elif action == "password_reset":
+            from .portal import send_password_reset
+
+            send_password_reset(u)
+            db.session.commit()
+            flash(f"Password reset link emailed to {u.email}.", "success")
         elif action == "cancel_sub":
             from ..services import billing
 

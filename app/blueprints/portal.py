@@ -61,6 +61,20 @@ log = logging.getLogger(__name__)
 MAGIC_MAX_AGE = 30 * 60  # magic links live 30 minutes
 
 
+def send_password_reset(user: User) -> None:
+    """Email a set-password link. Works for every role — the set-password
+    flow signs them in and lands them by role (member portal / coach view /
+    ops). Used by the public forgot-password page and the ops admin action."""
+    url = absolute_url(
+        "portal.set_password", token=make_token(user.id, SALT_SET_PASSWORD)
+    )
+    send_email(
+        user, user.email, "Set a new Box2Fit password",
+        render_template("emails/password_reset.html", user=user, url=url),
+        "password_reset", user.client_account_id,
+    )
+
+
 def _home_url(user) -> str:
     """Where a freshly signed-in user belongs. Staff accounts (coach invites
     reuse the member set-password flow) go to their ops home, not the portal."""
@@ -103,6 +117,25 @@ def login():
         else:
             flash("Invalid email or password. No password yet? Use the email link option.", "error")
     return render_template("portal/login.html")
+
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("10/hour", methods=["POST"])
+def forgot_password():
+    """Self-serve password reset for ANY account — members, coaches, staff.
+    Same response whether or not the email exists (no enumeration)."""
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        user = db.session.query(User).filter_by(email=email, active=True).first()
+        if user:
+            send_password_reset(user)
+            db.session.commit()
+        flash(
+            "If that email has an account, a password link is on its way.",
+            "success",
+        )
+        return redirect(url_for("portal.forgot_password"))
+    return render_template("portal/forgot_password.html")
 
 
 @bp.get("/magic/<token>")

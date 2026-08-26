@@ -15,6 +15,7 @@
       {{ form.password.label(class="pf-label") }}{{ form.password(class="pf-input", autocomplete="current-password") }}
     </div>
     <button class="pf-btn pf-btn--primary pf-btn--block" type="submit">Sign in</button>
+    <p class="pf-hint" style="margin-top:12px;text-align:center"><a href="{{ url_for('portal.forgot_password') }}">Forgot your password?</a></p>
   </form>
 </div>
 {% endblock %}

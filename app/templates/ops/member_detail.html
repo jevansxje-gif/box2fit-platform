@@ -40,6 +40,7 @@
       <form method="post" style="margin-top:10px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="resend_invite">Resend account invite</button>
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="password_reset" style="margin-left:8px" title="Emails a link where they choose a new password themselves">Send password reset</button>
       </form>
     </div>
   </div>

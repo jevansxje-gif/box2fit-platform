@@ -940,6 +940,41 @@ def member_detail(user_id: int):
     )
 
 
+# ------------------------------------------------------------- marketing ---
+@bp.route("/marketing", methods=["GET", "POST"])
+@admin_required
+def marketing():
+    """Ad-campaign funnel: human traffic from the access logs (Meta's bot
+    fleet filtered out) joined with lead/booking/activation truth from the
+    database, per ad creative. Spend is entered manually from Ads Manager."""
+    from ..models import SiteSetting
+    from ..services.marketing_report import db_funnel, traffic_funnel
+
+    campaign = "kids"
+    if request.method == "POST" and request.form.get("action") == "spend":
+        raw = (request.form.get("spend") or "").replace("$", "").strip()
+        try:
+            SiteSetting.set(f"marketing_spend_{campaign}", f"{float(raw):.2f}")
+            db.session.commit()
+            flash("Spend updated.", "success")
+        except ValueError:
+            flash("Enter spend as a number, e.g. 11.60", "error")
+        return redirect(url_for("ops_admin.marketing"))
+
+    spend = float(SiteSetting.get(f"marketing_spend_{campaign}", "0") or 0)
+    traffic = traffic_funnel(campaign)
+    funnel = db_funnel(_cid(), campaign)
+    leads_n = funnel["totals"]["leads"]
+    return render_template(
+        "ops/marketing.html",
+        campaign=campaign,
+        traffic=traffic,
+        funnel=funnel,
+        spend=spend,
+        cpl=(spend / leads_n) if leads_n else None,
+    )
+
+
 # ---------------------------------------------------------------- reports ---
 @bp.get("/reports")
 @admin_required

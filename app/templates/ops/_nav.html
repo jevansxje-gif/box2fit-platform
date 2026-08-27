@@ -1,6 +1,6 @@
 {% macro ops_nav() %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
-  {% for ep, label in [('ops.today','Today'), ('ops_admin.live_schedule','Schedule'), ('ops_admin.schedule_builder','Builder'), ('ops_admin.members','Members'), ('ops_admin.trainers','Trainers'), ('ops_admin.announcements','Announce'), ('ops_admin.reviews','Reviews'), ('ops_admin.reports','Reports'), ('ops.kiosk','Kiosk')] %}
+  {% for ep, label in [('ops.today','Today'), ('ops_admin.live_schedule','Schedule'), ('ops_admin.schedule_builder','Builder'), ('ops_admin.members','Members'), ('ops_admin.trainers','Trainers'), ('ops_admin.announcements','Announce'), ('ops_admin.reviews','Reviews'), ('ops_admin.reports','Reports'), ('ops_admin.marketing','Marketing'), ('ops.kiosk','Kiosk')] %}
   <a href="{{ url_for(ep) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if request.endpoint == ep else 'pf-btn--ghost' }}">{{ label }}</a>
   {% endfor %}
 </div>

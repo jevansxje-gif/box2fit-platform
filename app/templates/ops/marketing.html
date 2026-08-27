@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Marketing — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:960px">
+  {{ ops_nav() }}
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+    <h1 class="pf-h1" style="margin:0">Marketing</h1>
+    <span class="pf-chip pf-chip--ink">Campaign: {{ campaign }} · Meta</span>
+  </div>
+  <p style="color:var(--pf-text-2);font-size:14px;margin:6px 0 20px">Human visitors only — Meta's ad-review and preview bots are filtered out. Traffic comes from the server's own access log; leads and everything after come from the database.</p>
+
+  <div class="cards-4" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+    <div class="pf-card pf-card--pad"><div class="pf-kicker">Ad visitors</div><div class="bnum">{{ traffic.totals.visitors }}</div></div>
+    <div class="pf-card pf-card--pad"><div class="pf-kicker">Leads (booked trials)</div><div class="bnum">{{ funnel.totals.leads }}</div></div>
+    <div class="pf-card pf-card--pad"><div class="pf-kicker">Attended</div><div class="bnum">{{ funnel.totals.attended }}</div></div>
+    <div class="pf-card pf-card--pad"><div class="pf-kicker">Members activated</div><div class="bnum">{{ funnel.totals.activated }}</div></div>
+    <div class="pf-card pf-card--pad">
+      <div class="pf-kicker">Spend (from Ads Manager)</div>
+      <div class="bnum" style="font-size:1.7rem">${{ '%.2f' % spend }}</div>
+      {% if cpl is not none %}<div style="font-size:13px;color:var(--pf-text-2)">${{ '%.2f' % cpl }} / lead</div>{% endif %}
+      <form method="post" style="display:flex;gap:6px;margin-top:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="action" value="spend" />
+        <input class="pf-input" name="spend" placeholder="{{ '%.2f' % spend }}" style="min-height:36px;padding:6px 10px;font-size:13px;width:90px" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="pf-panel">
+    <h2>Funnel by ad</h2>
+    {% if traffic.error %}<p class="note" style="color:var(--pf-text-3)">Traffic data unavailable here: {{ traffic.error }}. Lead columns still live.</p>{% endif %}
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tr style="text-align:left;color:var(--pf-text-3);font-size:12px;text-transform:uppercase;letter-spacing:.06em">
+          <th style="padding:8px 10px">Ad</th>
+          <th style="padding:8px 10px">Visitors</th>
+          <th style="padding:8px 10px">Opened class picker</th>
+          <th style="padding:8px 10px">Reached details form</th>
+          <th style="padding:8px 10px">Leads</th>
+          <th style="padding:8px 10px">Booked</th>
+          <th style="padding:8px 10px">Attended</th>
+          <th style="padding:8px 10px">Activated</th>
+        </tr>
+        {% set ads = (traffic.per_ad.keys() | list) + (funnel.per_ad.keys() | list) %}
+        {% for ad in ads | unique | sort %}
+        {% set t = traffic.per_ad.get(ad, {}) %}
+        {% set f = funnel.per_ad.get(ad, {}) %}
+        <tr style="border-top:1px solid var(--pf-line)">
+          <td style="padding:9px 10px;font-weight:700">{{ ad }}</td>
+          <td style="padding:9px 10px">{{ t.get('visitors', '—') }}</td>
+          <td style="padding:9px 10px">{{ t.get('picker', '—') }}</td>
+          <td style="padding:9px 10px">{{ t.get('details', '—') }}</td>
+          <td style="padding:9px 10px">{{ f.get('leads', 0) }}</td>
+          <td style="padding:9px 10px">{{ f.get('booked', 0) }}</td>
+          <td style="padding:9px 10px">{{ f.get('attended', 0) }}</td>
+          <td style="padding:9px 10px;font-weight:700">{{ f.get('activated', 0) }}</td>
+        </tr>
+        {% endfor %}
+        <tr style="border-top:2px solid var(--pf-line);font-weight:800">
+          <td style="padding:9px 10px">All</td>
+          <td style="padding:9px 10px">{{ traffic.totals.visitors }}</td>
+          <td style="padding:9px 10px">{{ traffic.totals.picker }}</td>
+          <td style="padding:9px 10px">{{ traffic.totals.details }}</td>
+          <td style="padding:9px 10px">{{ funnel.totals.leads }}</td>
+          <td style="padding:9px 10px">{{ funnel.totals.booked }}</td>
+          <td style="padding:9px 10px">{{ funnel.totals.attended }}</td>
+          <td style="padding:9px 10px">{{ funnel.totals.activated }}</td>
+        </tr>
+      </table>
+    </div>
+    <p class="note" style="color:var(--pf-text-3);font-size:12.5px;margin-top:10px">Visitors/picker/details = unique humans from the access log (this server, log-rotation window ≈ last 2 weeks). Leads onward = database, all time. A visitor on a phone may appear under a different IP than their later booking — treat the join as directional.</p>
+  </div>
+
+  <div class="pf-panel">
+    <h2>Recent ad leads</h2>
+    {% if funnel.recent %}
+    {% for lead in funnel.recent %}
+    <div style="display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--pf-line);font-size:14px;flex-wrap:wrap">
+      <b>{{ lead.name }}</b>
+      <span style="color:var(--pf-text-2)">{{ lead.email }}</span>
+      <span class="pf-chip" style="font-size:11px">{{ lead.utm_content or '?' }}</span>
+      <span class="pf-chip {{ 'pf-chip--success' if lead.status == 'activated' else 'pf-chip--info' }}" style="font-size:11px">{{ lead.status }}</span>
+      <span style="margin-left:auto;color:var(--pf-text-3);font-size:12.5px">{{ lead.created_at.strftime('%b %d, %H:%M') }}</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="note">No ad-attributed leads yet — they'll appear here the moment the first parent books.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

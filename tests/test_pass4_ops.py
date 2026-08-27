@@ -327,6 +327,51 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
         assert cbrowser.get(path).status_code == 403, path
 
 
+def test_marketing_report_page(app, client, client_account, tmp_path, monkeypatch):
+    """Marketing page: parses the access log, filters Meta bot ranges and
+    internal test links, tracks funnel steps per visitor, saves spend, and
+    stays admin-only."""
+    log = tmp_path / "access.log"
+    ua = "Mozilla/5.0 (iPhone)"
+    log.write_text(
+        # human: lands on c1, opens picker, reaches details
+        f'9.9.9.9 - - [27/Aug/2026:10:00:00 -0700] "GET /kids?v=c1&utm_source=meta&utm_campaign=kids HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'9.9.9.9 - - [27/Aug/2026:10:01:00 -0700] "GET /book/kids HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'9.9.9.9 - - [27/Aug/2026:10:02:00 -0700] "GET /book/kids/details HTTP/1.1" 200 1 "-" "{ua}"\n'
+        # human: c3 bounce
+        f'8.8.4.4 - - [27/Aug/2026:11:00:00 -0700] "GET /kids?v=c3&utm_source=meta&utm_campaign=kids HTTP/1.1" 200 1 "-" "{ua}"\n'
+        # Meta bot fleet — must be excluded
+        f'173.252.70.5 - - [27/Aug/2026:10:00:00 -0700] "GET /kids?v=c1&utm_source=meta HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'7.7.7.7 - - [27/Aug/2026:10:00:00 -0700] "GET /kids?v=c1&utm_source=meta HTTP/1.1" 200 1 "-" "facebookexternalhit/1.1"\n'
+        # internal test link — excluded
+        f'6.6.6.6 - - [27/Aug/2026:10:00:00 -0700] "GET /kids?v=c1&utm_source=meta&fbclid=fbclid HTTP/1.1" 200 1 "-" "{ua}"\n'
+    )
+    monkeypatch.setenv("NGINX_ACCESS_LOG", str(log))
+
+    from app.services.marketing_report import traffic_funnel
+
+    t = traffic_funnel("kids")
+    assert t["totals"] == {"visitors": 2, "landings": 2, "picker": 1, "details": 1}
+    assert t["per_ad"]["c1"]["details"] == 1
+    assert t["per_ad"]["c3"]["visitors"] == 1
+
+    staff = _admin(app)
+    r = staff.get("/ops/marketing")
+    assert r.status_code == 200
+    assert b"Funnel by ad" in r.data
+
+    r = staff.post(
+        "/ops/marketing", data={"action": "spend", "spend": "11.60"},
+        follow_redirects=True,
+    )
+    assert b"$11.60" in r.data
+
+    # admin-only: front desk is refused
+    fd = app.test_client()
+    fd.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})
+    assert fd.get("/ops/marketing").status_code == 403
+
+
 def test_delete_trainer_unassigns_and_removes(app, client, client_account):
     from app.models import ScheduleTemplate, Trainer
 

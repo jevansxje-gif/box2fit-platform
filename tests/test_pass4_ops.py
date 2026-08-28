@@ -366,6 +366,11 @@ def test_marketing_report_page(app, client, client_account, tmp_path, monkeypatc
     )
     assert b"$11.60" in r.data
 
+    # campaign switcher: youth tab works, junk falls back to kids
+    assert b"utm" not in staff.get("/ops/marketing?c=youth").data  # renders
+    assert staff.get("/ops/marketing?c=youth").status_code == 200
+    assert staff.get("/ops/marketing?c=evil").status_code == 200
+
     # admin-only: front desk is refused
     fd = app.test_client()
     fd.post("/ops/login", data={"email": "frontdesk@test.local", "password": "pw"})

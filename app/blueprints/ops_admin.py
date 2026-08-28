@@ -950,7 +950,10 @@ def marketing():
     from ..models import SiteSetting
     from ..services.marketing_report import db_funnel, traffic_funnel
 
-    campaign = "kids"
+    CAMPAIGNS = ("kids", "youth")
+    campaign = request.args.get("c", "kids")
+    if campaign not in CAMPAIGNS:
+        campaign = "kids"
     if request.method == "POST" and request.form.get("action") == "spend":
         raw = (request.form.get("spend") or "").replace("$", "").strip()
         try:
@@ -959,7 +962,7 @@ def marketing():
             flash("Spend updated.", "success")
         except ValueError:
             flash("Enter spend as a number, e.g. 11.60", "error")
-        return redirect(url_for("ops_admin.marketing"))
+        return redirect(url_for("ops_admin.marketing", c=campaign))
 
     spend = float(SiteSetting.get(f"marketing_spend_{campaign}", "0") or 0)
     traffic = traffic_funnel(campaign)
@@ -968,6 +971,7 @@ def marketing():
     return render_template(
         "ops/marketing.html",
         campaign=campaign,
+        campaigns=CAMPAIGNS,
         traffic=traffic,
         funnel=funnel,
         spend=spend,

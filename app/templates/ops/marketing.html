@@ -6,7 +6,12 @@
   {{ ops_nav() }}
   <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
     <h1 class="pf-h1" style="margin:0">Marketing</h1>
-    <span class="pf-chip pf-chip--ink">Campaign: {{ campaign }} · Meta</span>
+    <span class="pf-chip pf-chip--ink">Meta</span>
+    <div style="display:flex;gap:6px">
+      {% for c in campaigns %}
+      <a href="{{ url_for('ops_admin.marketing', c=c) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if c == campaign else 'pf-btn--ghost' }}">{{ c }}</a>
+      {% endfor %}
+    </div>
   </div>
   <p style="color:var(--pf-text-2);font-size:14px;margin:6px 0 20px">Human visitors only — Meta's ad-review and preview bots are filtered out. Traffic comes from the server's own access log; leads and everything after come from the database.</p>
 

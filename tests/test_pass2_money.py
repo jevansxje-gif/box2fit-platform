@@ -107,6 +107,45 @@ def test_gst_on_invoices_and_commission_on_pretax(app, client, client_account):
     assert "{total}" in DISCLOSURE and "GST" in DISCLOSURE
 
 
+def test_family_pricing_tiers(app, client, client_account):
+    """Client family deal (2026-08-28): additional members under the SAME
+    guardian account — which is by construction the same card — price at
+    $139 / $119 / $100 automatically. First member stays full price, tiers
+    are fixed at activation, and the pre-charge reminder shows the family
+    rate."""
+    from app.models import AttendeeKind, AttendeeProfile
+    from app.services import billing as b
+
+    staff, booking, guardian = _setup_member(app, client, client_account)
+    plan = b.default_plan(client_account.id)
+    assert db.session.query(Subscription).one().mrr_cents == 18900  # auto-start
+
+    for i, expected in enumerate((13900, 11900, 10000, 10000), start=2):
+        a = AttendeeProfile(
+            client_account_id=client_account.id, user_id=guardian.id,
+            kind=AttendeeKind.child.value, first_name=f"Kid{i}",
+            birth_year=2018,
+        )
+        db.session.add(a)
+        db.session.commit()
+        sub = b.activate_subscription(
+            a, plan=plan, cohort_label="Group A", actor="staff"
+        )
+        db.session.commit()
+        assert sub.mrr_cents == expected, f"member {i}"
+
+    # the family-rate reminder quotes the tier price, GST on the tier, and
+    # flags the family rate
+    reminders = db.session.query(Message).filter_by(
+        template="pre_charge_reminder", channel="email"
+    ).all()
+    assert any(
+        "$139 + 5% GST ($145.95)" in m.body_preview
+        and "family rate applied" in m.body_preview
+        for m in reminders
+    )
+
+
 def test_e2e_money_lifecycle(app, client, client_account):
     staff, booking, guardian = _setup_member(app, client, client_account)
 

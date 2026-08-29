@@ -77,6 +77,46 @@ def ensure_stripe_price(plan: Plan) -> str:
     return price.id
 
 
+# FAMILY PRICING (client deal, 2026-08-28): 1st member full price, then
+# $139 / $119 / $100 per 4-week cycle for the 2nd / 3rd / 4th+ member.
+# "Family" = subscriptions under the SAME guardian account, which by
+# construction all bill the same vaulted card — no promo codes needed and
+# nothing for the parent to redeem; the tier applies automatically at
+# activation. Tier is fixed at activation time (no auto-reprice when a
+# sibling cancels — staff can adjust manually; open business rule).
+FAMILY_TIER_CENTS = (13900, 11900, 10000)  # 2nd, 3rd, 4th-and-beyond
+
+
+def family_price_cents(existing_family_subs: int, plan: Plan) -> int:
+    if existing_family_subs <= 0:
+        return plan.price_cents
+    return FAMILY_TIER_CENTS[min(existing_family_subs - 1, len(FAMILY_TIER_CENTS) - 1)]
+
+
+def ensure_stripe_price_cents(plan: Plan, cents: int) -> str:
+    """Find-or-create a Stripe Price for a family-tier amount. Cached per
+    test/live mode in SiteSetting (same pattern as the GST tax rate)."""
+    if cents == plan.price_cents:
+        return ensure_stripe_price(plan)
+    from ..models import SiteSetting
+
+    stripe = stripe_service.stripe_client()
+    mode = "live" if "live" in (stripe.api_key or "")[:8] else "test"
+    key = f"stripe_price_{cents}_{mode}"
+    price_id = SiteSetting.get(key, "")
+    if price_id:
+        return price_id
+    recurring = STRIPE_INTERVAL.get(plan.interval, STRIPE_INTERVAL["4_weeks"])
+    price = stripe.Price.create(
+        unit_amount=cents,
+        currency=plan.currency.lower(),
+        recurring=recurring,
+        product_data={"name": f"Box2Fit {plan.name} — family rate ${cents // 100}"},
+    )
+    SiteSetting.set(key, price.id)
+    return price.id
+
+
 def activate_subscription(
     attendee: AttendeeProfile,
     plan: Plan | None = None,
@@ -118,6 +158,25 @@ def activate_subscription(
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     first_charge_at = utcnow() + timedelta(hours=lead_hours)
 
+    # Family pricing: count the guardian's OTHER live subscriptions —
+    # same account means same card, so this is the family by construction.
+    siblings = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.user_id == guardian.id,
+            Subscription.attendee_id != attendee.id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            ),
+        )
+        .count()
+    )
+    tier_cents = family_price_cents(siblings, plan)
+
     sub = Subscription(
         client_account_id=attendee.client_account_id,
         user_id=guardian.id,
@@ -125,7 +184,7 @@ def activate_subscription(
         plan_id=plan.id,
         cohort_label=cohort_label,
         status=SubscriptionStatus.pending.value,
-        mrr_cents=plan.price_cents,
+        mrr_cents=tier_cents,
         first_charge_at=first_charge_at,
     )
     db.session.add(sub)
@@ -133,7 +192,7 @@ def activate_subscription(
 
     if stripe_service.is_configured():
         stripe = stripe_service.stripe_client()
-        price_id = ensure_stripe_price(plan)
+        price_id = ensure_stripe_price_cents(plan, tier_cents)
         from .tax import ensure_stripe_gst_rate
 
         ssub = stripe.Subscription.create(
@@ -185,7 +244,9 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
     )
     from .tax import price_with_gst_label
 
-    price = price_with_gst_label(plan.price_cents)
+    price = price_with_gst_label(sub.mrr_cents)
+    if sub.mrr_cents < plan.price_cents:
+        price += " — family rate applied"
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     is_child = attendee.kind == AttendeeKind.child.value
     html = render_template(
@@ -453,6 +514,28 @@ def _send_welcome(sub: Subscription) -> None:
         "portal.set_password", token=make_token(guardian.id, SALT_SET_PASSWORD)
     )
     guardian.invited_at = utcnow()
+    # Family-pricing nudge: what the NEXT family member would cost. Counts
+    # this guardian's live subs; the discount applies automatically.
+    from .tax import price_with_gst_label
+
+    plan = db.session.get(Plan, sub.plan_id)
+    live_subs = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.user_id == guardian.id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            ),
+        )
+        .count()
+    )
+    next_family_price = (
+        price_with_gst_label(family_price_cents(live_subs, plan)) if plan else None
+    )
     html = render_template(
         "emails/membership_welcome.html",
         guardian=guardian,
@@ -460,6 +543,7 @@ def _send_welcome(sub: Subscription) -> None:
         is_child=is_child,
         cohort=sub.cohort_label,
         invite_url=invite_url,
+        next_family_price=next_family_price,
     )
     who = f"{attendee.first_name} is" if is_child else "You're"
     send_email(

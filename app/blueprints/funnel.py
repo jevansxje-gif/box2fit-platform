@@ -576,7 +576,7 @@ def activate_membership(token: str):
     from ..services.signed_links import SALT_ACTIVATE
 
     from ..models import PaymentMethodStatus, StripeCustomer
-    from ..services.signed_links import SALT_UPDATE_CARD
+    from ..services.signed_links import SALT_UPDATE_CARD, make_token
     from ..services.tax import price_with_gst_label
 
     booking_id = read_token(token, SALT_ACTIVATE)

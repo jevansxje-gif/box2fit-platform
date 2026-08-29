@@ -146,6 +146,36 @@ def test_family_pricing_tiers(app, client, client_account):
     )
 
 
+def test_family_disclosure_and_touchpoints(app, client, client_account):
+    """The card-step disclosure quotes the family tier for an additional
+    member (never overstated), and the confirmation email carries the
+    family-pricing block."""
+    from test_pass1_e2e import _child_form
+
+    staff, booking, guardian = _setup_member(app, client, client_account)
+    # guardian has one live sub ($189). Book a SECOND child, same email
+    # (same test client session → same guardian account).
+    instance = _first_instance(client_account)
+    client.post("/book/youth", data={"instance_id": str(instance.id)})
+    client.post(
+        "/book/youth/details",
+        data=_child_form(instance, child_first_name="Sibling"),
+    )
+    r = client.get("/book/youth/card")
+    assert b"$139" in r.data                       # tier quoted, not $189
+    assert b"$145.95 billed every 4 weeks" in r.data
+    assert b"Family pricing applied" in r.data
+
+    # confirmation email template carries the (static) family-pricing block
+    # — asserted on the template because Message.body_preview truncates
+    from pathlib import Path
+
+    tpl = Path("app/templates/emails/booking_confirmation.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Family pricing" in tpl and "$139" in tpl and "$100" in tpl
+
+
 def test_e2e_money_lifecycle(app, client, client_account):
     staff, booking, guardian = _setup_member(app, client, client_account)
 

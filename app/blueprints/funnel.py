@@ -450,14 +450,41 @@ def step_card(segment: str):
         .order_by(Plan.class_type_id.desc())
         .first()
     )
+    from ..models import Subscription, SubscriptionStatus
+    from ..services.billing import family_price_cents
     from ..services.tax import fmt_cents, total_with_gst_cents
 
     cents = plan_row.price_cents if plan_row else 18900
+    family_note = ""
+    if plan_row:
+        # Family pricing: quote the ACTUAL tier this member would pay,
+        # based on the guardian's existing live memberships.
+        live = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.user_id == booking.attendee.guardian.id,
+                Subscription.status.in_(
+                    [
+                        SubscriptionStatus.pending.value,
+                        SubscriptionStatus.active.value,
+                        SubscriptionStatus.past_due.value,
+                    ]
+                ),
+            )
+            .count()
+        )
+        tier = family_price_cents(live, plan_row)
+        if tier < cents:
+            cents = tier
+            family_note = " Family pricing applied for your additional member."
     class_date_str = fmt_local(booking.class_instance.starts_at_utc, "%A, %B %d")
-    disclosure = DISCLOSURE.format(
-        price=fmt_cents(cents),
-        total=fmt_cents(total_with_gst_cents(cents)),
-        date=class_date_str,
+    disclosure = (
+        DISCLOSURE.format(
+            price=fmt_cents(cents),
+            total=fmt_cents(total_with_gst_cents(cents)),
+            date=class_date_str,
+        )
+        + family_note
     )
 
     return render_template(

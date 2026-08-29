@@ -57,6 +57,14 @@
       {% endfor %}
       <a href="{{ url_for('portal.membership') }}" style="display:inline-block;margin-top:12px">Manage membership →</a>
     </div>
+    {% if next_family_price %}
+    <div class="pf-card pf-card--pad" style="border:1.5px solid var(--pf-red)">
+      <div class="pf-kicker" style="color:var(--pf-red)">Family pricing</div>
+      <p style="margin:8px 0 4px;font-weight:900;font-size:22px;letter-spacing:.01em">{{ next_family_price }}</p>
+      <p style="margin:0;color:var(--pf-text-2);font-size:14px">for your next family member's membership — automatic on this account, and their first class is free.</p>
+      <a href="{{ url_for('funnel.landing_kids') }}" style="display:inline-block;margin-top:12px">Book their free class →</a>
+    </div>
+    {% endif %}
     <div class="pf-card pf-card--pad">
       <div class="pf-kicker" style="color:var(--pf-text-3)">Refer a friend</div>
       <p style="margin:8px 0 4px;font-weight:900;font-size:22px;letter-spacing:.02em">{{ referral_code }}</p>

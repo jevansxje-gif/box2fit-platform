@@ -140,8 +140,7 @@ def test_family_pricing_tiers(app, client, client_account):
         template="pre_charge_reminder", channel="email"
     ).all()
     assert any(
-        "$139 + 5% GST ($145.95)" in m.body_preview
-        and "family rate applied" in m.body_preview
+        "$139 + 5% GST ($145.95, family rate)" in m.body_preview
         for m in reminders
     )
 

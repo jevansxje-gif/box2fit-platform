@@ -246,7 +246,9 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
 
     price = price_with_gst_label(sub.mrr_cents)
     if sub.mrr_cents < plan.price_cents:
-        price += " — family rate applied"
+        # tuck inside the parens — the template continues "...billed every
+        # 4 weeks" right after this string
+        price = price[:-1] + ", family rate)"
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     is_child = attendee.kind == AttendeeKind.child.value
     html = render_template(

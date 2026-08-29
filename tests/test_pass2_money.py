@@ -303,11 +303,20 @@ def test_no_card_falls_back_to_activation_email(app, client, client_account):
     r = staff.post(f"/ops/bookings/{booking.id}/activate", follow_redirects=True)
     assert b"No card on file" in r.data
 
+    # CARDLESS: the activate page routes to the card page instead of a
+    # dead-end button (fix 2026-08-29)
+    r = client.get(f"/activate/{token}")
+    assert b"Add a card to start" in r.data
+    assert b"/portal/card/" in r.data
+    assert b"Start my membership" not in r.data
+    assert b"membership</button>" not in r.data
+
     # once the guardian vaults a card, the emailed link activates
     guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
     _vault_card(guardian)
     r = client.get(f"/activate/{token}")
     assert b"$189" in r.data and b"every 4 weeks" in r.data
+    assert b"Add a card to start" not in r.data
     r = client.post(f"/activate/{token}")
     assert b"crew" in r.data
     sub = db.session.query(Subscription).one()

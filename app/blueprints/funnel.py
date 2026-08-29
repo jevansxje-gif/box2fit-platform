@@ -575,12 +575,47 @@ def activate_membership(token: str):
     from ..services import billing
     from ..services.signed_links import SALT_ACTIVATE
 
+    from ..models import PaymentMethodStatus, StripeCustomer
+    from ..services.signed_links import SALT_UPDATE_CARD
+    from ..services.tax import price_with_gst_label
+
     booking_id = read_token(token, SALT_ACTIVATE)
     if booking_id is None:
         abort(404)
     booking = db.session.get(Booking, booking_id) or abort(404)
     attendee = booking.attendee
     plan = billing.default_plan(booking.client_account_id)
+
+    # Cardless members (skipped the card step at booking) need to vault a
+    # card first — route them to the card page instead of a dead-end error.
+    guardian = attendee.guardian
+    sc = (
+        db.session.query(StripeCustomer).filter_by(user_id=guardian.id).one_or_none()
+    )
+    has_card = bool(sc and sc.payment_method_status == PaymentMethodStatus.vaulted.value)
+    card_url = url_for(
+        "portal.update_card", token=make_token(guardian.id, SALT_UPDATE_CARD)
+    )
+    price_label = None
+    if plan:
+        from ..models import Subscription, SubscriptionStatus
+        from ..services.billing import family_price_cents
+
+        live = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.user_id == guardian.id,
+                Subscription.status.in_(
+                    [
+                        SubscriptionStatus.pending.value,
+                        SubscriptionStatus.active.value,
+                        SubscriptionStatus.past_due.value,
+                    ]
+                ),
+            )
+            .count()
+        )
+        price_label = price_with_gst_label(family_price_cents(live, plan))
 
     if request.method == "POST":
         try:
@@ -604,6 +639,9 @@ def activate_membership(token: str):
         booking=booking,
         plan=plan,
         token=token,
+        has_card=has_card,
+        card_url=card_url,
+        price_label=price_label,
     )
 
 

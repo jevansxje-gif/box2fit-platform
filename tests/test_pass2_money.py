@@ -173,7 +173,10 @@ def test_family_disclosure_and_touchpoints(app, client, client_account):
     tpl = Path("app/templates/emails/booking_confirmation.html").read_text(
         encoding="utf-8"
     )
-    assert "Family pricing" in tpl and "$139" in tpl and "$100" in tpl
+    # pre-pricing touchpoints use DISCOUNT framing (user preference
+    # 2026-08-28), not resulting prices
+    assert "Family pricing" in tpl and "$50" in tpl and "$89" in tpl
+    assert "$139" not in tpl
 
 
 def test_e2e_money_lifecycle(app, client, client_account):

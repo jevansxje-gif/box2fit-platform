@@ -243,24 +243,23 @@ def dashboard():
         .limit(3)
         .all()
     )
-    # Family pricing nudge: what the next member on this account would pay
-    next_family_price = None
-    live_subs = [s for s in subs]
-    if live_subs:
+    # Family pricing nudge: what the next member on this account would SAVE
+    next_family_discount = None
+    if subs:
         from ..services.billing import default_plan, family_price_cents
-        from ..services.tax import price_with_gst_label
+        from ..services.tax import fmt_cents
 
         plan = default_plan(current_user.client_account_id)
         if plan:
-            next_family_price = price_with_gst_label(
-                family_price_cents(len(live_subs), plan)
-            )
+            saving = plan.price_cents - family_price_cents(len(subs), plan)
+            if saving > 0:
+                next_family_discount = fmt_cents(saving)
     return render_template(
         "portal/dashboard.html",
         announcements=announcements,
         attendees=attendees,
         sub_by_attendee=sub_by_attendee,
-        next_family_price=next_family_price,
+        next_family_discount=next_family_discount,
         next_booking=next_booking,
         quick=quick,
         past_due=past_due,

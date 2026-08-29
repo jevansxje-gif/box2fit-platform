@@ -514,10 +514,8 @@ def _send_welcome(sub: Subscription) -> None:
         "portal.set_password", token=make_token(guardian.id, SALT_SET_PASSWORD)
     )
     guardian.invited_at = utcnow()
-    # Family-pricing nudge: what the NEXT family member would cost. Counts
+    # Family-pricing nudge: what the NEXT family member would save. Counts
     # this guardian's live subs; the discount applies automatically.
-    from .tax import price_with_gst_label
-
     plan = db.session.get(Plan, sub.plan_id)
     live_subs = (
         db.session.query(Subscription)
@@ -533,9 +531,13 @@ def _send_welcome(sub: Subscription) -> None:
         )
         .count()
     )
-    next_family_price = (
-        price_with_gst_label(family_price_cents(live_subs, plan)) if plan else None
-    )
+    from .tax import fmt_cents
+
+    next_family_discount = None
+    if plan:
+        saving = plan.price_cents - family_price_cents(live_subs, plan)
+        if saving > 0:
+            next_family_discount = fmt_cents(saving)
     html = render_template(
         "emails/membership_welcome.html",
         guardian=guardian,
@@ -543,7 +545,7 @@ def _send_welcome(sub: Subscription) -> None:
         is_child=is_child,
         cohort=sub.cohort_label,
         invite_url=invite_url,
-        next_family_price=next_family_price,
+        next_family_discount=next_family_discount,
     )
     who = f"{attendee.first_name} is" if is_child else "You're"
     send_email(

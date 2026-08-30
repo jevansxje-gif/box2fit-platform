@@ -66,6 +66,8 @@ def generate_instances(client_account_id: int, weeks: int | None = None) -> int:
             for tpl in templates:
                 if tpl.weekday != d.weekday() or (tpl.id, d) in existing:
                     continue
+                if tpl.starts_on and d < tpl.starts_on:
+                    continue  # program hasn't launched yet
                 ct = tpl.class_type
                 db.session.add(
                     ClassInstance(

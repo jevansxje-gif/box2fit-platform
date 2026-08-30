@@ -287,6 +287,9 @@ class ScheduleTemplate(db.Model):
     capacity: Mapped[int | None] = mapped_column(Integer)  # default: class type
     trainer_id: Mapped[int | None] = mapped_column(ForeignKey("trainers.id"))
     accepts_trials: Mapped[bool | None] = mapped_column(Boolean)  # default: type
+    # Program launch date: no instances are generated before this (e.g. a
+    # class announced ahead of its first session). Null = no restriction.
+    starts_on: Mapped[date | None] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     class_type: Mapped[ClassType] = relationship()

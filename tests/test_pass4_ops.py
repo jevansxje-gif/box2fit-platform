@@ -327,6 +327,32 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
         assert cbrowser.get(path).status_code == 403, path
 
 
+def test_template_starts_on_gates_generation(app, client_account):
+    """A template with starts_on (program launch date) generates no
+    instances before that date — used when a class is announced ahead of
+    its first session."""
+    from datetime import timedelta
+
+    from app.models import ClassInstance, ScheduleTemplate
+    from app.services.scheduling import generate_instances
+    from app.services.tzutil import today_local
+
+    tpl = db.session.query(ScheduleTemplate).first()
+    launch = today_local() + timedelta(days=7)
+    tpl.starts_on = launch
+    db.session.query(ClassInstance).filter_by(template_id=tpl.id).delete()
+    db.session.commit()
+
+    generate_instances(client_account.id)
+    db.session.commit()
+    dates = [
+        i.local_date
+        for i in db.session.query(ClassInstance).filter_by(template_id=tpl.id)
+    ]
+    assert dates, "expected instances after the launch date"
+    assert min(dates) >= launch
+
+
 def test_marketing_report_page(app, client, client_account, tmp_path, monkeypatch):
     """Marketing page: parses the access log, filters Meta bot ranges and
     internal test links, tracks funnel steps per visitor, saves spend, and

@@ -964,7 +964,7 @@ def marketing():
     from ..models import SiteSetting
     from ..services.marketing_report import db_funnel, traffic_funnel
 
-    CAMPAIGNS = ("kids", "youth")
+    CAMPAIGNS = ("kids", "youth", "shehits", "beast")
     campaign = request.args.get("c", "kids")
     if campaign not in CAMPAIGNS:
         campaign = "kids"

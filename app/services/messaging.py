@@ -86,21 +86,27 @@ def _send_via_brevo_api(to_email: str, subject: str, html: str) -> None:
     blocked (DigitalOcean default). Raises on non-2xx."""
     import requests
 
+    payload = {
+        "sender": {
+            "name": current_app.config["MAIL_FROM_NAME"],
+            "email": current_app.config["MAIL_FROM_EMAIL"],
+        },
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html,
+    }
+    # Replies (cancellations, questions) go to the gym's real inbox —
+    # the sending domain has no mailbox.
+    reply_to = current_app.config.get("MAIL_REPLY_TO")
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
     resp = requests.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={
             "api-key": current_app.config["BREVO_API_KEY"],
             "content-type": "application/json",
         },
-        json={
-            "sender": {
-                "name": current_app.config["MAIL_FROM_NAME"],
-                "email": current_app.config["MAIL_FROM_EMAIL"],
-            },
-            "to": [{"email": to_email}],
-            "subject": subject,
-            "htmlContent": html,
-        },
+        json=payload,
         timeout=20,
     )
     resp.raise_for_status()

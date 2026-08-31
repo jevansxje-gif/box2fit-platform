@@ -54,6 +54,8 @@ class Config:
     MAIL_FROM_EMAIL = os.environ.get(
         "MAIL_FROM_EMAIL", os.environ.get("SENDGRID_FROM_EMAIL", "hello@box2fit.com")
     )
+    # Where member replies land (the sending domain has no mailbox)
+    MAIL_REPLY_TO = os.environ.get("MAIL_REPLY_TO", "box2fit@gmail.com")
     MAIL_FROM_NAME = os.environ.get(
         "MAIL_FROM_NAME", os.environ.get("SENDGRID_FROM_NAME", "Box2Fit White Rock")
     )

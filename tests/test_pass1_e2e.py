@@ -283,3 +283,40 @@ def test_api_classes_and_auth(client, client_account):
 
 def test_ops_requires_staff(client):
     assert client.get("/ops/today").status_code == 302  # redirected to login
+
+
+def test_double_submit_books_once(client, client_account):
+    """Tapping Continue repeatedly on a slow response must not mint duplicate
+    children/bookings/leads or re-send emails (4x prod incident 2026-08-29)."""
+    instance = _first_instance(client_account)
+    r1 = _book_child(client, instance)
+    assert r1.status_code == 302 and "/card" in r1.location
+    sent_after_first = (
+        db.session.query(Message)
+        .filter_by(template="booking_confirmation")
+        .count()
+    )
+    # The impatient second tap: identical form, same session.
+    r2 = client.post(
+        "/book/youth/details", data=_child_form(instance), follow_redirects=False
+    )
+    assert r2.status_code == 302 and "/card" in r2.location
+
+    guardian = (
+        db.session.query(User).filter_by(email="sam.parent@example.com").one()
+    )
+    kids = (
+        db.session.query(AttendeeProfile).filter_by(user_id=guardian.id).all()
+    )
+    assert len(kids) == 1
+    bookings = (
+        db.session.query(Booking).filter_by(attendee_id=kids[0].id).all()
+    )
+    assert len(bookings) == 1
+    assert db.session.query(Lead).filter_by(user_id=guardian.id).count() == 1
+    sent_after_second = (
+        db.session.query(Message)
+        .filter_by(template="booking_confirmation")
+        .count()
+    )
+    assert sent_after_second == sent_after_first

@@ -405,18 +405,27 @@ def step_details(segment: str):
         db.session.add(lead)
         db.session.flush()
 
-        booking = booking_flow.create_trial_booking(
+        booking, created = booking_flow.create_trial_booking(
             instance,
             attendee,
             lead,
             walkin=request.args.get("source") == "walkin",
         )
-        booking_flow.send_booking_confirmation(booking)
-        booking_flow.send_admin_signup_alert(booking)
+        if created:
+            booking_flow.send_booking_confirmation(booking)
+            booking_flow.send_admin_signup_alert(booking)
+        else:
+            # Re-submitted form: keep the booking's original lead so ad
+            # counts don't inflate, and drop the one minted above.
+            db.session.delete(lead)
         db.session.commit()
 
         state.update(
-            {"booking_id": booking.id, "lead_id": lead.id, "guardian_id": guardian.id}
+            {
+                "booking_id": booking.id,
+                "lead_id": booking.lead_id,
+                "guardian_id": guardian.id,
+            }
         )
         _save(state)
         return redirect(url_for("funnel.step_card", segment=segment))

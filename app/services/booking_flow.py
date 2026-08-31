@@ -5,6 +5,7 @@ later the mobile app) reuses the exact same path."""
 import logging
 
 from flask import render_template
+from sqlalchemy import func
 
 from ..extensions import db
 from ..models import (
@@ -12,6 +13,7 @@ from ..models import (
     AttendeeProfile,
     Booking,
     BookingKind,
+    BookingStatus,
     ClassInstance,
     Lead,
     LeadStatus,
@@ -72,6 +74,28 @@ def create_child_attendee(
     emergency_contact_phone: str,
     health_answers: dict,
 ) -> AttendeeProfile:
+    # Same child re-submitted (double-tapped Continue on a slow response, or
+    # a genuine second signup) must not mint a duplicate profile — seen in
+    # production 2026-08-29: four identical children in one minute.
+    attendee = (
+        db.session.query(AttendeeProfile)
+        .filter(
+            AttendeeProfile.user_id == guardian.id,
+            AttendeeProfile.kind == AttendeeKind.child.value,
+            func.lower(AttendeeProfile.first_name) == first_name.lower(),
+            AttendeeProfile.birth_year == birth_year,
+        )
+        .first()
+    )
+    if attendee:
+        attendee.emergency_contact_name = (
+            emergency_contact_name or attendee.emergency_contact_name
+        )
+        attendee.emergency_contact_phone = (
+            emergency_contact_phone or attendee.emergency_contact_phone
+        )
+        attendee.health_json = health_answers or attendee.health_json
+        return attendee
     attendee = AttendeeProfile(
         client_account_id=guardian.client_account_id,
         user_id=guardian.id,
@@ -143,7 +167,23 @@ def create_trial_booking(
     attendee: AttendeeProfile,
     lead: Lead,
     walkin: bool = False,
-) -> Booking:
+) -> tuple[Booking, bool]:
+    """Returns (booking, created). A live booking for the same attendee and
+    class is reused, so a re-submitted form can't double-book — the caller
+    skips confirmation/alert emails when created is False."""
+    existing = (
+        db.session.query(Booking)
+        .filter(
+            Booking.attendee_id == attendee.id,
+            Booking.class_instance_id == instance.id,
+            Booking.status.in_(
+                [BookingStatus.booked.value, BookingStatus.attended.value]
+            ),
+        )
+        .first()
+    )
+    if existing:
+        return existing, False
     booking = Booking(
         client_account_id=instance.client_account_id,
         attendee_id=attendee.id,
@@ -159,7 +199,7 @@ def create_trial_booking(
     enqueue_event(
         "Schedule", instance.client_account_id, lead, booking_id=booking.id
     )
-    return booking
+    return booking, True
 
 
 def admin_alert_recipients() -> list[str]:

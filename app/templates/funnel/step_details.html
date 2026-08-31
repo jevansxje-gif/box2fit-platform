@@ -115,7 +115,23 @@
       })();
     </script>
 
-    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Continue</button>
+    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit" data-submit-once>Continue</button>
   </form>
+  <script>
+    // A slow response invites repeated taps, each of which re-books
+    // (four identical sign-ups in prod, 2026-08-29). Server dedupes too;
+    // this stops the extra requests at the source.
+    (function () {
+      var form = document.querySelector('form[method="post"]');
+      var btn = document.querySelector('[data-submit-once]');
+      if (!form || !btn) return;
+      form.addEventListener('submit', function () {
+        setTimeout(function () {
+          btn.disabled = true;
+          btn.textContent = 'Booking…';
+        }, 0);
+      });
+    })();
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 {% endblock %}

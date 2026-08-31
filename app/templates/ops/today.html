@@ -55,6 +55,29 @@
     </div>
   </div>
 
+  {% if follow_ups %}
+  <div class="pf-card ops-class">
+    <div class="head">
+      <b>Trial follow-ups</b>
+      <span class="pf-chip pf-chip--warn">{{ follow_ups|length }}</span>
+      <span style="color:var(--pf-text-2);font-size:13px">attended a free class, no membership yet — worth a friendly call</span>
+    </div>
+    <div class="ops-roster">
+      {% for b in follow_ups %}
+      <div class="roster-row">
+        <div class="who">
+          <b>{{ b.attendee.first_name }} {{ b.attendee.last_name or '' }}
+            {% if b.attendee.kind == 'child' %}<span class="pf-chip pf-chip--info" style="font-size:11px;padding:4px 8px">child</span>{% endif %}</b>
+          <span>{% if b.attendee.kind == 'child' %}Guardian: {{ b.attendee.guardian.name }} · {% endif %}{{ b.attendee.guardian.phone }} · {{ b.attendee.guardian.email }}</span>
+        </div>
+        <span style="font-size:14px;color:var(--pf-text-2);white-space:nowrap">attended {{ b.class_instance.local_date.strftime('%a %b %d') }}</span>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('ops_admin.member_detail', user_id=b.attendee.user_id) }}">Open</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if not instances %}
     <div class="pf-panel"><h2>No classes today</h2><p class="note">The schedule generator fills instances nightly; run the seed if this is a fresh install.</p></div>
   {% endif %}

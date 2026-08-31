@@ -327,6 +327,50 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
         assert cbrowser.get(path).status_code == 403, path
 
 
+def test_trial_followup_nudge_and_call_list(app, client, client_account):
+    """Attended trials without a membership get exactly one day-2 email
+    nudge, and appear on the Today page's follow-up call list."""
+    from datetime import time as dtime, timedelta
+
+    from app.models import ClassType
+    from app.services.tzutil import local_to_utc, today_local
+    from app.tasks.jobs import send_trial_followups
+
+    # attended trial two days ago, no membership
+    kids = db.session.query(ClassType).filter_by(key="kids_7_10").one()
+    past = today_local() - timedelta(days=2)
+    inst = ClassInstance(
+        client_account_id=client_account.id, class_type_id=kids.id,
+        cohort_label="Group A",
+        starts_at_utc=local_to_utc(past, dtime(16, 0)),
+        local_date=past, local_time=dtime(16, 0), duration_min=45, capacity=12,
+    )
+    db.session.add(inst)
+    db.session.commit()
+    other = _first_instance(client_account, "kids_7_10")
+    _book_child(client, other)
+    booking = db.session.query(Booking).one()
+    booking.class_instance_id = inst.id
+    booking.status = BookingStatus.attended.value
+    db.session.commit()
+
+    assert send_trial_followups.apply().get() == 1
+    nudge = db.session.query(Message).filter_by(
+        template="trial_followup", channel="email"
+    ).one()
+    assert "/activate/" in nudge.body_preview
+    assert "still open" in nudge.subject
+
+    # strictly once
+    assert send_trial_followups.apply().get() == 0
+
+    # and the Today page lists them for the front desk
+    staff = _admin(app)
+    r = staff.get("/ops/today")
+    assert b"Trial follow-ups" in r.data
+    assert b"Maya" in r.data
+
+
 def test_staff_cancel_booking_from_member_page(app, client, client_account):
     """Ops member page can cancel a trial booking (e.g. an emailed
     cancellation request) — spot released, status recorded."""

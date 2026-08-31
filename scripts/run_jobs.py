@@ -19,6 +19,7 @@ from app.tasks.jobs import (
     drain_event_outbox,
     release_expired_waitlist_offers,
     send_due_reminders,
+    send_trial_followups,
 )
 
 app = create_app()
@@ -28,6 +29,7 @@ with app.app_context():
     reminders = send_due_reminders.apply().get()
     noshows = automark_no_shows.apply().get()
     released = release_expired_waitlist_offers.apply().get()
+    followups = send_trial_followups.apply().get()
     drained = drain_event_outbox.apply().get()
 
     generated = pruned = 0
@@ -39,6 +41,6 @@ with app.app_context():
 
     print(
         f"[{stamp}] reminders={reminders} noshows={noshows} "
-        f"waitlist_released={released} outbox={drained} "
+        f"waitlist_released={released} followups={followups} outbox={drained} "
         f"generated={generated} pruned={pruned}"
     )

@@ -223,6 +223,44 @@ def today():
                 BookingStatus.no_show.value,
             )
         ]
+
+    # Trial follow-ups: attended a free class in the last week, no
+    # membership yet — the front desk's call list. (A day-2 email nudge
+    # goes out automatically; a voice closes fence-sitters.)
+    from ..models import Subscription, SubscriptionStatus
+
+    live_attendee_ids = {
+        s.attendee_id
+        for s in db.session.query(Subscription).filter(
+            Subscription.client_account_id == current_user.client_account_id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            ),
+        )
+    }
+    from datetime import timedelta as _td
+
+    from ..models import BookingKind as _BK
+
+    follow_ups = [
+        b
+        for b in db.session.query(Booking)
+        .join(ClassInstance, Booking.class_instance_id == ClassInstance.id)
+        .filter(
+            Booking.client_account_id == current_user.client_account_id,
+            Booking.kind.in_([_BK.trial.value, _BK.walkin.value]),
+            Booking.status == BookingStatus.attended.value,
+            ClassInstance.local_date >= d - _td(days=7),
+            ClassInstance.local_date < d,
+        )
+        .order_by(ClassInstance.local_date)
+        .all()
+        if b.attendee_id not in live_attendee_ids
+    ]
     return render_template(
         "ops/today.html",
         instances=instances,
@@ -231,6 +269,7 @@ def today():
         today=d,
         recent_signups=recent_signups,
         signup_window_days=SIGNUP_WINDOW_DAYS,
+        follow_ups=follow_ups,
     )
 
 

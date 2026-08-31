@@ -11,6 +11,7 @@ from ..extensions import db
 from ..models import (
     AttendeeKind,
     Booking,
+    BookingKind,
     BookingStatus,
     ClassInstance,
     ClientAccount,
@@ -111,6 +112,74 @@ def _send_reminder(booking: Booking, template: str) -> None:
         booking.client_account_id,
         attendee_id=attendee.id,
     )
+
+
+@shared_task(name="app.tasks.jobs.send_trial_followups")
+def send_trial_followups() -> int:
+    """Day-2 nudge for attended trials that never became memberships (the
+    single post-class email is easy to miss). Marketing send — honors email
+    consent — and strictly once per attendee, tracked via the Message log."""
+    from ..models import Message, Subscription, SubscriptionStatus
+    from ..services.signed_links import SALT_ACTIVATE
+    from ..services.tzutil import today_local
+
+    target = today_local() - timedelta(days=2)
+    rows = (
+        db.session.query(Booking)
+        .join(ClassInstance, Booking.class_instance_id == ClassInstance.id)
+        .filter(
+            Booking.kind.in_([BookingKind.trial.value, BookingKind.walkin.value]),
+            Booking.status == BookingStatus.attended.value,
+            ClassInstance.local_date == target,
+        )
+        .all()
+    )
+    sent = 0
+    for b in rows:
+        attendee = b.attendee
+        live = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.attendee_id == attendee.id,
+                Subscription.status.in_(
+                    [
+                        SubscriptionStatus.pending.value,
+                        SubscriptionStatus.active.value,
+                        SubscriptionStatus.past_due.value,
+                    ]
+                ),
+            )
+            .count()
+        )
+        if live:
+            continue
+        already = (
+            db.session.query(Message)
+            .filter_by(template="trial_followup", attendee_id=attendee.id)
+            .count()
+        )
+        if already:
+            continue
+        guardian = attendee.guardian
+        is_child = attendee.kind == AttendeeKind.child.value
+        url = absolute_url(
+            "funnel.activate_membership", token=make_token(b.id, SALT_ACTIVATE)
+        )
+        html = render_template(
+            "emails/trial_followup.html",
+            guardian=guardian, attendee=attendee, is_child=is_child,
+            activate_url=url,
+        )
+        who = f"{attendee.first_name}'s" if is_child else "Your"
+        send_email(
+            guardian, guardian.email,
+            f"{who} spot at Box2Fit is still open",
+            html, "trial_followup", b.client_account_id,
+            attendee_id=attendee.id, transactional=False,
+        )
+        sent += 1
+    db.session.commit()
+    return sent
 
 
 @shared_task(name="app.tasks.jobs.release_expired_waitlist_offers")

@@ -30,7 +30,7 @@ def send_email(
         template=template,
         recipient=to_email,
         subject=subject,
-        body_preview=html[:2000],
+        body_preview=html[:4000],
     )
     if not transactional and user is not None and not user.consent_email:
         msg.delivery_status = "suppressed_no_consent"

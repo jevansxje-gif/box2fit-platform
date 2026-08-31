@@ -8,7 +8,7 @@
     <div class="pf-kicker">Booking confirmed</div>
     <div class="big">{{ booking.attendee.first_name }} is in.</div>
     <div class="when">{{ booking.class_instance.class_type.name }} · {{ fmt_local(booking.class_instance.starts_at_utc) }}</div>
-    <p style="margin:18px 0 4px">1522 Finlay St, Unit 216 · White Rock, BC</p>
+    <p style="margin:18px 0 4px">1522 Finlay St, Unit 216 · White Rock, BC · Free underground parking</p>
     <p style="margin:8px 0 0;color:var(--pf-text-2);font-size:15px">
       Comfortable athletic clothing, indoor shoes, and a water bottle. Gloves and wraps are provided.
       {% if booking.attendee.kind == 'child' %}Parents are welcome to stay and watch.{% endif %}

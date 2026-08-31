@@ -26,7 +26,8 @@ def _event_fields(booking: Booking) -> dict:
     )
     description = (
         f"{who}'s class at Box2Fit White Rock. Arrive 10 minutes early; "
-        f"gloves and wraps provided. Need to cancel? {cancel_url}"
+        f"free underground parking at the building; gloves and wraps "
+        f"provided. Need to cancel? {cancel_url}"
     )
     return {
         "start": start,

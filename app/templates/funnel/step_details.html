@@ -28,7 +28,10 @@
       <h2>About your child</h2>
       <p class="note">We keep this to the minimum: first name and birth year. Everything else stays with you, the parent or guardian.</p>
       <div class="pf-field">
-        {{ form.child_first_name.label(class="pf-label") }}{{ form.child_first_name(class="pf-input", autocomplete="off") }}{{ errs(form.child_first_name) }}
+        {# readonly-until-focus: browsers ignore autocomplete="off" on
+           name-like fields and stamp the guardian's name in (seen in
+           production twice) — readonly blocks autofill at page load #}
+        {{ form.child_first_name.label(class="pf-label") }}{{ form.child_first_name(class="pf-input", autocomplete="off", readonly=True, onfocus="this.removeAttribute('readonly')") }}{{ errs(form.child_first_name) }}
       </div>
       <div class="pf-field">
         {{ form.child_birth_year.label(class="pf-label") }}{{ form.child_birth_year(class="pf-input", inputmode="numeric", placeholder="e.g. 2015") }}{{ errs(form.child_birth_year) }}

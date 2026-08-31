@@ -351,6 +351,17 @@ def step_details(segment: str):
             consent_sms=form.consent_sms.data,
         )
         if form.attendee_kind.data == "child":
+            # Hard guard: a blank child name slipped past form validation
+            # once in production (2026-08-31) — never store one.
+            if not (form.child_first_name.data or "").strip():
+                from ..legal import WAIVER_SECTIONS
+
+                flash("Please enter your child's first name.", "error")
+                return render_template(
+                    "funnel/step_details.html", form=form, instance=instance,
+                    health_questions=HEALTH_QUESTIONS,
+                    waiver_sections=WAIVER_SECTIONS, segment=segment, step=2,
+                )
             attendee = booking_flow.create_child_attendee(
                 guardian,
                 first_name=form.child_first_name.data.strip(),

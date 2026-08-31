@@ -894,6 +894,20 @@ def member_detail(user_id: int):
             send_password_reset(u)
             db.session.commit()
             flash(f"Password reset link emailed to {u.email}.", "success")
+        elif action == "cancel_booking":
+            from ..services import waitlist
+
+            bk = db.session.get(Booking, request.form.get("booking_id", type=int))
+            if bk and bk.attendee.user_id == u.id and (
+                bk.status == BookingStatus.booked.value
+            ):
+                bk.status = BookingStatus.cancelled.value
+                bk.cancelled_at = utcnow()
+                waitlist.promote_next(bk.class_instance)
+                db.session.commit()
+                flash("Booking cancelled — the spot has been released.", "success")
+            else:
+                flash("That booking can't be cancelled.", "error")
         elif action == "cancel_sub":
             from ..services import billing
 

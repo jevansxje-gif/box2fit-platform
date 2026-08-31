@@ -64,6 +64,14 @@
       <span style="min-width:150px;font-size:14px">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</span>
       <span style="flex:1;font-size:14px">{{ b.class_instance.class_type.name }} — {{ b.attendee.first_name }} <span style="color:var(--pf-text-3)">({{ b.kind }})</span></span>
       <span class="pf-chip pf-chip--{{ 'success' if b.status == 'attended' else ('warn' if b.status == 'no_show' else '') }}" style="font-size:11px">{{ b.status.replace('_',' ') }}{{ ' · late' if b.late_cancel }}</span>
+      {% if b.status == 'booked' %}
+      <form method="post" onsubmit="return confirm('Cancel this booking? The spot is released and any waitlist is offered it.')" style="margin-left:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="action" value="cancel_booking" />
+        <input type="hidden" name="booking_id" value="{{ b.id }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" style="color:var(--pf-red)">Cancel</button>
+      </form>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

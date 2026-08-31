@@ -327,6 +327,34 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
         assert cbrowser.get(path).status_code == 403, path
 
 
+def test_staff_cancel_booking_from_member_page(app, client, client_account):
+    """Ops member page can cancel a trial booking (e.g. an emailed
+    cancellation request) — spot released, status recorded."""
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian_id = booking.attendee.user_id
+
+    staff = _admin(app)
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={"action": "cancel_booking", "booking_id": str(booking.id)},
+        follow_redirects=True,
+    )
+    assert b"Booking cancelled" in r.data
+    db.session.refresh(booking)
+    assert booking.status == BookingStatus.cancelled.value
+    assert booking.cancelled_at is not None
+
+    # cancelling again is refused gracefully
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={"action": "cancel_booking", "booking_id": str(booking.id)},
+        follow_redirects=True,
+    )
+    assert b"can't be cancelled" in r.data
+
+
 def test_template_starts_on_gates_generation(app, client_account):
     """A template with starts_on (program launch date) generates no
     instances before that date — used when a class is announced ahead of

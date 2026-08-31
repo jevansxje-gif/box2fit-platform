@@ -352,7 +352,7 @@ def test_staff_cancel_booking_from_member_page(app, client, client_account):
         data={"action": "cancel_booking", "booking_id": str(booking.id)},
         follow_redirects=True,
     )
-    assert b"can't be cancelled" in r.data
+    assert b"cannot be cancelled" in r.data
 
 
 def test_template_starts_on_gates_generation(app, client_account):

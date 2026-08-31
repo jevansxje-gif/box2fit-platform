@@ -907,7 +907,7 @@ def member_detail(user_id: int):
                 db.session.commit()
                 flash("Booking cancelled — the spot has been released.", "success")
             else:
-                flash("That booking can't be cancelled.", "error")
+                flash("That booking cannot be cancelled.", "error")
         elif action == "cancel_sub":
             from ..services import billing
 

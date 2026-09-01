@@ -126,10 +126,15 @@ def me():
 
 @bp.post("/webhooks/calls")
 def calls_webhook():
-    """CallRail-compatible call-tracking webhook."""
+    """CallRail-compatible call-tracking webhook. Requires the shared token
+    (?token=... matching CALLS_WEBHOOK_TOKEN) — without one configured the
+    endpoint stays closed, so nobody can inject fake call attributions."""
     from ..models import ClientAccount
     from ..services import calls
 
+    expected = current_app.config.get("CALLS_WEBHOOK_TOKEN")
+    if not expected or request.args.get("token") != expected:
+        return jsonify(error="forbidden"), 403
     client = (
         db.session.query(ClientAccount).filter_by(active=True).order_by(
             ClientAccount.id

@@ -100,6 +100,9 @@ class Config:
     )
 
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    # Shared secret for the call-tracking webhook; unset = endpoint closed.
+    CALLS_WEBHOOK_TOKEN = os.environ.get("CALLS_WEBHOOK_TOKEN", "")
+    SESSION_COOKIE_SAMESITE = "Lax"
     UTM_COOKIE_NAME = "b2f_attr"
     UTM_COOKIE_MAX_AGE = 30 * 24 * 3600
     WTF_CSRF_TIME_LIMIT = None

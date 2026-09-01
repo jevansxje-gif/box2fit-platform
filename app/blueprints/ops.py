@@ -15,7 +15,7 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 
-from ..extensions import db
+from ..extensions import db, limiter
 from ..models import (
     Booking,
     BookingStatus,
@@ -70,6 +70,7 @@ def desk_required(fn):
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("15/hour", methods=["POST"])
 def login():
     form = OpsLoginForm()
     if form.validate_on_submit():

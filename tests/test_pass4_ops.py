@@ -884,15 +884,19 @@ def test_outbox_dispatch_and_hashing(app, client, client_account):
     assert hashed["ph"][0] == __import__("hashlib").sha256(b"16045550123").hexdigest()
 
 
-def test_call_webhook_matching_and_attribution(client, client_account):
+def test_call_webhook_matching_and_attribution(app, client, client_account):
     instance = _first_instance(client_account)
     _book_child(client, instance)
     lead = db.session.query(Lead).one()
     lead.status = "activated"
     db.session.commit()
 
+    # No/wrong token → closed (the endpoint requires the shared secret)
+    app.config["CALLS_WEBHOOK_TOKEN"] = "test-token"
+    assert client.post("/api/v1/webhooks/calls", json={}).status_code == 403
+
     r = client.post(
-        "/api/v1/webhooks/calls",
+        "/api/v1/webhooks/calls?token=test-token",
         json={
             "customer_phone_number": "604-330-2671",
             "tracking_phone_number": "+16040001111",

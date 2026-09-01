@@ -17,6 +17,10 @@ def create_app(config_class=Config) -> Flask:
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+    # Session cookie is HTTPS-only in production; dev and tests run on
+    # plain http and would silently lose their sessions with this on.
+    app.config["SESSION_COOKIE_SECURE"] = not (app.debug or app.testing)
+
     configure_logging(app)
 
     db.init_app(app)

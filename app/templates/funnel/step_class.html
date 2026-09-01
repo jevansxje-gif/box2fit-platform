@@ -1,8 +1,13 @@
 {% extends "funnel/_flow_base.html" %}
 
 {% block flow %}
+  {% if segment in ('kids', 'youth') %}
   <h1>Pick their free class</h1>
   <p class="lede">Choose the age group and a time that fits your week. The first class is free.</p>
+  {% else %}
+  <h1>Pick your free class</h1>
+  <p class="lede">Choose a time that fits your week. The first class is free.</p>
+  {% endif %}
 
   {% if not occurrences %}
     <div class="pf-panel"><h2>No upcoming classes posted yet</h2>

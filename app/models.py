@@ -369,6 +369,10 @@ class Lead(db.Model):
     landing_variant: Mapped[str | None] = mapped_column(String(80))
     referral_code: Mapped[str | None] = mapped_column(String(20), index=True)
     first_touch_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Forensics: who actually submitted the form (real client IP via
+    # ProxyFix). Added after a fake-signup incident needed log archaeology.
+    submit_ip: Mapped[str | None] = mapped_column(String(45))
+    submit_user_agent: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

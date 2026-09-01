@@ -141,4 +141,10 @@ def _normalize_phone(raw: str) -> str:
         raise ValidationError("Enter a valid Canadian phone number.")
     if not phonenumbers.is_valid_number(parsed):
         raise ValidationError("Enter a valid Canadian phone number.")
-    return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    e164 = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    # NANP 555-01XX numbers are reserved for fiction — no real person has
+    # one, but fake signups do (prod, 2026-08-31). Same generic message so
+    # the submitter learns nothing about what tripped.
+    if e164.startswith("+1") and e164[5:10] == "55501":
+        raise ValidationError("Enter a valid Canadian phone number.")
+    return e164

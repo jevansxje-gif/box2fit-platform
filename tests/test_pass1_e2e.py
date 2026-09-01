@@ -40,10 +40,10 @@ def _child_form(instance, birth_year=None, **overrides):
         "child_first_name": "Maya",
         "child_birth_year": str(year),
         "emergency_contact_name": "Sam Parent",
-        "emergency_contact_phone": "604-555-0100",
+        "emergency_contact_phone": "604-330-2600",
         "guardian_name": "Sam Parent",
         "email": "sam.parent@example.com",
-        "phone": "604-555-0123",
+        "phone": "604-330-2671",
         "health_asthma": "y",
         "health_notes": "Peanut allergy — epipen in bag.",
         "consent_email": "y",
@@ -81,7 +81,7 @@ def test_e2e_ad_click_to_attendance(app, client, client_account, monkeypatch):
     assert r.status_code == 302, r.data
 
     guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
-    assert guardian.phone == "+16045550123"
+    assert guardian.phone == "+16043302671"
     assert guardian.consent_email is True and guardian.consent_sms is False
 
     child = db.session.query(AttendeeProfile).filter_by(kind="child").one()
@@ -320,3 +320,22 @@ def test_double_submit_books_once(client, client_account):
         .count()
     )
     assert sent_after_second == sent_after_first
+
+
+def test_fictional_phone_rejected(client, client_account):
+    """NANP 555-01XX numbers are reserved for fiction - real people cannot
+    have one, fake signups do (prod incident 2026-08-31). Same generic
+    error as any invalid number, so the submitter learns nothing."""
+    instance = _first_instance(client_account)
+    r = _book_child(
+        client, instance,
+        phone="(604) 555-0123", email="fake.person@example.com",
+    )
+    assert r.status_code == 200  # form re-rendered with the error
+    assert b"valid Canadian phone number" in r.data
+    assert (
+        db.session.query(User)
+        .filter_by(email="fake.person@example.com")
+        .count()
+        == 0
+    )

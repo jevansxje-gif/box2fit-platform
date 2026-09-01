@@ -401,6 +401,8 @@ def step_details(segment: str):
             landing_variant=touch.get("landing_variant") or segment,
             referral_code=touch.get("referral_code"),
             first_touch_at=utcnow(),
+            submit_ip=request.remote_addr,
+            submit_user_agent=(request.user_agent.string or "")[:255],
         )
         db.session.add(lead)
         db.session.flush()

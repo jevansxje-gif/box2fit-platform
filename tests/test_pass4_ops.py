@@ -894,7 +894,7 @@ def test_call_webhook_matching_and_attribution(client, client_account):
     r = client.post(
         "/api/v1/webhooks/calls",
         json={
-            "customer_phone_number": "604-555-0123",
+            "customer_phone_number": "604-330-2671",
             "tracking_phone_number": "+16040001111",
             "duration": "95",
             "start_time": "2026-07-24T10:00:00Z",
@@ -904,7 +904,7 @@ def test_call_webhook_matching_and_attribution(client, client_account):
     assert data["received"] is True
     call = db.session.query(Call).one()
     assert call.matched_lead_id == lead.id
-    assert call.caller_number == "+16045550123"
+    assert call.caller_number == "+16043302671"
     events = {e.event_name for e in db.session.query(EventOutbox).all()}
     assert "CallAttributedConversion" in events
 

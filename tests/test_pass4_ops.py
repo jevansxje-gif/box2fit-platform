@@ -411,8 +411,16 @@ def test_template_starts_on_gates_generation(app, client_account):
 
     tpl = db.session.query(ScheduleTemplate).first()
     launch = today_local() + timedelta(days=7)
-    tpl.starts_on = launch
-    db.session.query(ClassInstance).filter_by(template_id=tpl.id).delete()
+    # Gate the whole program, as production does (every template of the
+    # class type), so the picker window test below sees a clean launch.
+    siblings = (
+        db.session.query(ScheduleTemplate)
+        .filter_by(class_type_id=tpl.class_type_id)
+        .all()
+    )
+    for t in siblings:
+        t.starts_on = launch
+        db.session.query(ClassInstance).filter_by(template_id=t.id).delete()
     db.session.commit()
 
     generate_instances(client_account.id)
@@ -423,6 +431,19 @@ def test_template_starts_on_gates_generation(app, client_account):
     ]
     assert dates, "expected instances after the launch date"
     assert min(dates) >= launch
+
+    # The picker window anchors at the launch date: a program starting
+    # beyond today+14 still shows a full run, not just its opening day.
+    from app.services.scheduling import upcoming_instances
+
+    shown = [
+        o["instance"].local_date
+        for o in upcoming_instances(
+            client_account.id, class_type_id=tpl.class_type_id
+        )
+    ]
+    assert shown and min(shown) == min(dates)
+    assert max(shown) >= launch + timedelta(days=10)
 
 
 def test_marketing_report_page(app, client, client_account, tmp_path, monkeypatch):

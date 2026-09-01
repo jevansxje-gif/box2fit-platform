@@ -119,7 +119,7 @@ def upcoming_instances(
     days: int = 14,
     trials_only: bool = False,
 ) -> list[dict]:
-    from sqlalchemy import or_
+    from sqlalchemy import func, or_
 
     q = (
         db.session.query(ClassInstance)
@@ -129,7 +129,6 @@ def upcoming_instances(
             ClassInstance.client_account_id == client_account_id,
             ClassInstance.status == InstanceStatus.scheduled.value,
             ClassInstance.starts_at_utc > now_utc(),
-            ClassInstance.local_date <= today_local() + timedelta(days=days),
             ClassType.active.is_(True),
             # instances of a deactivated weekly template never show
             or_(
@@ -144,6 +143,12 @@ def upcoming_instances(
         q = q.filter(ClassInstance.class_type_id == class_type_id)
     if trials_only:
         q = q.filter(ClassInstance.accepts_trials.is_(True))
+    # The display window is anchored to the first available class, not
+    # today, so a program gated to a future launch (starts_on) still shows
+    # a full run of dates instead of just its opening day.
+    earliest = q.with_entities(func.min(ClassInstance.local_date)).scalar()
+    anchor = max(today_local(), earliest) if earliest else today_local()
+    q = q.filter(ClassInstance.local_date <= anchor + timedelta(days=days))
     instances = q.order_by(ClassInstance.starts_at_utc).all()
 
     counts = booked_counts([i.id for i in instances])

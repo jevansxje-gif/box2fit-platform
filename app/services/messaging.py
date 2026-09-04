@@ -1,4 +1,5 @@
-"""Outbound email (SendGrid) / SMS (Twilio). Every send logs a messages row
+"""Outbound email (Brevo API → SMTP → SendGrid) / SMS (Brevo, template-
+allowlisted via SMS_TEMPLATES; Twilio legacy). Every send logs a messages row
 (CASL audit trail). All communication goes to the guardian — never to a child
 (PIPEDA). Transactional sends ignore marketing consent; marketing sends check
 it and record suppression."""
@@ -134,6 +135,31 @@ def _send_via_smtp(to_email: str, subject: str, html: str) -> None:
         s.send_message(m)
 
 
+def _send_sms_via_brevo(to_number: str, body: str) -> None:
+    """Brevo transactional SMS over HTTPS (prepaid credits on the account).
+    Canadian/US carriers don't support alphanumeric senders — Brevo swaps
+    the sender for a shared local number; that's expected. Raises on
+    non-2xx (including 'no credits')."""
+    import requests
+
+    resp = requests.post(
+        "https://api.brevo.com/v3/transactionalSMS/sms",
+        headers={
+            "api-key": current_app.config["BREVO_API_KEY"],
+            "content-type": "application/json",
+        },
+        json={
+            "type": "transactional",
+            "sender": current_app.config["SMS_SENDER"],
+            # Brevo wants country-code digits without the leading +
+            "recipient": to_number.lstrip("+"),
+            "content": body,
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
+
+
 def send_sms(
     user: User | None,
     to_number: str,
@@ -158,8 +184,17 @@ def send_sms(
         db.session.add(msg)
         return msg
 
+    allowed = current_app.config["SMS_TEMPLATES"]
+    brevo_key = current_app.config["BREVO_API_KEY"]
     sid = current_app.config["TWILIO_ACCOUNT_SID"]
-    if not sid:
+    if brevo_key and ("*" in allowed or template in allowed):
+        try:
+            _send_sms_via_brevo(to_number, body)
+            msg.delivery_status = "sent"
+        except Exception as exc:
+            log.exception("brevo sms send failed")
+            msg.delivery_status = f"error:{type(exc).__name__}"
+    elif not sid:
         msg.delivery_status = "skipped_not_configured"
         log.info("sms (dev, not sent) to=%s body=%s", to_number, body[:80])
     else:

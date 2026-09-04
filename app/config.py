@@ -105,6 +105,15 @@ class Config:
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     # Shared secret for the call-tracking webhook; unset = endpoint closed.
     CALLS_WEBHOOK_TOKEN = os.environ.get("CALLS_WEBHOOK_TOKEN", "")
+    # Brevo transactional SMS (prepaid credits). SMS_TEMPLATES gates which
+    # message templates actually send as SMS — empty = SMS off, "*" = all.
+    # Costs real money per message, so it's opt-in per template.
+    SMS_SENDER = os.environ.get("SMS_SENDER", "Box2Fit")
+    SMS_TEMPLATES = frozenset(
+        t.strip()
+        for t in os.environ.get("SMS_TEMPLATES", "").split(",")
+        if t.strip()
+    )
     SESSION_COOKIE_SAMESITE = "Lax"
     UTM_COOKIE_NAME = "b2f_attr"
     UTM_COOKIE_MAX_AGE = 30 * 24 * 3600

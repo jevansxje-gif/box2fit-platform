@@ -176,3 +176,45 @@ def test_coach_assignment_email_on_bulk_and_day_swap(app, client, client_account
     notices = db.session.query(Message).filter_by(template="coach_assignment").all()
     assert len(notices) == 2
     assert "this day only" in notices[-1].body_preview
+
+
+def test_brevo_sms_gated_by_template(app, client_account, monkeypatch):
+    """Brevo SMS sends only for allowlisted templates (each SMS costs
+    credits); everything else stays skipped. Recipient is sent without
+    the leading + (Brevo format)."""
+    import requests
+
+    from app.services.messaging import send_sms
+
+    calls = []
+
+    class _Resp:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append((url, json))
+        return _Resp()
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setitem(app.config, "BREVO_API_KEY", "test-key")
+    monkeypatch.setitem(
+        app.config, "SMS_TEMPLATES", frozenset({"pre_charge_reminder"})
+    )
+
+    with app.test_request_context():
+        m1 = send_sms(
+            None, "+16045550000", "heads up", "pre_charge_reminder",
+            client_account.id,
+        )
+        m2 = send_sms(
+            None, "+16045550000", "see you", "reminder_24h",
+            client_account.id,
+        )
+    assert m1.delivery_status == "sent"
+    assert len(calls) == 1
+    assert "transactionalSMS" in calls[0][0]
+    assert calls[0][1]["recipient"] == "16045550000"
+    assert calls[0][1]["type"] == "transactional"
+    assert m2.delivery_status == "skipped_not_configured"
+    db.session.rollback()

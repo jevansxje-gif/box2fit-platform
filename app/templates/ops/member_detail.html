@@ -60,10 +60,11 @@
   <div class="pf-panel">
     <h2>Recent bookings</h2>
     {% for b in bookings %}
-    <div class="roster-row">
-      <span style="min-width:150px;font-size:14px">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</span>
-      <span style="flex:1;font-size:14px">{{ b.class_instance.class_type.name }} — {{ b.attendee.first_name }} <span style="color:var(--pf-text-3)">({{ b.kind }})</span></span>
+    <div class="roster-row" style="flex-wrap:wrap;row-gap:8px">
+      <span style="min-width:150px;font-size:14px;white-space:nowrap">{{ fmt_local(b.class_instance.starts_at_utc, '%a %b %d · %I:%M %p') }}</span>
+      <span style="flex:1;min-width:220px;font-size:14px;white-space:nowrap">{{ b.class_instance.class_type.name }} — {{ b.attendee.first_name }} <span style="color:var(--pf-text-3)">({{ b.kind }})</span></span>
       <span class="pf-chip pf-chip--{{ 'success' if b.status == 'attended' else ('warn' if b.status == 'no_show' else '') }}" style="font-size:11px">{{ b.status.replace('_',' ') }}{{ ' · late' if b.late_cancel }}</span>
+      {% if b.first_charge_on %}<span class="pf-chip pf-chip--info" style="font-size:11px" title="Set from the date field — activation charges on this date">first charge {{ b.first_charge_on.strftime('%b %d') }}</span>{% endif %}
       {% if b.status in ('booked', 'no_show') and b.class_instance.starts_at_utc <= now %}
       {# Retroactive check-in: coaches often skip live marking, and an
          unmarked trial silently no-shows — this re-fires the whole

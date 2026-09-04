@@ -281,6 +281,13 @@ def mark_attendance(booking_id: int):
     if booking.client_account_id != current_user.client_account_id:
         abort(404)
     action = request.form.get("action")
+    # Retroactive check-in from the member page (coaches often skip live
+    # marking): bounce back there instead of the Today view.
+    return_to = (
+        url_for("ops_admin.member_detail", user_id=booking.attendee.user_id)
+        if request.form.get("return") == "member"
+        else url_for(_attendance_return_endpoint())
+    )
     if action == "attended":
         booking.status = BookingStatus.attended.value
         booking.checked_in_at = utcnow()
@@ -288,7 +295,13 @@ def mark_attendance(booking_id: int):
         db.session.commit()
         if booking.kind in ("trial", "walkin"):
             _post_class_followup(booking)
-        return redirect(url_for(_attendance_return_endpoint()))
+        if request.form.get("return") == "member":
+            flash(
+                f"{booking.attendee.first_name} marked attended — the "
+                "follow-up (activation link or auto-start) has gone out.",
+                "success",
+            )
+        return redirect(return_to)
     elif action == "no_show":
         booking.status = BookingStatus.no_show.value
     elif action == "undo":
@@ -298,7 +311,7 @@ def mark_attendance(booking_id: int):
         abort(400)
     booking.attendance_marked_by = current_user.email
     db.session.commit()
-    return redirect(url_for(_attendance_return_endpoint()))
+    return redirect(return_to)
 
 
 def _attendance_return_endpoint() -> str:

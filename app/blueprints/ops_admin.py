@@ -942,6 +942,8 @@ def member_detail(user_id: int):
     )
     subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
     lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
+    from ..services.tzutil import now_utc
+
     return render_template(
         "ops/member_detail.html",
         u=u,
@@ -951,6 +953,7 @@ def member_detail(user_id: int):
         bookings=bookings,
         subs=subs,
         lead=lead,
+        now=now_utc(),
     )
 
 

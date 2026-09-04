@@ -1011,3 +1011,40 @@ def test_final_full_platform_e2e(app, client, client_account, monkeypatch):
     r = admin.get("/ops/export/payments.csv")
     assert b"in_final_1" in r.data
     assert str(payment.agency_share_cents).encode() in r.data
+
+
+def test_retroactive_checkin_from_member_page(app, client, client_account):
+    """Coaches often skip live attendance marking, so an unmarked trial
+    silently no-shows and the guardian never gets the payment link. The
+    member page can check them in after the fact, re-firing the whole
+    post-class flow (activation email / auto-start)."""
+    from datetime import timedelta
+
+    from app.models import Message, utcnow
+    from app.services.tzutil import today_local
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian_id = booking.attendee.user_id
+    # The class happened yesterday and the automark flagged a no-show.
+    booking.class_instance.starts_at_utc = utcnow() - timedelta(days=1)
+    booking.class_instance.local_date = today_local() - timedelta(days=1)
+    booking.status = BookingStatus.no_show.value
+    db.session.commit()
+
+    staff = _admin(app)
+    r = staff.get(f"/ops/members/{guardian_id}")
+    assert b"Mark attended" in r.data
+
+    r = staff.post(
+        f"/ops/bookings/{booking.id}/attendance",
+        data={"action": "attended", "return": "member"},
+        follow_redirects=True,
+    )
+    assert b"marked attended" in r.data  # flash, back on the member page
+    db.session.refresh(booking)
+    assert booking.status == BookingStatus.attended.value
+    assert (
+        db.session.query(Message).filter_by(template="post_class").count() >= 1
+    )

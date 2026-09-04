@@ -328,17 +328,18 @@ def test_coach_login_invite_and_phone_view(app, client, client_account):
 
 
 def test_trial_followup_nudge_and_call_list(app, client, client_account):
-    """Attended trials without a membership get exactly one day-2 email
-    nudge, and appear on the Today page's follow-up call list."""
+    """Attended trials without a membership get exactly one next-day email
+    nudge (TRIAL_FOLLOWUP_DAYS), and appear on the Today page's follow-up
+    call list."""
     from datetime import time as dtime, timedelta
 
     from app.models import ClassType
     from app.services.tzutil import local_to_utc, today_local
     from app.tasks.jobs import send_trial_followups
 
-    # attended trial two days ago, no membership
+    # attended trial exactly TRIAL_FOLLOWUP_DAYS ago, no membership
     kids = db.session.query(ClassType).filter_by(key="kids_7_10").one()
-    past = today_local() - timedelta(days=2)
+    past = today_local() - timedelta(days=app.config["TRIAL_FOLLOWUP_DAYS"])
     inst = ClassInstance(
         client_account_id=client_account.id, class_type_id=kids.id,
         cohort_label="Group A",
@@ -1045,6 +1046,22 @@ def test_retroactive_checkin_from_member_page(app, client, client_account):
     assert b"marked attended" in r.data  # flash, back on the member page
     db.session.refresh(booking)
     assert booking.status == BookingStatus.attended.value
+    sent = db.session.query(Message).filter_by(template="post_class").count()
+    assert sent >= 1
+
+    # "I never got it": the member page can re-send the activation email
+    r = staff.get(f"/ops/members/{guardian_id}")
+    assert b"Resend membership email" in r.data
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "resend_membership_email",
+            "booking_id": str(booking.id),
+        },
+        follow_redirects=True,
+    )
+    assert b"re-sent" in r.data
     assert (
-        db.session.query(Message).filter_by(template="post_class").count() >= 1
+        db.session.query(Message).filter_by(template="post_class").count()
+        == sent + 1
     )

@@ -74,6 +74,13 @@
         <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="attended">Mark attended</button>
       </form>
       {% endif %}
+      {% if b.status == 'attended' and b.kind in ('trial', 'walkin') and not subs %}
+      <form method="post" style="margin-left:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="booking_id" value="{{ b.id }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="resend_membership_email">Resend membership email</button>
+      </form>
+      {% endif %}
       {% if b.status == 'booked' %}
       <form method="post" onsubmit="return confirm('Cancel this booking? The spot is released and any waitlist is offered it.')" style="margin-left:8px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />

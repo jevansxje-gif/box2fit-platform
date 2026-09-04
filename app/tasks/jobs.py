@@ -116,14 +116,17 @@ def _send_reminder(booking: Booking, template: str) -> None:
 
 @shared_task(name="app.tasks.jobs.send_trial_followups")
 def send_trial_followups() -> int:
-    """Day-2 nudge for attended trials that never became memberships (the
-    single post-class email is easy to miss). Marketing send — honors email
-    consent — and strictly once per attendee, tracked via the Message log."""
+    """Next-day nudge (TRIAL_FOLLOWUP_DAYS) for attended trials that never
+    became memberships (the single post-class email is easy to miss).
+    Marketing send — honors email consent — and strictly once per attendee,
+    tracked via the Message log."""
     from ..models import Message, Subscription, SubscriptionStatus
     from ..services.signed_links import SALT_ACTIVATE
     from ..services.tzutil import today_local
 
-    target = today_local() - timedelta(days=2)
+    target = today_local() - timedelta(
+        days=current_app.config["TRIAL_FOLLOWUP_DAYS"]
+    )
     rows = (
         db.session.query(Booking)
         .join(ClassInstance, Booking.class_instance_id == ClassInstance.id)

@@ -908,6 +908,24 @@ def member_detail(user_id: int):
                 flash("Booking cancelled — the spot has been released.", "success")
             else:
                 flash("That booking cannot be cancelled.", "error")
+        elif action == "resend_membership_email":
+            # Re-runs the post-class flow for an attended trial: auto-start
+            # on a vaulted card, otherwise the activation-link email again
+            # (for "I never got it" — spam folders, typos, Hotmail).
+            from .ops import _post_class_followup
+
+            bk = db.session.get(Booking, request.form.get("booking_id", type=int))
+            if (
+                bk
+                and bk.attendee.user_id == u.id
+                and bk.status == BookingStatus.attended.value
+                and bk.kind in ("trial", "walkin")
+            ):
+                _post_class_followup(bk)
+                db.session.commit()
+                flash(f"Membership email re-sent to {u.email}.", "success")
+            else:
+                flash("That booking has no membership email to resend.", "error")
         elif action == "cancel_sub":
             from ..services import billing
 

@@ -90,6 +90,9 @@ class Config:
     POLICY_ALLOW_CROSS_GROUP = os.environ.get("POLICY_ALLOW_CROSS_GROUP", "0") == "1"
 
     SCHEDULE_HORIZON_WEEKS = _int("SCHEDULE_HORIZON_WEEKS", 4)
+    # Days after an attended trial before the one-time "spot is still open"
+    # nudge (client asked for 1, 2026-09-03; was 2).
+    TRIAL_FOLLOWUP_DAYS = _int("TRIAL_FOLLOWUP_DAYS", 1)
 
     # First charge lands this many hours after activation; the pre-charge
     # reminder (card-network trial rule) goes out at activation, which is by

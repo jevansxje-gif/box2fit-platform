@@ -292,6 +292,7 @@ def mark_attendance(booking_id: int):
         booking.status = BookingStatus.attended.value
         booking.checked_in_at = utcnow()
         booking.attendance_marked_by = current_user.email
+        _advance_lead_on_attendance(booking)
         db.session.commit()
         if booking.kind in ("trial", "walkin"):
             _post_class_followup(booking)
@@ -312,6 +313,19 @@ def mark_attendance(booking_id: int):
     booking.attendance_marked_by = current_user.email
     db.session.commit()
     return redirect(return_to)
+
+
+def _advance_lead_on_attendance(booking: Booking) -> None:
+    """Marketing truth: an attended booking moves its ad lead booked →
+    attended (activation later moves it to activated). Without this the
+    Marketing page's attended column never counts anyone."""
+    from ..models import Lead, LeadStatus
+
+    if not booking.lead_id:
+        return
+    lead = db.session.get(Lead, booking.lead_id)
+    if lead and lead.status == LeadStatus.booked.value:
+        lead.status = LeadStatus.attended.value
 
 
 def _attendance_return_endpoint() -> str:
@@ -381,6 +395,7 @@ def kiosk_checkin(booking_id: int):
         booking.status = BookingStatus.attended.value
         booking.checked_in_at = utcnow()
         booking.attendance_marked_by = "kiosk"
+        _advance_lead_on_attendance(booking)
         db.session.commit()
         if booking.kind in ("trial", "walkin"):
             _post_class_followup(booking)

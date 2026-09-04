@@ -1046,6 +1046,7 @@ def test_retroactive_checkin_from_member_page(app, client, client_account):
     assert b"marked attended" in r.data  # flash, back on the member page
     db.session.refresh(booking)
     assert booking.status == BookingStatus.attended.value
+    assert db.session.get(Lead, booking.lead_id).status == "attended"
     sent = (
         db.session.query(Message)
         .filter_by(template="post_class", channel="email")

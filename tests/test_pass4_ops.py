@@ -1065,3 +1065,69 @@ def test_retroactive_checkin_from_member_page(app, client, client_account):
         db.session.query(Message).filter_by(template="post_class").count()
         == sent + 1
     )
+
+
+def test_first_charge_date_override(app, client, client_account):
+    """Staff-agreed payday ("take it on the 21st"): the date is set on the
+    trial booking from the member page; activation charges on that date and
+    the pre-charge reminder states the date instead of "in 48 hours"."""
+    from datetime import timedelta
+
+    from app.models import PaymentMethodStatus
+    from app.services import billing
+    from app.services.tzutil import today_local
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian = booking.attendee.guardian
+    payday = today_local() + timedelta(days=17)
+
+    staff = _admin(app)
+    r = staff.post(
+        f"/ops/members/{guardian.id}",
+        data={
+            "action": "set_first_charge",
+            "booking_id": str(booking.id),
+            "first_charge_on": payday.isoformat(),
+        },
+        follow_redirects=True,
+    )
+    assert b"First charge set for" in r.data
+    db.session.refresh(booking)
+    assert booking.first_charge_on == payday
+
+    # a past date is refused
+    r = staff.post(
+        f"/ops/members/{guardian.id}",
+        data={
+            "action": "set_first_charge",
+            "booking_id": str(booking.id),
+            "first_charge_on": (today_local() - timedelta(days=1)).isoformat(),
+        },
+        follow_redirects=True,
+    )
+    assert b"future date" in r.data
+
+    db.session.add(
+        StripeCustomer(
+            user_id=guardian.id,
+            payment_method_status=PaymentMethodStatus.vaulted.value,
+        )
+    )
+    db.session.commit()
+    with app.test_request_context():
+        sub = billing.activate_subscription(
+            booking.attendee,
+            cohort_label=None,
+            first_charge_on=booking.first_charge_on,
+        )
+    db.session.commit()
+    assert sub.first_charge_at.date() == payday
+    reminder = (
+        db.session.query(Message)
+        .filter_by(template="pre_charge_reminder", channel="email")
+        .one()
+    )
+    assert payday.strftime("%B") in reminder.subject
+    assert "hours" not in reminder.subject

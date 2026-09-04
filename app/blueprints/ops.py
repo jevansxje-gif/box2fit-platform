@@ -441,6 +441,7 @@ def _post_class_followup(booking: Booking) -> None:
                 attendee,
                 cohort_label=booking.class_instance.cohort_label,
                 actor="auto_post_class",
+                first_charge_on=booking.first_charge_on,
             )
             db.session.commit()
             flash(
@@ -510,6 +511,7 @@ def activate_membership(booking_id: int):
             booking.attendee,
             cohort_label=booking.class_instance.cohort_label,
             actor=current_user.email,
+            first_charge_on=booking.first_charge_on,
         )
         db.session.commit()
         flash(

@@ -646,6 +646,7 @@ def activate_membership(token: str):
                 plan=plan,
                 cohort_label=booking.class_instance.cohort_label,
                 actor="member",
+                first_charge_on=booking.first_charge_on,
             )
             db.session.commit()
             return render_template(

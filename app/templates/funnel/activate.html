@@ -15,7 +15,7 @@
       Month to month; a 30-day cancellation notice applies after the first month (per the membership terms you signed).
     </p>
     <p style="margin:0 0 18px;color:var(--pf-text-2);font-size:14px">
-      Nothing is charged for 48 hours after you confirm — we'll remind you before the first charge.
+      {% if booking.first_charge_on %}Nothing is charged until <b>{{ booking.first_charge_on.strftime('%B %d') }}</b> (as arranged) — we'll remind you before the first charge.{% else %}Nothing is charged for 48 hours after you confirm — we'll remind you before the first charge.{% endif %}
     </p>
     {% if has_card %}
     <form method="post">

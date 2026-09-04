@@ -122,6 +122,7 @@ def activate_subscription(
     plan: Plan | None = None,
     cohort_label: str | None = None,
     actor: str = "member",
+    first_charge_on=None,
 ) -> Subscription:
     """Create the subscription on the vaulted card. One subscription per
     enrolled attendee, billed to the guardian."""
@@ -157,6 +158,17 @@ def activate_subscription(
 
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     first_charge_at = utcnow() + timedelta(hours=lead_hours)
+    if first_charge_on is not None:
+        # Staff-agreed payday (e.g. "take it on the 21st"): charge at
+        # 10 AM local that day — but never shorter than the standard
+        # pre-charge notice window.
+        from datetime import time as dtime
+
+        from .tzutil import local_to_utc
+
+        candidate = local_to_utc(first_charge_on, dtime(10, 0))
+        if candidate > first_charge_at:
+            first_charge_at = candidate
 
     # Family pricing: count the guardian's OTHER live subscriptions —
     # same account means same card, so this is the family by construction.
@@ -250,6 +262,14 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
         # 4 weeks" right after this string
         price = price[:-1] + ", family rate)"
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
+    # A staff-agreed payday pushes the charge past the standard window —
+    # then the reminder must state the actual date, not "48 hours".
+    from .tzutil import fmt_local
+
+    if sub.first_charge_at <= utcnow() + timedelta(hours=lead_hours + 1):
+        when = f"in {lead_hours} hours"
+    else:
+        when = "on " + fmt_local(sub.first_charge_at, "%A, %B %d")
     is_child = attendee.kind == AttendeeKind.child.value
     html = render_template(
         "emails/pre_charge_reminder.html",
@@ -257,21 +277,21 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
         attendee=attendee,
         is_child=is_child,
         price=price,
-        lead_hours=lead_hours,
+        when=when,
         cohort=sub.cohort_label,
         cancel_url=cancel_url,
     )
     who = f"{attendee.first_name}'s" if is_child else "Your"
     send_email(
         guardian, guardian.email,
-        f"{who} Box2Fit membership starts in {lead_hours} hours",
+        f"{who} Box2Fit membership starts {when}",
         html, "pre_charge_reminder", sub.client_account_id,
         attendee_id=attendee.id,
     )
     send_sms(
         guardian, guardian.phone,
-        f"Box2Fit: {who.lower()} membership ({price} every 4 weeks) starts in "
-        f"{lead_hours} hours. Cancel before the charge in one click: {cancel_url}",
+        f"Box2Fit: {who.lower()} membership ({price} every 4 weeks) starts "
+        f"{when}. Cancel before the charge in one click: {cancel_url}",
         "pre_charge_reminder", sub.client_account_id, attendee_id=attendee.id,
     )
     sub.pre_charge_reminder_sent_at = utcnow()

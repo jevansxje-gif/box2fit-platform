@@ -391,6 +391,9 @@ class Booking(db.Model):
         ForeignKey("class_instances.id"), index=True
     )
     lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"))
+    # Staff-agreed payday: when set, activation schedules the first charge
+    # for this date (10 AM local) instead of the default 48-hour lead.
+    first_charge_on: Mapped[date | None] = mapped_column(Date)
     kind: Mapped[str] = mapped_column(String(10), default=BookingKind.trial.value)
     status: Mapped[str] = mapped_column(
         String(12), default=BookingStatus.booked.value, index=True

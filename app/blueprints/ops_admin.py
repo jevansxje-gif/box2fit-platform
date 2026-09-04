@@ -926,6 +926,34 @@ def member_detail(user_id: int):
                 flash(f"Membership email re-sent to {u.email}.", "success")
             else:
                 flash("That booking has no membership email to resend.", "error")
+        elif action == "set_first_charge":
+            from datetime import date as _date
+
+            from ..services.tzutil import today_local
+
+            bk = db.session.get(Booking, request.form.get("booking_id", type=int))
+            raw = (request.form.get("first_charge_on") or "").strip()
+            when = None
+            if raw:
+                try:
+                    when = _date.fromisoformat(raw)
+                except ValueError:
+                    when = None
+                if when is None or when <= today_local():
+                    flash("Pick a future date for the first charge.", "error")
+                    return redirect(
+                        url_for("ops_admin.member_detail", user_id=u.id)
+                    )
+            if bk and bk.attendee.user_id == u.id:
+                bk.first_charge_on = when
+                db.session.commit()
+                flash(
+                    f"First charge set for {when.strftime('%B %d, %Y')} — "
+                    "applies when the membership is activated."
+                    if when
+                    else "First-charge date cleared (standard 48-hour lead).",
+                    "success",
+                )
         elif action == "cancel_sub":
             from ..services import billing
 

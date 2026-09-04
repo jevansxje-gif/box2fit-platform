@@ -1,5 +1,5 @@
-"""Pass 2 gate: book → attend → activate → invoice.paid → member active →
-past-due path → recovery. Plus refunds, cancel-before-charge, and the
+﻿"""Pass 2 gate: book â†’ attend â†’ activate â†’ invoice.paid â†’ member active â†’
+past-due path â†’ recovery. Plus refunds, cancel-before-charge, and the
 agency-share math."""
 import json
 
@@ -54,7 +54,7 @@ def test_webhook_root_alias(client):
 
 
 def _setup_member(app, client, client_account):
-    """Funnel booking + vaulted card + attended class → ready to activate."""
+    """Funnel booking + vaulted card + attended class â†’ ready to activate."""
     instance = _first_instance(client_account)
     _book_child(client, instance)
     guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
@@ -70,7 +70,7 @@ def _setup_member(app, client, client_account):
 def test_gst_on_invoices_and_commission_on_pretax(app, client, client_account):
     """5% GST (client requirement 2026-08-21): Stripe adds tax on top of the
     $189 price; the platform records the tax portion and computes the 25%
-    agency share on PRE-TAX revenue only — collected GST is never
+    agency share on PRE-TAX revenue only â€” collected GST is never
     commissionable, on payment or on refund reversal."""
     staff, booking, guardian = _setup_member(app, client, client_account)
     sub = db.session.query(Subscription).one()
@@ -88,7 +88,7 @@ def test_gst_on_invoices_and_commission_on_pretax(app, client, client_account):
     assert payment.tax_cents == 945
     assert payment.agency_share_cents == round(18900 * 0.25)  # 4725, not 4961
 
-    # full refund → share fully reversed
+    # full refund â†’ share fully reversed
     _webhook(client, "charge.refunded", {
         "id": "ch_gst_1", "invoice": "in_gst_1", "amount_refunded": 19845,
     })
@@ -109,7 +109,7 @@ def test_gst_on_invoices_and_commission_on_pretax(app, client, client_account):
 
 def test_family_pricing_tiers(app, client, client_account):
     """Client family deal (2026-08-28): additional members under the SAME
-    guardian account — which is by construction the same card — price at
+    guardian account â€” which is by construction the same card â€” price at
     $139 / $119 / $100 automatically. First member stays full price, tiers
     are fixed at activation, and the pre-charge reminder shows the family
     rate."""
@@ -153,7 +153,7 @@ def test_family_disclosure_and_touchpoints(app, client, client_account):
 
     staff, booking, guardian = _setup_member(app, client, client_account)
     # guardian has one live sub ($189). Book a SECOND child, same email
-    # (same test client session → same guardian account).
+    # (same test client session â†’ same guardian account).
     instance = _first_instance(client_account)
     client.post("/book/youth", data={"instance_id": str(instance.id)})
     client.post(
@@ -166,7 +166,7 @@ def test_family_disclosure_and_touchpoints(app, client, client_account):
     assert b"Family pricing applied" in r.data
 
     # confirmation email template carries the (static) family-pricing block
-    # — asserted on the template because Message.body_preview truncates
+    # â€” asserted on the template because Message.body_preview truncates
     from pathlib import Path
 
     tpl = Path("app/templates/emails/booking_confirmation.html").read_text(
@@ -182,7 +182,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     staff, booking, guardian = _setup_member(app, client, client_account)
 
     # 1. AUTO-START (client policy 2026-08-27): marking attendance with a
-    # vaulted card starts the membership automatically — no post-class
+    # vaulted card starts the membership automatically â€” no post-class
     # email, the pre-charge reminder IS the notice.
     assert db.session.query(Message).filter_by(template="post_class").count() == 0
     sub = db.session.query(Subscription).one()
@@ -200,7 +200,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     r = staff.post(f"/ops/bookings/{booking.id}/activate", follow_redirects=True)
     assert b"already has a membership" in r.data
 
-    # 2. invoice.paid → payment row, 25% agency share, member active
+    # 2. invoice.paid â†’ payment row, 25% agency share, member active
     sub.stripe_subscription_id = "sub_test_1"
     db.session.commit()
     _webhook(client, "invoice.paid", {
@@ -224,7 +224,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     })
     assert db.session.query(Payment).count() == 1
 
-    # 3. payment fails → past_due, dunning sent, NEW bookings blocked
+    # 3. payment fails â†’ past_due, dunning sent, NEW bookings blocked
     _webhook(client, "invoice.payment_failed", {
         "id": "in_test_2", "subscription": "sub_test_1",
     })
@@ -238,7 +238,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     with app.test_request_context():
         err = validate_bookable(_first_instance(client_account), attendee=attendee)
     assert err is not None and "card update" in err
-    # existing booking is honored — still attended, untouched
+    # existing booking is honored â€” still attended, untouched
     db.session.refresh(booking)
     assert booking.status == "attended"
 
@@ -249,7 +249,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     assert r.status_code == 200
     assert b"payment didn" in r.data  # past-due banner
 
-    # 4. recovery: next invoice.paid → active again, booking unblocked
+    # 4. recovery: next invoice.paid â†’ active again, booking unblocked
     _webhook(client, "invoice.paid", {
         "id": "in_test_3", "subscription": "sub_test_1",
         "amount_paid": 18900, "currency": "cad", "charge": "ch_test_2",
@@ -271,7 +271,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
     assert refunded.agency_share_cents == 0
     assert refunded.status == "refunded"
 
-    # 6. subscription deleted on Stripe → churn recorded
+    # 6. subscription deleted on Stripe â†’ churn recorded
     _webhook(client, "customer.subscription.deleted", {"id": "sub_test_1"})
     db.session.refresh(sub)
     assert sub.status == SubscriptionStatus.cancelled.value
@@ -279,7 +279,7 @@ def test_e2e_money_lifecycle(app, client, client_account):
 
 
 def test_no_card_falls_back_to_activation_email(app, client, client_account):
-    """Without a vaulted card, attendance can't auto-start — the 'Loved it?'
+    """Without a vaulted card, attendance can't auto-start â€” the 'Loved it?'
     email with the activate link goes out instead, and the link works once a
     card exists."""
     import re
@@ -296,7 +296,7 @@ def test_no_card_falls_back_to_activation_email(app, client, client_account):
     )
     assert b"no card on file" in r.data
     assert db.session.query(Subscription).count() == 0  # nothing auto-started
-    post_class = db.session.query(Message).filter_by(template="post_class").one()
+    post_class = db.session.query(Message).filter_by(template="post_class", channel="email").one()
     token = re.search(r"/activate/([\w\-\.]+)", post_class.body_preview).group(1)
 
     # manual ops activation also blocked without a card
@@ -336,3 +336,4 @@ def test_cancel_before_charge(app, client, client_account):
     assert sub.status == SubscriptionStatus.cancelled.value
     assert sub.cancel_reason == "cancelled_before_charge"
     assert sub.activated_at is None  # no charge ever happened
+

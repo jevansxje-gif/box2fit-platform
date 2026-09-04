@@ -391,7 +391,7 @@ def kiosk_checkin(booking_id: int):
     )
 
 
-def _post_class_followup(booking: Booking) -> None:
+def _post_class_followup(booking: Booking, requested: bool = False) -> None:
     """Auto-start policy (client decision 2026-08-27): a trial attendance
     starts the membership automatically on the vaulted card — the pre-charge
     reminder (48h, one-click cancel) is the member's notice, matching the
@@ -460,7 +460,7 @@ def _post_class_followup(booking: Booking) -> None:
                 "auto-activation failed for booking %s", booking.id
             )
     # fallback: no card (or activation failed) → the activate-link email
-    _send_post_class_email(booking)
+    _send_post_class_email(booking, requested=requested)
     db.session.commit()
     flash(
         f"{attendee.first_name} attended — no card on file for auto-start, "
@@ -469,12 +469,14 @@ def _post_class_followup(booking: Booking) -> None:
     )
 
 
-def _send_post_class_email(booking: Booking) -> None:
+def _send_post_class_email(booking: Booking, requested: bool = False) -> None:
     """'Loved it?' email after a trial attendance: activate or one-click
-    cancel, both signed links, no login needed."""
+    cancel, both signed links, no login needed. Also texts the activation
+    link (template-gated) — as a consent-respecting nudge after class, or
+    as transactional when the guardian asked staff to resend it."""
     from flask import render_template
 
-    from ..services.messaging import send_email
+    from ..services.messaging import send_email, send_sms
     from ..services.signed_links import SALT_ACTIVATE, SALT_CANCEL_BOOKING, make_token
     from ..services.urls import absolute_url
 
@@ -494,6 +496,17 @@ def _send_post_class_email(booking: Booking) -> None:
     send_email(
         guardian, guardian.email, f"{who} first class?", html,
         "post_class", booking.client_account_id, attendee_id=attendee.id,
+    )
+    whose = f"{attendee.first_name}'s" if attendee.kind == "child" else "your"
+    send_sms(
+        guardian, guardian.phone,
+        f"Box2Fit: here's {whose} membership link — start whenever "
+        f"you're ready: {activate_url}",
+        "post_class", booking.client_account_id, attendee_id=attendee.id,
+        # A staff resend means the guardian asked for the link (send it
+        # regardless of the marketing-SMS checkbox); the automatic
+        # after-class nudge respects consent.
+        transactional=requested,
     )
 
 

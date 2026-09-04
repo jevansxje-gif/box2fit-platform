@@ -1046,7 +1046,11 @@ def test_retroactive_checkin_from_member_page(app, client, client_account):
     assert b"marked attended" in r.data  # flash, back on the member page
     db.session.refresh(booking)
     assert booking.status == BookingStatus.attended.value
-    sent = db.session.query(Message).filter_by(template="post_class").count()
+    sent = (
+        db.session.query(Message)
+        .filter_by(template="post_class", channel="email")
+        .count()
+    )
     assert sent >= 1
 
     # "I never got it": the member page can re-send the activation email
@@ -1062,9 +1066,21 @@ def test_retroactive_checkin_from_member_page(app, client, client_account):
     )
     assert b"re-sent" in r.data
     assert (
-        db.session.query(Message).filter_by(template="post_class").count()
+        db.session.query(Message)
+        .filter_by(template="post_class", channel="email")
+        .count()
         == sent + 1
     )
+    # the staff resend also composes the SMS with the activation link,
+    # as transactional (the guardian asked for it)
+    sms = (
+        db.session.query(Message)
+        .filter_by(template="post_class", channel="sms")
+        .order_by(Message.id.desc())
+        .first()
+    )
+    assert sms is not None and "/activate/" in sms.body_preview
+    assert sms.delivery_status != "suppressed_no_consent"
 
 
 def test_first_charge_date_override(app, client, client_account):

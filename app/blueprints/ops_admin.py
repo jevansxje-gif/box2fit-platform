@@ -921,9 +921,14 @@ def member_detail(user_id: int):
                 and bk.status == BookingStatus.attended.value
                 and bk.kind in ("trial", "walkin")
             ):
-                _post_class_followup(bk)
+                _post_class_followup(bk, requested=True)
                 db.session.commit()
-                flash(f"Membership email re-sent to {u.email}.", "success")
+                flash(
+                    f"Membership link re-sent to {u.email}"
+                    + (" and texted" if u.phone else "")
+                    + ".",
+                    "success",
+                )
             else:
                 flash("That booking has no membership email to resend.", "error")
         elif action == "set_first_charge":

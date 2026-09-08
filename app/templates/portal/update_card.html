@@ -4,6 +4,24 @@
 
 {% block content %}
 <div class="flow">
+  {% if saved %}
+  {# Stripe's post-save redirect lands here. Without this state people saw
+     the blank form again and assumed the save failed (prod 2026-09-08). #}
+  <div class="confirm-card" style="text-align:left">
+    <div class="pf-kicker" style="color:var(--pf-good, #1E7B4D)">Card saved</div>
+    <div class="big" style="text-transform:none;letter-spacing:-.01em">✓ Your card is saved.</div>
+    {% if activate_url %}
+    <p style="margin:14px 0 16px;color:var(--pf-text-2);line-height:1.6">
+      One last tap to finish: start the membership. Nothing is charged today.
+    </p>
+    <a class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" href="{{ activate_url }}">Finish — start the membership</a>
+    {% else %}
+    <p style="margin:14px 0 0;color:var(--pf-text-2);line-height:1.6">
+      You're all set — nothing else to do. Payments will use this card from now on.
+    </p>
+    {% endif %}
+  </div>
+  {% else %}
   <h1>Update your card</h1>
   {% if past_due %}
   <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
@@ -37,6 +55,7 @@
         e.preventDefault();
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
+        btn.textContent = 'Saving…';
         const { error } = await stripe.confirmSetup({
           elements,
           confirmParams: { return_url: window.location.href },
@@ -44,6 +63,7 @@
         if (error) {
           document.getElementById('payment-error').textContent = error.message;
           btn.disabled = false;
+          btn.textContent = 'Save new card';
         }
       });
     </script>
@@ -52,6 +72,7 @@
       <h2>Stripe not configured (dev mode)</h2>
       <p class="note">Set STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY to render the live card element here.</p>
     </div>
+  {% endif %}
   {% endif %}
 </div>
 {% endblock %}

@@ -1203,3 +1203,46 @@ def test_stop_trial_followups(app, client, client_account):
     assert b"Follow-ups resumed" in r.data
     assert send_trial_followups.apply().get() == 1
     assert b"Trial follow-ups" in staff.get("/ops/today").data
+
+
+def test_card_save_return_shows_success_and_next_step(
+    app, client, client_account, monkeypatch
+):
+    """Stripe bounces back to the card page after a save; that landing must
+    say the card saved and hand over the one remaining tap (start the
+    membership) - not re-render a blank form (prod confusion 2026-09-08)."""
+    from app.services import stripe_service
+    from app.services.signed_links import SALT_UPDATE_CARD, make_token
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    booking.status = BookingStatus.attended.value
+    guardian = booking.attendee.guardian
+    sc = StripeCustomer(user_id=guardian.id, stripe_customer_id="cus_test1")
+    db.session.add(sc)
+    db.session.commit()
+
+    class FakeSI:
+        status = "succeeded"
+        customer = "cus_test1"
+        payment_method = "pm_test1"
+
+    class FakeStripe:
+        class SetupIntent:
+            @staticmethod
+            def retrieve(_id):
+                return FakeSI()
+
+    monkeypatch.setattr(stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(stripe_service, "stripe_client", lambda: FakeStripe)
+
+    with app.test_request_context():
+        tok = make_token(guardian.id, SALT_UPDATE_CARD)
+    r = client.get(
+        f"/portal/card/{tok}?setup_intent=seti_1&redirect_status=succeeded"
+    )
+    assert b"Your card is saved" in r.data
+    assert b"/activate/" in r.data  # the onward tap
+    db.session.refresh(sc)
+    assert sc.payment_method_status == "vaulted"

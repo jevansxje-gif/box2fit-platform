@@ -658,6 +658,80 @@ def update_card(token: str):
         abort(404)
     guardian = db.session.get(User, user_id) or abort(404)
 
+    # Stripe's redirect after a successful save comes back to this URL.
+    # Previously it re-rendered the blank form — people read that as
+    # "it didn't work" and retried (prod, 2026-09-08). Confirm the save
+    # server-side and show a success state with the next step instead.
+    si_id = request.args.get("setup_intent")
+    if request.args.get("redirect_status") == "succeeded" and si_id:
+        from ..models import PaymentMethodStatus
+        from ..services.signed_links import SALT_ACTIVATE
+
+        customer = (
+            db.session.query(StripeCustomer)
+            .filter_by(user_id=guardian.id)
+            .one_or_none()
+        )
+        if customer and stripe_service.is_configured():
+            stripe = stripe_service.stripe_client()
+            si = stripe.SetupIntent.retrieve(si_id)
+            if (
+                si.status == "succeeded"
+                and si.customer == customer.stripe_customer_id
+            ):
+                customer.payment_method_status = (
+                    PaymentMethodStatus.vaulted.value
+                )
+                customer.stripe_payment_method_id = si.payment_method
+                db.session.commit()
+        # If an attended trial is waiting on activation, hand them the
+        # one remaining tap instead of a dead end.
+        activate_url = None
+        live = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.user_id == guardian.id,
+                Subscription.status.in_(
+                    [
+                        SubscriptionStatus.pending.value,
+                        SubscriptionStatus.active.value,
+                        SubscriptionStatus.past_due.value,
+                    ]
+                ),
+            )
+            .count()
+        )
+        if not live:
+            trial = (
+                db.session.query(Booking)
+                .join(
+                    AttendeeProfile,
+                    Booking.attendee_id == AttendeeProfile.id,
+                )
+                .filter(
+                    AttendeeProfile.user_id == guardian.id,
+                    Booking.kind.in_(
+                        [BookingKind.trial.value, BookingKind.walkin.value]
+                    ),
+                    Booking.status == BookingStatus.attended.value,
+                )
+                .order_by(Booking.id.desc())
+                .first()
+            )
+            if trial:
+                activate_url = url_for(
+                    "funnel.activate_membership",
+                    token=make_token(trial.id, SALT_ACTIVATE),
+                )
+        return render_template(
+            "portal/update_card.html",
+            guardian=guardian,
+            saved=True,
+            activate_url=activate_url,
+            past_due=False,
+            stripe_configured=stripe_service.is_configured(),
+        )
+
     customer, client_secret = stripe_service.ensure_customer_with_setup_intent(
         guardian
     )
@@ -672,6 +746,7 @@ def update_card(token: str):
     return render_template(
         "portal/update_card.html",
         guardian=guardian,
+        saved=False,
         past_due=past_due,
         stripe_publishable_key=current_app.config["STRIPE_PUBLISHABLE_KEY"],
         client_secret=client_secret,

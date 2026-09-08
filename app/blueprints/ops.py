@@ -453,16 +453,21 @@ def _post_class_followup(booking: Booking, requested: bool = False) -> None:
     )
     if vaulted:
         try:
-            billing.activate_subscription(
+            sub = billing.activate_subscription(
                 attendee,
                 cohort_label=booking.class_instance.cohort_label,
                 actor="auto_post_class",
                 first_charge_on=booking.first_charge_on,
             )
             db.session.commit()
+            # State the ACTUAL first-charge date, not a boilerplate "48
+            # hours" — an arranged payday made the old wording alarming.
+            from ..services.tzutil import fmt_local
+
+            when = fmt_local(sub.first_charge_at, "%B %d")
             flash(
-                f"{attendee.first_name} attended — membership starts "
-                "automatically in 48 hours (reminder with one-click cancel sent).",
+                f"{attendee.first_name} attended — membership started, first "
+                f"charge {when} (reminder with one-click cancel sent).",
                 "success",
             )
             return

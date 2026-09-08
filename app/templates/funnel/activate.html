@@ -18,6 +18,7 @@
       {% if booking.first_charge_on %}Nothing is charged until <b>{{ booking.first_charge_on.strftime('%B %d') }}</b> (as arranged) — we'll remind you before the first charge.{% else %}Nothing is charged for 48 hours after you confirm — we'll remind you before the first charge.{% endif %}
     </p>
     {% if has_card %}
+    <p style="margin:0 0 12px;color:var(--pf-good, #1E7B4D);font-weight:700;font-size:14.5px">✓ Card saved — one tap left:</p>
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">
@@ -25,9 +26,15 @@
       </button>
     </form>
     {% else %}
+    {# People read the no-charge-yet promise as "all done" and close the
+       tab (happened in prod, twice, same parent). The unfinished state
+       must be impossible to miss. #}
+    <div style="background:#FBE9EC;border-radius:10px;padding:12px 16px;margin:0 0 14px;color:var(--pf-red);font-weight:700;font-size:14.5px">
+      Not finished yet — no card is saved, so the membership hasn't started.
+    </div>
     <a class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" href="{{ card_url }}">Add a card to start</a>
     <p style="margin:10px 0 0;color:var(--pf-text-3);font-size:13px;text-align:center">
-      Save your card securely with Stripe, then come back to this page and confirm — nothing is charged until 48 hours after you do.
+      Card details are saved securely with Stripe — we never see them. After saving you'll come back here for one last tap: <b>Start membership</b>. {% if booking.first_charge_on %}Nothing is charged until {{ booking.first_charge_on.strftime('%B %d') }}.{% else %}Nothing is charged until 48 hours after that.{% endif %}
     </p>
     {% endif %}
   </div>

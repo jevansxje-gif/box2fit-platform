@@ -1148,3 +1148,58 @@ def test_first_charge_date_override(app, client, client_account):
     )
     assert payday.strftime("%B") in reminder.subject
     assert "hours" not in reminder.subject
+
+
+def test_stop_trial_followups(app, client, client_account):
+    """A family that bows out (injury, changed mind) gets an off switch:
+    Stop follow-ups silences the nudge email and removes them from the
+    Today call list; Resume undoes it."""
+    from datetime import time as dtime, timedelta
+
+    from app.models import ClassType
+    from app.services.tzutil import local_to_utc, today_local
+    from app.tasks.jobs import send_trial_followups
+
+    kids = db.session.query(ClassType).filter_by(key="kids_7_10").one()
+    past = today_local() - timedelta(days=app.config["TRIAL_FOLLOWUP_DAYS"])
+    inst = ClassInstance(
+        client_account_id=client_account.id, class_type_id=kids.id,
+        starts_at_utc=local_to_utc(past, dtime(16, 0)),
+        local_date=past, local_time=dtime(16, 0), duration_min=45, capacity=12,
+    )
+    db.session.add(inst)
+    db.session.commit()
+    other = _first_instance(client_account, "kids_7_10")
+    _book_child(client, other)
+    booking = db.session.query(Booking).one()
+    booking.class_instance_id = inst.id
+    booking.status = BookingStatus.attended.value
+    db.session.commit()
+    guardian_id = booking.attendee.user_id
+
+    staff = _admin(app)
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "close_trial",
+            "attendee_id": str(booking.attendee_id),
+            "reason": "broken wrist",
+        },
+        follow_redirects=True,
+    )
+    assert b"Follow-ups stopped" in r.data
+    assert b"broken wrist" in r.data  # reason chip on the member page
+
+    # nudge suppressed, call list empty
+    assert send_trial_followups.apply().get() == 0
+    assert b"Trial follow-ups" not in staff.get("/ops/today").data
+
+    # resume brings the machinery back
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={"action": "reopen_trial", "attendee_id": str(booking.attendee_id)},
+        follow_redirects=True,
+    )
+    assert b"Follow-ups resumed" in r.data
+    assert send_trial_followups.apply().get() == 1
+    assert b"Trial follow-ups" in staff.get("/ops/today").data

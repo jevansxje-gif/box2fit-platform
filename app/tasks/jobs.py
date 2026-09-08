@@ -140,6 +140,8 @@ def send_trial_followups() -> int:
     sent = 0
     for b in rows:
         attendee = b.attendee
+        if attendee.trial_closed_at is not None:
+            continue  # family asked to stop (injury, changed mind)
         live = (
             db.session.query(Subscription)
             .filter(

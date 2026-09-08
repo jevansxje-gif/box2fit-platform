@@ -177,6 +177,10 @@ class AttendeeProfile(db.Model):
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(20))
     # Guardian-completed health questionnaire {questions, answers, notes}
     health_json: Mapped[dict | None] = mapped_column(JSON)
+    # Family asked to stop the trial chase (injury, changed mind): silences
+    # the nudge email and removes them from the front-desk call list.
+    trial_closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    trial_closed_reason: Mapped[str | None] = mapped_column(String(120))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

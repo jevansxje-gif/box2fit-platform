@@ -261,6 +261,7 @@ def today():
         .order_by(ClassInstance.local_date)
         .all()
         if b.attendee_id not in live_attendee_ids
+        and b.attendee.trial_closed_at is None
     ]
     return render_template(
         "ops/today.html",

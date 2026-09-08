@@ -931,6 +931,28 @@ def member_detail(user_id: int):
                 )
             else:
                 flash("That booking has no membership email to resend.", "error")
+        elif action in ("close_trial", "reopen_trial"):
+            from ..models import AttendeeProfile
+
+            att = db.session.get(
+                AttendeeProfile, request.form.get("attendee_id", type=int)
+            )
+            if att and att.user_id == u.id:
+                if action == "close_trial":
+                    att.trial_closed_at = utcnow()
+                    att.trial_closed_reason = (
+                        request.form.get("reason") or ""
+                    ).strip()[:120] or None
+                    flash(
+                        f"Follow-ups stopped for {att.first_name} — no nudge "
+                        "emails, off the call list. Resume anytime.",
+                        "success",
+                    )
+                else:
+                    att.trial_closed_at = None
+                    att.trial_closed_reason = None
+                    flash(f"Follow-ups resumed for {att.first_name}.", "success")
+                db.session.commit()
         elif action == "set_first_charge":
             from datetime import date as _date
 

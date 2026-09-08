@@ -16,7 +16,27 @@
   <div class="cards-3" style="margin:0 0 18px">
     <div class="pf-card pf-card--pad">
       <div class="pf-kicker" style="color:var(--pf-text-3)">Attendees</div>
-      {% for a in u.attendees %}<p style="margin:8px 0 0"><b>{{ a.first_name }}</b> {{ '(child, b. ' + a.birth_year|string + ')' if a.kind == 'child' else '(self)' }}</p>{% endfor %}
+      {% for a in u.attendees %}
+      <p style="margin:8px 0 0"><b>{{ a.first_name }}</b> {{ '(child, b. ' + a.birth_year|string + ')' if a.kind == 'child' else '(self)' }}
+        {% if a.trial_closed_at %}<span class="pf-chip pf-chip--warn" style="font-size:11px" title="No nudge emails, not on the call list">follow-ups stopped{{ ' · ' + a.trial_closed_reason if a.trial_closed_reason }}</span>{% endif %}
+      </p>
+      {% if a.trial_closed_at %}
+      <form method="post" style="margin:6px 0 0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="attendee_id" value="{{ a.id }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="reopen_trial">Resume follow-ups</button>
+      </form>
+      {% else %}
+      {# Off switch for the trial chase — injury, changed mind, asked us
+         to stop. Silences the nudge and the Today call list. #}
+      <form method="post" style="display:flex;gap:6px;align-items:center;margin:6px 0 0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="attendee_id" value="{{ a.id }}" />
+        <input class="pf-input" name="reason" placeholder="reason (e.g. injury)" maxlength="120" style="padding:7px 10px;font-size:13px;width:150px" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="close_trial">Stop follow-ups</button>
+      </form>
+      {% endif %}
+      {% endfor %}
     </div>
     <div class="pf-card pf-card--pad">
       <div class="pf-kicker" style="color:var(--pf-text-3)">Memberships</div>

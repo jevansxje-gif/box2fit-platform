@@ -12,6 +12,7 @@ SALT_WAITLIST_CONFIRM = "waitlist-confirm"
 SALT_UPDATE_CARD = "update-card"
 SALT_ACTIVATE = "activate-membership"
 SALT_CONFIRM_ATTEND = "confirm-attendance"
+SALT_AD_INVITE = "ad-invite"
 
 MAX_AGE = 60 * 60 * 24 * 90  # 90 days default
 
@@ -27,5 +28,19 @@ def make_token(record_id: int, salt: str) -> str:
 def read_token(token: str, salt: str, max_age: int = MAX_AGE) -> int | None:
     try:
         return _serializer(salt).loads(token, max_age=max_age)
+    except (BadSignature, SignatureExpired):
+        return None
+
+
+def make_payload_token(payload: dict, salt: str) -> str:
+    """Signed token carrying a small dict (e.g. an ad-invite's email +
+    segment) rather than a bare record id."""
+    return _serializer(salt).dumps(payload)
+
+
+def read_payload_token(token: str, salt: str, max_age: int = MAX_AGE) -> dict | None:
+    try:
+        data = _serializer(salt).loads(token, max_age=max_age)
+        return data if isinstance(data, dict) else None
     except (BadSignature, SignatureExpired):
         return None

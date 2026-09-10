@@ -29,7 +29,7 @@ from app.models import (
 )
 from app.services.dispatch import drain, hash_user_data
 
-from test_pass1_e2e import _book_child, _first_instance
+from test_pass1_e2e import _book_child, _child_form, _first_instance
 from test_pass2_money import _vault_card, _webhook
 from test_pass3_portal import _login, _make_member
 
@@ -1304,3 +1304,52 @@ def test_edit_attendee_name_and_birth_year(app, client, client_account):
     )
     db.session.refresh(child)
     assert child.birth_year == 2016
+
+
+def test_ad_invite_flow_attributes_to_campaign(app, client, client_account):
+    """Off-flow ad enquiries: staff invite by email; the signed link seeds
+    campaign attribution server-side; a booking through it becomes a lead
+    tagged meta / referral / <segment> / gym-referral (transparent it was a
+    gym referral, not a pixel click) with no phantom lead created up front."""
+    from app.models import Message
+
+    staff = _admin(app)
+    r = staff.post(
+        "/ops/members/invite",
+        data={
+            "email": "Walkin.Parent@Example.com",
+            "first_name": "Jordan",
+            "segment": "kids",
+        },
+        follow_redirects=True,
+    )
+    assert b"Invite sent" in r.data
+    invite = (
+        db.session.query(Message).filter_by(template="ad_invite").one()
+    )
+    assert invite.recipient == "walkin.parent@example.com"
+    # no lead conjured before they actually book
+    assert db.session.query(Lead).count() == 0
+    link = re.search(r"/invite/([\w.\-]+)", invite.body_preview).group(0)
+
+    # The invited person clicks the link → attribution cookie seeded, then
+    # books a class through the normal funnel.
+    visitor = app.test_client()
+    r = visitor.get(link)
+    assert r.status_code == 302 and "/kids" in r.location
+    instance = _first_instance(client_account, "kids_7_10")
+    r = visitor.post("/book/youth", data={"instance_id": str(instance.id)})
+    assert r.status_code == 302
+    r = visitor.post(
+        "/book/youth/details", data=_child_form(instance), follow_redirects=False
+    )
+    assert r.status_code == 302
+
+    lead = db.session.query(Lead).one()
+    assert lead.utm_source == "meta"
+    assert lead.utm_medium == "referral"
+    assert lead.utm_campaign == "kids"
+    assert lead.utm_content == "gym-referral"
+
+    # a tampered/garbage invite token 404s
+    assert visitor.get("/invite/not-a-real-token").status_code == 404

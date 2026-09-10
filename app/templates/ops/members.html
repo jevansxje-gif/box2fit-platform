@@ -6,11 +6,36 @@
   {{ ops_nav() }}
   <div style="display:flex;justify-content:space-between;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:16px">
     <h1 class="pf-h1" style="margin:0">Members</h1>
-    <form method="get" style="display:flex;gap:8px">
-      <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:280px;min-height:44px" autofocus />
-      <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
-    </form>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button type="button" class="pf-btn pf-btn--primary pf-btn--sm" onclick="document.getElementById('ad-invite').hidden = !document.getElementById('ad-invite').hidden">+ Invite from an ad enquiry</button>
+      <form method="get" style="display:flex;gap:8px">
+        <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:280px;min-height:44px" autofocus />
+        <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
+      </form>
+    </div>
   </div>
+
+  {# Someone who saw an ad but phoned/walked in instead of clicking — send
+     them a link that gets them into the funnel and credited to the campaign. #}
+  <form id="ad-invite" method="post" action="{{ url_for('ops_admin.invite_from_ad') }}" hidden style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div>
+      <label class="pf-label" style="font-size:12px">Their email</label>
+      <input class="pf-input" name="email" type="email" required placeholder="parent@example.com" style="min-width:240px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">First name (optional)</label>
+      <input class="pf-input" name="first_name" placeholder="e.g. Sam" style="width:140px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Which ad / program</label>
+      <select class="pf-input" name="segment" style="min-width:200px">
+        {% for value, label in invite_segments %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="pf-btn pf-btn--primary pf-btn--sm">Send invite</button>
+    <p class="note" style="width:100%;margin:4px 0 0;color:var(--pf-text-3);font-size:12.5px">Emails them a booking link. When they sign up they're tracked and credited to the campaign (marked as a gym referral, not a click).</p>
+  </form>
   {% for r in rows %}
   <a href="{{ url_for('ops_admin.member_detail', user_id=r.user.id) }}" class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:12px 16px;margin-bottom:6px;text-decoration:none;color:inherit">
     <div class="who" style="flex:1.4">

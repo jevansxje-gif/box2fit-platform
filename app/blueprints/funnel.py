@@ -264,6 +264,46 @@ def landing_strong_retired():
     return redirect(url_for("funnel.landing", slug="technical"), 301)
 
 
+@bp.get("/invite/<token>")
+def ad_invite(token: str):
+    """A gym-referred ad enquiry: someone who saw the ad but contacted the
+    gym directly instead of clicking. Staff send this signed link; it seeds
+    the ad attribution server-side (tagged medium=referral, content=
+    gym-referral so it's transparent it wasn't a pixel click), then drops
+    them into the normal booking flow where the real lead is created."""
+    import json
+
+    from ..services.signed_links import SALT_AD_INVITE, read_payload_token
+
+    data = read_payload_token(token, SALT_AD_INVITE)
+    if not data:
+        abort(404)
+    segment = data.get("segment") if data.get("segment") in SEGMENTS else "kids"
+    resp = make_response(redirect(url_for("funnel.landing", slug=segment)))
+    # Seed first-touch directly (don't rely on query UTMs surviving). First
+    # touch still wins for 30 days, so a later real ad click won't clobber
+    # a click this person made earlier — matching normal attribution rules.
+    if not request.cookies.get(current_app.config["UTM_COOKIE_NAME"]):
+        resp.set_cookie(
+            current_app.config["UTM_COOKIE_NAME"],
+            json.dumps(
+                {
+                    "utm_source": "meta",
+                    "utm_medium": "referral",
+                    "utm_campaign": segment,
+                    "utm_content": "gym-referral",
+                    "landing_variant": f"{segment}:invite",
+                    "first_touch_at": utcnow().isoformat(),
+                }
+            ),
+            max_age=current_app.config["UTM_COOKIE_MAX_AGE"],
+            httponly=True,
+            samesite="Lax",
+            secure=request.is_secure,
+        )
+    return resp
+
+
 @bp.get("/<slug>")
 def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""

@@ -792,7 +792,62 @@ def members():
             or any(q in a.first_name.lower() for a in u.attendees)
         ]
     rows = [_member_row(u) for u in users[:200]]
-    return render_template("ops/members.html", rows=rows, q=q)
+    return render_template(
+        "ops/members.html", rows=rows, q=q, invite_segments=AD_INVITE_SEGMENTS
+    )
+
+
+# Campaigns we actively advertise — the segments a gym-referred enquiry can
+# be attributed to (label shown to staff, value used in the invite link).
+AD_INVITE_SEGMENTS = [
+    ("kids", "Kids Boxing (6–10)"),
+    ("youth", "Youth Confidence (11–18)"),
+    ("shehits", "She Hits (women)"),
+    ("beast", "Beast Camp"),
+]
+
+
+@bp.post("/members/invite")
+@staff_required
+def invite_from_ad():
+    """Send a gym-referred ad enquiry a signed link that seeds the campaign
+    attribution, then drops them into the normal booking flow. Keeps
+    off-flow (called/walked-in) ad sign-ups tracked and credited."""
+    from ..services.messaging import send_email
+    from ..services.signed_links import SALT_AD_INVITE, make_payload_token
+    from ..services.urls import absolute_url
+
+    email = (request.form.get("email") or "").strip().lower()
+    first = (request.form.get("first_name") or "").strip()
+    segment = request.form.get("segment") or "kids"
+    valid = {s for s, _ in AD_INVITE_SEGMENTS}
+    if "@" not in email or "." not in email.split("@")[-1]:
+        flash("Enter a valid email address to invite.", "error")
+        return redirect(url_for("ops_admin.members"))
+    if segment not in valid:
+        segment = "kids"
+
+    link = absolute_url(
+        "funnel.ad_invite",
+        token=make_payload_token({"email": email, "segment": segment}, SALT_AD_INVITE),
+    )
+    label = dict(AD_INVITE_SEGMENTS)[segment]
+    html = render_template(
+        "emails/ad_invite.html", first=first, label=label, link=link
+    )
+    # Transactional: the person asked the gym to sign them up, so this is a
+    # requested message, not marketing.
+    send_email(
+        None, email, "Your free first class at Box2Fit White Rock",
+        html, "ad_invite", _cid(),
+    )
+    db.session.commit()
+    flash(
+        f"Invite sent to {email} for {label} — they'll be attributed to the "
+        "campaign when they book.",
+        "success",
+    )
+    return redirect(url_for("ops_admin.members"))
 
 
 def _member_row(u: User) -> dict:

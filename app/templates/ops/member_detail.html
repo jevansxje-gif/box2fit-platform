@@ -36,6 +36,19 @@
         <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="close_trial">Stop follow-ups</button>
       </form>
       {% endif %}
+      {# Fix a mis-entered name/birth year (browser autofill stamps the
+         guardian's name on the child field, seen repeatedly). #}
+      <details style="margin:6px 0 2px">
+        <summary style="cursor:pointer;font-size:12.5px;color:var(--pf-text-3)">Edit details</summary>
+        <form method="post" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0 0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="attendee_id" value="{{ a.id }}" />
+          <input class="pf-input" name="first_name" value="{{ a.first_name }}" placeholder="First name" maxlength="80" required style="padding:7px 10px;font-size:13px;width:110px" />
+          <input class="pf-input" name="last_name" value="{{ a.last_name or '' }}" placeholder="Last name" maxlength="80" style="padding:7px 10px;font-size:13px;width:110px" />
+          {% if a.kind == 'child' %}<input class="pf-input" name="birth_year" value="{{ a.birth_year or '' }}" placeholder="Birth year" inputmode="numeric" maxlength="4" style="padding:7px 10px;font-size:13px;width:90px" />{% endif %}
+          <button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="edit_attendee">Save</button>
+        </form>
+      </details>
       {% endfor %}
     </div>
     <div class="pf-card pf-card--pad">

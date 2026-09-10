@@ -931,6 +931,26 @@ def member_detail(user_id: int):
                 )
             else:
                 flash("That booking has no membership email to resend.", "error")
+        elif action == "edit_attendee":
+            from datetime import date as _date
+
+            from ..models import AttendeeProfile
+
+            att = db.session.get(
+                AttendeeProfile, request.form.get("attendee_id", type=int)
+            )
+            first = (request.form.get("first_name") or "").strip()
+            if att and att.user_id == u.id and first:
+                att.first_name = first[:80]
+                att.last_name = (request.form.get("last_name") or "").strip()[:80] or None
+                if att.kind == "child":
+                    yr = request.form.get("birth_year", type=int)
+                    if yr and 1900 < yr <= _date.today().year:
+                        att.birth_year = yr
+                db.session.commit()
+                flash(f"Details updated for {att.first_name}.", "success")
+            else:
+                flash("A first name is required.", "error")
         elif action in ("close_trial", "reopen_trial"):
             from ..models import AttendeeProfile
 

@@ -1246,3 +1246,61 @@ def test_card_save_return_shows_success_and_next_step(
     assert b"/activate/" in r.data  # the onward tap
     db.session.refresh(sc)
     assert sc.payment_method_status == "vaulted"
+
+
+def test_edit_attendee_name_and_birth_year(app, client, client_account):
+    """Front desk can fix a child's name/birth year (browser autofill
+    mangles these). First name is required; a bad birth year is ignored."""
+    from app.models import AttendeeProfile
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    child = db.session.query(AttendeeProfile).filter_by(kind="child").one()
+    guardian_id = child.user_id
+    assert child.first_name == "Maya"
+
+    staff = _admin(app)
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "edit_attendee",
+            "attendee_id": str(child.id),
+            "first_name": "Mia",
+            "last_name": "Parent",
+            "birth_year": "2016",
+        },
+        follow_redirects=True,
+    )
+    assert b"Details updated" in r.data
+    db.session.refresh(child)
+    assert child.first_name == "Mia"
+    assert child.last_name == "Parent"
+    assert child.birth_year == 2016
+
+    # blank first name refused
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "edit_attendee",
+            "attendee_id": str(child.id),
+            "first_name": "  ",
+        },
+        follow_redirects=True,
+    )
+    assert b"first name is required" in r.data
+    db.session.refresh(child)
+    assert child.first_name == "Mia"  # unchanged
+
+    # nonsense birth year ignored, name still saved
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "edit_attendee",
+            "attendee_id": str(child.id),
+            "first_name": "Mia",
+            "birth_year": "3999",
+        },
+        follow_redirects=True,
+    )
+    db.session.refresh(child)
+    assert child.birth_year == 2016

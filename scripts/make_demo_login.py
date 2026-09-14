@@ -10,7 +10,7 @@ The demo guardian/child are named "Demo ..." so they're obvious in any
 roster. Safe to re-run; it resets the demo each time.
 """
 import sys
-from datetime import date, datetime, time
+from datetime import date, timedelta
 
 from app import create_app
 from app.extensions import db
@@ -116,18 +116,13 @@ with app.app_context():
         .order_by(ClassInstance.starts_at_utc)
         .first()
     )
-    if inst:
-        db.session.add(
-            Booking(
-                client_account_id=ca.id,
-                attendee_id=child.id,
-                class_instance_id=inst.id,
-                kind=BookingKind.member.value,
-                status=BookingStatus.booked.value,
-            )
-        )
+    # Enrol in the group of the next upcoming Kids class so the schedule
+    # filters to their bookable sessions. No class booked yet — the demo is
+    # a PAID member who now goes and schedules their classes.
+    cohort = inst.cohort_label if inst else None
 
-    # Pending membership, first charge Sept 21 (as arranged) — mirrors Lucas.
+    # Active (paid) membership: first charge already happened, next billing
+    # ~4 weeks out. This is a member ready to RSVP into the schedule.
     plan = default_plan(ca.id)
     if plan:
         db.session.add(
@@ -136,10 +131,12 @@ with app.app_context():
                 user_id=guardian.id,
                 attendee_id=child.id,
                 plan_id=plan.id,
-                cohort_label=inst.cohort_label if inst else None,
-                status=SubscriptionStatus.pending.value,
+                cohort_label=cohort,
+                status=SubscriptionStatus.active.value,
                 mrr_cents=plan.price_cents,
-                first_charge_at=local_to_utc(date(2026, 9, 21), time(10, 0)),
+                activated_at=now_utc() - timedelta(days=3),
+                first_charge_at=now_utc() - timedelta(days=3),
+                current_period_end=now_utc() + timedelta(weeks=4),
             )
         )
 
@@ -148,6 +145,6 @@ with app.app_context():
     print("URL:      https://health.box2fit.com/portal/login")
     print(f"Email:    {DEMO_EMAIL}")
     print(f"Password: {password}")
-    print(f"Booked into: {inst.class_type.name} {inst.local_date} {inst.local_time.strftime('%I:%M %p') if inst else '(no upcoming kids class found)'}" if inst else "Booked into: (no upcoming kids class found)")
-    print("Child: Demo Kid | Membership: pending, first charge Sep 21")
+    print(f"Child: Demo Kid | Membership: ACTIVE (paid){' · ' + cohort if cohort else ''}")
+    print("No class booked yet — log in and use 'Open the schedule' to book.")
     print("Remove later with:  .venv/bin/python -m scripts.make_demo_login --remove")

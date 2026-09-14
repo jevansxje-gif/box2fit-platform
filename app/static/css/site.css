@@ -125,6 +125,9 @@ img{ display:block; max-width:100%; }
   .hero-photo{ aspect-ratio:16/10; order:-1; }
   .cards-3,.cards-4{ grid-template-columns:1fr; }
   .site-hdr .pf-btn{ display:none; }
+  /* Member login must stay reachable on mobile — the primary CTA has a
+     bottom bar / in-hero button, but login has no other entry point. */
+  .site-hdr .hdr-login{ display:inline-flex; min-height:38px; padding:8px 14px; font-size:14px; }
   .mobile-cta{ display:block; position:fixed; left:0; right:0; bottom:0; z-index:50; }
   body.has-mobile-cta{ padding-bottom:84px; }
 }

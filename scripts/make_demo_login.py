@@ -73,7 +73,7 @@ with app.app_context():
     guardian = User(
         client_account_id=ca.id,
         email=DEMO_EMAIL,
-        name="Demo Parent",
+        name="Sam Demo",
         phone="+16040000000",
         role=Role.member.value,
         consent_email=True,
@@ -82,16 +82,30 @@ with app.app_context():
     db.session.add(guardian)
     db.session.flush()
 
+    # Real first names so buttons read "Book Leo" / "Book Sam", not "Book
+    # Demo"; last name "Demo" keeps them obvious in staff rosters.
     child = AttendeeProfile(
         client_account_id=ca.id,
         user_id=guardian.id,
         kind=AttendeeKind.child.value,
-        first_name="Demo",
-        last_name="Kid",
+        first_name="Leo",
+        last_name="Demo",
         birth_year=date.today().year - 8,
     )
     db.session.add(child)
     db.session.flush()
+
+    # The parent as a member who also trains — so the schedule shows the
+    # "Try another class" (adult) section alongside the child's program.
+    db.session.add(
+        AttendeeProfile(
+            client_account_id=ca.id,
+            user_id=guardian.id,
+            kind=AttendeeKind.self_.value,
+            first_name="Sam",
+            last_name="Demo",
+        )
+    )
 
     # A card on file (placeholder — payment-management pages will try Stripe
     # and error, but the dashboard/schedule the parent uses do not).
@@ -145,6 +159,6 @@ with app.app_context():
     print("URL:      https://health.box2fit.com/portal/login")
     print(f"Email:    {DEMO_EMAIL}")
     print(f"Password: {password}")
-    print(f"Child: Demo Kid | Membership: ACTIVE (paid){' · ' + cohort if cohort else ''}")
-    print("No class booked yet — log in and use 'Open the schedule' to book.")
+    print(f"Family: Leo (child, Kids Boxing{' · ' + cohort if cohort else ''}) + Sam (parent, also trains)")
+    print("Membership: ACTIVE (paid). No class booked yet — use 'Open the schedule' to book.")
     print("Remove later with:  .venv/bin/python -m scripts.make_demo_login --remove")

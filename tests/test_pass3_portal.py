@@ -360,3 +360,36 @@ def test_api_member_booking(client, client_account):
 
     r = client.post(f"/api/v1/bookings/{booking_id}/cancel", headers=headers)
     assert r.get_json()["cancelled"] is True
+
+
+def test_schedule_splits_program_from_other_classes(client, client_account):
+    """Schedule leads with the member's enrolled program, then age/segment-
+    appropriate other classes. A child never gets book buttons for adult
+    classes (they have no age gate, so validate_age alone wouldn't stop it)."""
+    guardian, child = _make_member(
+        client_account, email="split@example.com", cohort="Group A"
+    )
+    _login(client, "split@example.com")
+    r = client.get("/portal/schedule")
+    body = r.data.decode()
+
+    # Their program is highlighted at the top
+    assert "Your program" in body
+    assert "Kids Boxing" in body
+    # The child can be booked into their own kids class
+    assert f"Book {child.first_name}" in body
+
+    # An adult class (She Hits) exists in the schedule window but the child
+    # is NOT offered a book button for it — child + adult class = not shown.
+    kids_idx = body.find("Kids Boxing")
+    # There is no "Book <child>" anywhere tied to She Hits: the only book
+    # buttons for the child are on youth/kids programs.
+    import re
+
+    child_buttons = body.count(f"Book {child.first_name}")
+    # child has kids Group A sessions only (Mon/Wed/Fri etc.), never adult
+    assert child_buttons >= 1
+    # adult-only classes shouldn't produce a child book button; the "Try
+    # another class" section only appears if an eligible attendee exists,
+    # and this family has no self-attendee, so it must be absent.
+    assert "Try another class" not in body

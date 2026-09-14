@@ -23,6 +23,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from ..extensions import db, limiter
 from ..models import (
+    AttendeeKind,
     AttendeeProfile,
     Booking,
     BookingKind,
@@ -43,7 +44,12 @@ from ..models import (
 from ..services import stripe_service, waitlist
 from ..services.booking_flow import sign_waiver
 from ..services.messaging import send_email
-from ..services.scheduling import booked_counts, upcoming_instances, validate_bookable
+from ..services.scheduling import (
+    booked_counts,
+    upcoming_instances,
+    validate_age,
+    validate_bookable,
+)
 from ..services.signed_links import (
     SALT_MAGIC_LOGIN,
     SALT_SET_PASSWORD,
@@ -289,14 +295,12 @@ def schedule():
             ]
 
     ids = [a.id for a in attendees] or [0]
-    my_bookings = (
-        db.session.query(Booking)
-        .filter(
-            Booking.attendee_id.in_(ids),
-            Booking.status == BookingStatus.booked.value,
-        )
-        .all()
+    all_bookings = (
+        db.session.query(Booking).filter(Booking.attendee_id.in_(ids)).all()
     )
+    my_bookings = [
+        b for b in all_bookings if b.status == BookingStatus.booked.value
+    ]
     booked_map = {(b.attendee_id, b.class_instance_id): b for b in my_bookings}
     waiting = {
         (w.attendee_id, w.class_instance_id): w
@@ -307,10 +311,42 @@ def schedule():
         )
         .all()
     }
+
+    # "Your classes" = the program(s) this member is in — derived from the
+    # classes they've ever booked (the one they signed up for), plus the
+    # cohort-matched types for a brand-new member with no bookings yet.
+    home_type_ids = {
+        b.class_instance.class_type_id for b in all_bookings
+    }
+    member_cohorts = {s.cohort_label for s in subs if s.cohort_label}
+    if member_cohorts:
+        home_type_ids |= {
+            o["instance"].class_type_id
+            for o in occurrences
+            if o["instance"].cohort_label in member_cohorts
+        }
+
+    def _can(att, ct) -> bool:
+        # A child can attend youth/kids programs they're the right age for;
+        # an adult (self) can attend the adult classes.
+        if ct.is_youth:
+            return att.kind == AttendeeKind.child.value and (
+                validate_age(ct, att) is None
+            )
+        return att.kind == AttendeeKind.self_.value
+
+    mine, others = [], []
+    for o in occurrences:
+        ct = o["instance"].class_type
+        o["who"] = [a for a in attendees if _can(a, ct)]
+        if not o["who"]:
+            continue  # nobody on this account can attend it — hide it
+        (mine if ct.id in home_type_ids else others).append(o)
+
     return render_template(
         "portal/schedule.html",
-        attendees=attendees,
-        occurrences=occurrences,
+        mine=mine,
+        others=others,
         booked_map=booked_map,
         waiting=waiting,
         past_due=any(

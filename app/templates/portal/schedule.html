@@ -1,19 +1,9 @@
 {% extends "portal/_base.html" %}
 {% block title %}Schedule — My Box2Fit{% endblock %}
-{% block portal %}
-  <div class="pf-kicker">Going or not going</div>
-  <h1 class="pf-h1" style="margin:6px 0 6px">Class schedule</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 20px">Tap to book the sessions you'll attend. Cancel anytime, no penalties.</p>
 
-  {% if past_due %}
-  <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
-    Booking is paused until a quick card update.
-    <a class="pf-btn pf-btn--primary pf-btn--sm" href="{{ url_for('portal.update_card', token=card_token) }}" style="margin-left:10px">Update card</a>
-  </div>
-  {% endif %}
-
+{% macro class_list(occ) %}
   {% set ns = namespace(day=None) %}
-  {% for o in occurrences %}
+  {% for o in occ %}
     {% if o.instance.local_date != ns.day %}
       {% set ns.day = o.instance.local_date %}
       <div class="day-lbl">{{ o.instance.local_date.strftime('%A · %b %d') }}</div>
@@ -26,7 +16,7 @@
         {% if o.remaining == 0 %}Full{% else %}{{ o.remaining }} spots open{% endif %}</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        {% for a in attendees %}
+        {% for a in o.who %}
           {% set b = booked_map.get((a.id, o.instance.id)) %}
           {% set w = waiting.get((a.id, o.instance.id)) %}
           {% if b %}
@@ -48,4 +38,30 @@
       </div>
     </div>
   {% endfor %}
+{% endmacro %}
+
+{% block portal %}
+  <div class="pf-kicker">Going or not going</div>
+  <h1 class="pf-h1" style="margin:6px 0 6px">Your schedule</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 20px">Tap to book the sessions you'll attend. Cancel anytime, no penalties.</p>
+
+  {% if past_due %}
+  <div class="disclosure" style="background:var(--pf-warn-bg);border-color:var(--pf-warn);color:var(--pf-warn)">
+    Booking is paused until a quick card update.
+    <a class="pf-btn pf-btn--primary pf-btn--sm" href="{{ url_for('portal.update_card', token=card_token) }}" style="margin-left:10px">Update card</a>
+  </div>
+  {% endif %}
+
+  {% if mine %}
+    <div class="pf-kicker" style="color:var(--pf-red);margin:6px 0 8px">Your program — book your upcoming classes</div>
+    {{ class_list(mine) }}
+  {% elif not others %}
+    <div class="pf-panel"><p style="margin:0;color:var(--pf-text-2)">No upcoming classes to book yet — check back soon, or call us at <a href="tel:+17783846284">(778) 384-6284</a>.</p></div>
+  {% endif %}
+
+  {% if others %}
+    <div class="pf-kicker" style="margin:28px 0 8px">Try another class</div>
+    <p style="color:var(--pf-text-2);font-size:14px;margin:0 0 12px">Other sessions you're welcome to join.</p>
+    {{ class_list(others) }}
+  {% endif %}
 {% endblock %}

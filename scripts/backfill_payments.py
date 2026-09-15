@@ -22,6 +22,10 @@ with app.app_context():
     if not is_configured():
         raise SystemExit("Stripe not configured.")
     st = stripe_client()
+    # Fetch invoices in the SAME API version the webhook/handler expect
+    # (top-level subscription, tax, period_end, lines) — the account default
+    # is newer and reshapes those, which makes the handler skip everything.
+    st.api_version = "2019-09-09"
     subs = (
         db.session.query(Subscription)
         .filter(Subscription.stripe_subscription_id.isnot(None))
@@ -43,14 +47,17 @@ with app.app_context():
             )
             if already:
                 continue
+            amt = invd.get("amount_paid", 0) / 100
+            tax = (invd.get("tax") or 0) / 100
             print(
                 f"  sub {s.id} | invoice {invd.get('id')} | "
-                f"${invd.get('amount_paid', 0) / 100} paid"
+                f"${amt} paid (tax ${tax})"
                 + ("  -> recording" if WRITE else "  (report only)")
             )
             if WRITE:
-                billing.handle_invoice_paid(invd)
-                processed += 1
+                p = billing.handle_invoice_paid(invd)
+                if p is not None:
+                    processed += 1
     if WRITE:
         db.session.commit()
     after = db.session.query(Payment).count()

@@ -14,12 +14,15 @@ from app.extensions import db
 from app.models import ClientAccount
 from app.services.class_admin import prune_inactive_template_instances
 from app.services.scheduling import generate_instances
+from app.services.tzutil import now_utc, utc_to_local
 from app.tasks.jobs import (
     automark_no_shows,
     drain_event_outbox,
+    payment_health_check,
     release_expired_waitlist_offers,
     send_due_reminders,
     send_trial_followups,
+    weekly_ops_digest,
 )
 
 app = create_app()
@@ -39,8 +42,18 @@ with app.app_context():
             pruned += prune_inactive_template_instances(ca.id)
         db.session.commit()
 
+    # Daily 8am-local payment self-audit (alerts only on drift); the weekly
+    # ops digest goes out Monday 8am. The <10 minute gate makes each fire on
+    # a single cron tick per day.
+    health = digest = "-"
+    local = utc_to_local(now_utc())
+    if local.hour == 8 and local.minute < 10:
+        health = payment_health_check.apply().get()
+        if local.weekday() == 0:  # Monday
+            digest = weekly_ops_digest.apply().get()
+
     print(
         f"[{stamp}] reminders={reminders} noshows={noshows} "
         f"waitlist_released={released} followups={followups} outbox={drained} "
-        f"generated={generated} pruned={pruned}"
+        f"generated={generated} pruned={pruned} health={health} digest={digest}"
     )

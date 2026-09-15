@@ -1353,3 +1353,69 @@ def test_ad_invite_flow_attributes_to_campaign(app, client, client_account):
 
     # a tampered/garbage invite token 404s
     assert visitor.get("/invite/not-a-real-token").status_code == 404
+
+
+def test_payment_health_check_flags_and_alerts(app, client, client_account, monkeypatch):
+    """The daily self-audit flags a Stripe-charged invoice with no local
+    Payment (the silent-webhook failure) and emails the ops mailbox; it
+    stays silent when everything reconciles."""
+    import json as _json
+
+    from app.models import Payment, Subscription, SubscriptionStatus, Plan
+    from app.services import stripe_service
+    from app.tasks import jobs
+
+    # A subscription that Stripe says was charged, but we recorded nothing.
+    guardian, child = _make_member(client_account, email="audit@example.com")
+    sub = db.session.query(Subscription).filter_by(user_id=guardian.id).one()
+    sub.stripe_subscription_id = "sub_audit1"
+    db.session.commit()
+
+    class FakeInvoice:
+        def __init__(self, d):
+            self._d = d
+        def __str__(self):
+            return _json.dumps(self._d)
+
+    class FakeList:
+        def __init__(self, items):
+            self._items = items
+        def auto_paging_iter(self):
+            return iter(self._items)
+
+    paid = FakeInvoice({"id": "in_audit1", "amount_paid": 19845, "tax": 945})
+
+    class FakeStripe:
+        api_version = None
+        class Invoice:
+            @staticmethod
+            def list(**kw):
+                return FakeList([paid])
+
+    monkeypatch.setattr(stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(stripe_service, "stripe_client", lambda: FakeStripe)
+
+    sent = []
+    monkeypatch.setattr(
+        jobs, "send_email",
+        lambda *a, **k: sent.append((a[1], a[2])),  # (recipient, subject)
+    )
+    monkeypatch.setitem(app.config, "ADMIN_NOTIFY_EMAIL", "ops@box2fit.local")
+
+    n = jobs.payment_health_check()
+    assert n >= 1
+    assert sent and "payment issue" in sent[0][1].lower()
+
+    # Now record the payment — the audit goes quiet.
+    db.session.add(
+        Payment(
+            client_account_id=client_account.id, user_id=guardian.id,
+            subscription_id=sub.id, stripe_invoice_id="in_audit1",
+            amount_cents=19845, tax_cents=945, currency="CAD", status="paid",
+            agency_share_cents=4725,
+        )
+    )
+    db.session.commit()
+    sent.clear()
+    assert jobs.payment_health_check() == 0
+    assert sent == []

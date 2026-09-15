@@ -255,3 +255,187 @@ def automark_no_shows() -> int:
     if marked:
         log.info("no-shows automarked", extra={"count": marked})
     return marked
+
+
+@shared_task(name="app.tasks.jobs.payment_health_check")
+def payment_health_check() -> int:
+    """Daily self-audit: reconcile Stripe's paid invoices against our Payment
+    ledger and flag drift — the exact failure class where a broken webhook
+    silently stops recording payments/commission. Emails an alert to the ops
+    mailbox ONLY when something's wrong. Returns the number of issues."""
+    import json
+
+    from ..models import Payment, Subscription, SubscriptionStatus
+    from ..services.stripe_service import is_configured, stripe_client
+
+    if not is_configured():
+        return 0
+    st = stripe_client()
+    st.api_version = "2019-09-09"  # match the shape our handlers expect
+    issues: list[str] = []
+
+    subs = (
+        db.session.query(Subscription)
+        .filter(Subscription.stripe_subscription_id.isnot(None))
+        .all()
+    )
+    for s in subs:
+        try:
+            invs = st.Invoice.list(
+                subscription=s.stripe_subscription_id, status="paid", limit=100
+            )
+        except Exception as exc:  # a Stripe read failure is itself worth knowing
+            issues.append(
+                f"Couldn't read Stripe for subscription {s.id}: {type(exc).__name__}"
+            )
+            continue
+        for inv in invs.auto_paging_iter():
+            invd = json.loads(str(inv))
+            if (invd.get("amount_paid") or 0) <= 0:
+                continue
+            recorded = (
+                db.session.query(Payment)
+                .filter_by(stripe_invoice_id=invd.get("id"))
+                .count()
+            )
+            if not recorded:
+                issues.append(
+                    f"Stripe charged ${(invd.get('amount_paid') or 0) / 100:.2f} "
+                    f"(invoice {invd.get('id')}) but we have no payment recorded "
+                    f"— webhook may be failing again."
+                )
+
+    # Local red flag that needs no Stripe call: a charge date well past due
+    # with the membership still 'pending' (grace to avoid flapping).
+    stale = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.status == SubscriptionStatus.pending.value,
+            Subscription.first_charge_at.isnot(None),
+            Subscription.first_charge_at < now_utc() - timedelta(hours=12),
+        )
+        .all()
+    )
+    for s in stale:
+        issues.append(
+            f"Membership {s.id} first charge was {fmt_local(s.first_charge_at)} "
+            f"but it's still marked pending (payment not recorded)."
+        )
+
+    if issues:
+        _send_ops_alert(issues)
+        log.warning("payment health check found issues", extra={"count": len(issues)})
+    return len(issues)
+
+
+def _send_ops_alert(issues: list[str]) -> None:
+    from ..services.booking_flow import admin_alert_recipients
+
+    recipients = admin_alert_recipients()
+    if not recipients:
+        return
+    ca = db.session.query(ClientAccount).filter_by(active=True).first()
+    html = render_template("emails/ops_alert.html", issues=issues)
+    for to in recipients:
+        send_email(
+            None, to,
+            f"⚠️ Box2Fit needs a look — {len(issues)} payment issue(s)",
+            html, "ops_alert", ca.id if ca else 1,
+        )
+
+
+@shared_task(name="app.tasks.jobs.weekly_ops_digest")
+def weekly_ops_digest() -> int:
+    """Weekly Monday summary to the ops mailbox — so the numbers land in your
+    inbox regularly instead of being something you have to go dig for (or hear
+    about from a member)."""
+    from ..models import (
+        AttendeeProfile,
+        Lead,
+        Payment,
+        StripeCustomer,
+        Subscription,
+        SubscriptionStatus,
+    )
+    from ..services.booking_flow import admin_alert_recipients
+
+    recipients = admin_alert_recipients()
+    if not recipients:
+        return 0
+
+    since = now_utc() - timedelta(days=7)
+    new_signups = (
+        db.session.query(Lead).filter(Lead.created_at >= since).count()
+    )
+    attended = (
+        db.session.query(Booking)
+        .join(ClassInstance, Booking.class_instance_id == ClassInstance.id)
+        .filter(
+            Booking.status == BookingStatus.attended.value,
+            ClassInstance.starts_at_utc >= since,
+        )
+        .count()
+    )
+    payments = (
+        db.session.query(Payment)
+        .filter(Payment.amount_cents > 0, Payment.paid_at >= since)
+        .all()
+    )
+    revenue = sum(p.amount_cents for p in payments) / 100
+    commission = sum(p.agency_share_cents for p in payments) / 100
+    active_members = (
+        db.session.query(Subscription)
+        .filter_by(status=SubscriptionStatus.active.value)
+        .count()
+    )
+    past_due = (
+        db.session.query(Subscription)
+        .filter_by(status=SubscriptionStatus.past_due.value)
+        .count()
+    )
+    # Attended trials with no membership and no card = money left on the table
+    live_attendees = {
+        s.attendee_id
+        for s in db.session.query(Subscription).filter(
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            )
+        )
+    }
+    warm_leads = (
+        db.session.query(Booking)
+        .join(AttendeeProfile, Booking.attendee_id == AttendeeProfile.id)
+        .filter(
+            Booking.kind.in_([BookingKind.trial.value, BookingKind.walkin.value]),
+            Booking.status == BookingStatus.attended.value,
+        )
+        .all()
+    )
+    to_chase = len({b.attendee_id for b in warm_leads} - live_attendees)
+
+    # The self-audit result, folded in so the digest says "all clear" or not.
+    issues = payment_health_check()
+
+    ca = db.session.query(ClientAccount).filter_by(active=True).first()
+    html = render_template(
+        "emails/ops_digest.html",
+        new_signups=new_signups,
+        attended=attended,
+        revenue=f"{revenue:.2f}",
+        commission=f"{commission:.2f}",
+        payment_count=len(payments),
+        active_members=active_members,
+        past_due=past_due,
+        to_chase=to_chase,
+        issues=issues,
+    )
+    for to in recipients:
+        send_email(
+            None, to, "Box2Fit — your weekly numbers",
+            html, "ops_digest", ca.id if ca else 1,
+        )
+    return 1

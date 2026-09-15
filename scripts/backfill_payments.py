@@ -6,6 +6,7 @@ recorded, so this is safe to run repeatedly.
     .venv/bin/python -m scripts.backfill_payments          # report only
     .venv/bin/python -m scripts.backfill_payments --write  # apply
 """
+import json
 import sys
 
 from app import create_app
@@ -33,20 +34,22 @@ with app.app_context():
             subscription=s.stripe_subscription_id, status="paid", limit=100
         )
         for inv in invoices.auto_paging_iter():
+            # Stripe objects don't expose .get() here — use plain dicts.
+            invd = json.loads(str(inv))
             already = (
                 db.session.query(Payment)
-                .filter_by(stripe_invoice_id=inv.get("id"))
+                .filter_by(stripe_invoice_id=invd.get("id"))
                 .one_or_none()
             )
             if already:
                 continue
             print(
-                f"  sub {s.id} | invoice {inv.get('id')} | "
-                f"${inv.get('amount_paid', 0) / 100} paid"
+                f"  sub {s.id} | invoice {invd.get('id')} | "
+                f"${invd.get('amount_paid', 0) / 100} paid"
                 + ("  -> recording" if WRITE else "  (report only)")
             )
             if WRITE:
-                billing.handle_invoice_paid(inv)
+                billing.handle_invoice_paid(invd)
                 processed += 1
     if WRITE:
         db.session.commit()

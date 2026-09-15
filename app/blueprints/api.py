@@ -57,6 +57,8 @@ def health():
 def stripe_webhook():
     """Stripe webhook receiver. Signature-verified when a webhook secret is
     configured; in dev/test (no secret) the JSON body is trusted as-is."""
+    import json
+
     from ..services import billing
 
     secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
@@ -65,17 +67,17 @@ def stripe_webhook():
         import stripe
 
         try:
-            event = stripe.Webhook.construct_event(
+            stripe.Webhook.construct_event(
                 payload, request.headers.get("Stripe-Signature", ""), secret
             )
         except Exception:
             return jsonify(error="invalid_signature"), 400
-        event_type = event["type"]
-        obj = event["data"]["object"]
-    else:
-        body = request.get_json(silent=True) or {}
-        event_type = body.get("type", "")
-        obj = (body.get("data") or {}).get("object") or {}
+    # Verified (or dev with no secret). Parse the raw payload into plain
+    # dicts — the handlers use obj.get(), and this stripe-python's
+    # StripeObject doesn't expose .get(), which silently broke every event.
+    body = json.loads(payload) if payload else {}
+    event_type = body.get("type", "")
+    obj = (body.get("data") or {}).get("object") or {}
 
     handlers = {
         "setup_intent.succeeded": billing.handle_setup_intent_succeeded,

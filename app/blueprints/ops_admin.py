@@ -963,6 +963,79 @@ def member_detail(user_id: int):
                 flash("Booking cancelled — the spot has been released.", "success")
             else:
                 flash("That booking cannot be cancelled.", "error")
+        elif action == "rebook":
+            # A no-show/cancelled member wants back in: book the same
+            # attendee into the NEXT occurrence of that same weekly slot
+            # (same day + time), and send a fresh confirmation.
+            from ..services import booking_flow
+            from ..services.scheduling import validate_bookable
+            from ..services.tzutil import fmt_local, now_utc
+
+            bk = db.session.get(Booking, request.form.get("booking_id", type=int))
+            if not (bk and bk.attendee.user_id == u.id):
+                flash("That booking can't be rebooked.", "error")
+                return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+            old = bk.class_instance
+            q = db.session.query(ClassInstance).filter(
+                ClassInstance.client_account_id == u.client_account_id,
+                ClassInstance.status == InstanceStatus.scheduled.value,
+                ClassInstance.starts_at_utc > now_utc(),
+                ClassInstance.id != old.id,  # the NEXT one, not the missed one
+            )
+            if old.template_id:  # next same weekday+time slot
+                q = q.filter(ClassInstance.template_id == old.template_id)
+            else:  # one-off: next same class type (+ group if any)
+                q = q.filter(ClassInstance.class_type_id == old.class_type_id)
+                if old.cohort_label:
+                    q = q.filter(ClassInstance.cohort_label == old.cohort_label)
+            target = q.order_by(ClassInstance.starts_at_utc).first()
+            if target is None:
+                flash(
+                    f"No upcoming {old.class_type.name} class to rebook into.",
+                    "error",
+                )
+                return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+            err = validate_bookable(
+                target, attendee=bk.attendee, for_trial=bk.kind == "trial"
+            )
+            if err:
+                flash(err, "error")
+                return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+            existing = (
+                db.session.query(Booking)
+                .filter_by(attendee_id=bk.attendee_id, class_instance_id=target.id)
+                .one_or_none()
+            )
+            if existing and existing.status == BookingStatus.booked.value:
+                flash(
+                    f"{bk.attendee.first_name} is already booked for "
+                    f"{fmt_local(target.starts_at_utc, '%a %b %d')}.",
+                    "info",
+                )
+                return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+            if existing:  # revive a prior cancelled/no-show row for that class
+                existing.status = BookingStatus.booked.value
+                existing.cancelled_at = None
+                new = existing
+            else:
+                new = Booking(
+                    client_account_id=target.client_account_id,
+                    attendee_id=bk.attendee_id,
+                    class_instance_id=target.id,
+                    kind=bk.kind,
+                    lead_id=bk.lead_id,  # keep original attribution
+                )
+                db.session.add(new)
+            db.session.flush()
+            booking_flow.send_booking_confirmation(new)
+            db.session.commit()
+            flash(
+                f"{bk.attendee.first_name} rebooked into "
+                f"{old.class_type.name} on "
+                f"{fmt_local(target.starts_at_utc, '%A %b %d · %I:%M %p')} — "
+                "confirmation sent.",
+                "success",
+            )
         elif action == "resend_membership_email":
             # Re-runs the post-class flow for an attended trial: auto-start
             # on a vaulted card, otherwise the activation-link email again

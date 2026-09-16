@@ -1419,3 +1419,49 @@ def test_payment_health_check_flags_and_alerts(app, client, client_account, monk
     sent.clear()
     assert jobs.payment_health_check() == 0
     assert sent == []
+
+
+def test_rebook_no_show_into_next_slot(app, client, client_account):
+    """A no-show can be rebooked into the next occurrence of the same
+    weekly slot, with a fresh confirmation and original attribution kept."""
+    from app.models import Message
+
+    instance = _first_instance(client_account, "kids_7_10")
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    booking.status = BookingStatus.no_show.value
+    db.session.commit()
+    guardian_id = booking.attendee.user_id
+    lead_id = booking.lead_id
+    before = (
+        db.session.query(Message)
+        .filter_by(template="booking_confirmation", channel="email")
+        .count()
+    )
+
+    staff = _admin(app)
+    r = staff.get(f"/ops/members/{guardian_id}")
+    assert b"Rebook" in r.data
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={"action": "rebook", "booking_id": str(booking.id)},
+        follow_redirects=True,
+    )
+    assert b"rebooked into" in r.data
+
+    booked = (
+        db.session.query(Booking)
+        .filter_by(attendee_id=booking.attendee_id, status=BookingStatus.booked.value)
+        .all()
+    )
+    assert len(booked) == 1
+    new = booked[0]
+    assert new.class_instance_id != instance.id  # a future instance
+    assert new.class_instance.template_id == instance.template_id  # same slot
+    assert new.lead_id == lead_id  # attribution preserved
+    after = (
+        db.session.query(Message)
+        .filter_by(template="booking_confirmation", channel="email")
+        .count()
+    )
+    assert after == before + 1  # fresh confirmation sent

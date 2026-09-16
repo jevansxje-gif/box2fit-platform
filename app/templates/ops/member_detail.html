@@ -131,6 +131,14 @@
         <button class="pf-btn pf-btn--ghost pf-btn--sm" style="color:var(--pf-red)">Cancel</button>
       </form>
       {% endif %}
+      {% if b.status in ('no_show', 'cancelled') %}
+      {# Missed or cancelled — book them into the next same-day/time slot. #}
+      <form method="post" onsubmit="return confirm('Rebook {{ b.attendee.first_name }} into the next {{ b.class_instance.class_type.name }} at the same day and time? A fresh confirmation is sent.')" style="margin-left:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="booking_id" value="{{ b.id }}" />
+        <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="rebook">Rebook</button>
+      </form>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

@@ -132,12 +132,19 @@
       </form>
       {% endif %}
       {% if b.status in ('no_show', 'cancelled') %}
-      {# Missed or cancelled — book them into the next same-day/time slot. #}
-      <form method="post" onsubmit="return confirm('Rebook {{ b.attendee.first_name }} into the next {{ b.class_instance.class_type.name }} at the same day and time? A fresh confirmation is sent.')" style="margin-left:8px">
+      {# Missed or cancelled — pick an upcoming class and rebook. Defaults to
+         the soonest; a fresh confirmation is sent. #}
+      {% set opts = rebook_options.get(b.class_instance.class_type_id, []) %}
+      {% if opts %}
+      <form method="post" style="margin-left:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <input type="hidden" name="booking_id" value="{{ b.id }}" />
+        <select class="pf-input" name="instance_id" style="padding:7px 10px;font-size:13px;width:auto">
+          {% for i in opts %}<option value="{{ i.id }}">{{ i.local_date.strftime('%a %b %d') }} · {{ i.local_time.strftime('%I:%M %p').lstrip('0') }}{% if i.cohort_label %} · {{ i.cohort_label }}{% endif %}</option>{% endfor %}
+        </select>
         <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="rebook">Rebook</button>
       </form>
+      {% endif %}
       {% endif %}
     </div>
     {% endfor %}

@@ -976,25 +976,41 @@ def member_detail(user_id: int):
                 flash("That booking can't be rebooked.", "error")
                 return redirect(url_for("ops_admin.member_detail", user_id=u.id))
             old = bk.class_instance
-            q = db.session.query(ClassInstance).filter(
-                ClassInstance.client_account_id == u.client_account_id,
-                ClassInstance.status == InstanceStatus.scheduled.value,
-                ClassInstance.starts_at_utc > now_utc(),
-                ClassInstance.id != old.id,  # the NEXT one, not the missed one
-            )
-            if old.template_id:  # next same weekday+time slot
-                q = q.filter(ClassInstance.template_id == old.template_id)
-            else:  # one-off: next same class type (+ group if any)
-                q = q.filter(ClassInstance.class_type_id == old.class_type_id)
-                if old.cohort_label:
-                    q = q.filter(ClassInstance.cohort_label == old.cohort_label)
-            target = q.order_by(ClassInstance.starts_at_utc).first()
-            if target is None:
-                flash(
-                    f"No upcoming {old.class_type.name} class to rebook into.",
-                    "error",
+            chosen_id = request.form.get("instance_id", type=int)
+            if chosen_id:  # staff picked a specific class from the dropdown
+                target = db.session.get(ClassInstance, chosen_id)
+                if not (
+                    target
+                    and target.client_account_id == u.client_account_id
+                    and target.status == InstanceStatus.scheduled.value
+                    and target.starts_at_utc > now_utc()
+                ):
+                    flash("That class isn't available to book.", "error")
+                    return redirect(
+                        url_for("ops_admin.member_detail", user_id=u.id)
+                    )
+            else:  # default: the next occurrence of the same weekly slot
+                q = db.session.query(ClassInstance).filter(
+                    ClassInstance.client_account_id == u.client_account_id,
+                    ClassInstance.status == InstanceStatus.scheduled.value,
+                    ClassInstance.starts_at_utc > now_utc(),
+                    ClassInstance.id != old.id,
                 )
-                return redirect(url_for("ops_admin.member_detail", user_id=u.id))
+                if old.template_id:
+                    q = q.filter(ClassInstance.template_id == old.template_id)
+                else:
+                    q = q.filter(ClassInstance.class_type_id == old.class_type_id)
+                    if old.cohort_label:
+                        q = q.filter(ClassInstance.cohort_label == old.cohort_label)
+                target = q.order_by(ClassInstance.starts_at_utc).first()
+                if target is None:
+                    flash(
+                        f"No upcoming {old.class_type.name} class to rebook into.",
+                        "error",
+                    )
+                    return redirect(
+                        url_for("ops_admin.member_detail", user_id=u.id)
+                    )
             err = validate_bookable(
                 target, attendee=bk.attendee, for_trial=bk.kind == "trial"
             )
@@ -1165,6 +1181,30 @@ def member_detail(user_id: int):
     lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
     from ..services.tzutil import now_utc
 
+    # Rebook options: upcoming classes of the same type as any missed /
+    # cancelled booking, so staff can pick a different day/time.
+    rebook_type_ids = {
+        b.class_instance.class_type_id
+        for b in bookings
+        if b.status in (BookingStatus.no_show.value, BookingStatus.cancelled.value)
+    }
+    rebook_options: dict[int, list] = {}
+    if rebook_type_ids:
+        upcoming = (
+            db.session.query(ClassInstance)
+            .filter(
+                ClassInstance.client_account_id == u.client_account_id,
+                ClassInstance.status == InstanceStatus.scheduled.value,
+                ClassInstance.starts_at_utc > now_utc(),
+                ClassInstance.starts_at_utc < now_utc() + timedelta(days=21),
+                ClassInstance.class_type_id.in_(rebook_type_ids),
+            )
+            .order_by(ClassInstance.starts_at_utc)
+            .all()
+        )
+        for i in upcoming:
+            rebook_options.setdefault(i.class_type_id, []).append(i)
+
     return render_template(
         "ops/member_detail.html",
         u=u,
@@ -1175,6 +1215,7 @@ def member_detail(user_id: int):
         subs=subs,
         lead=lead,
         now=now_utc(),
+        rebook_options=rebook_options,
     )
 
 

@@ -1442,6 +1442,8 @@ def test_rebook_no_show_into_next_slot(app, client, client_account):
     staff = _admin(app)
     r = staff.get(f"/ops/members/{guardian_id}")
     assert b"Rebook" in r.data
+
+    # Default rebook (no instance chosen) → next occurrence of the same slot
     r = staff.post(
         f"/ops/members/{guardian_id}",
         data={"action": "rebook", "booking_id": str(booking.id)},
@@ -1459,9 +1461,32 @@ def test_rebook_no_show_into_next_slot(app, client, client_account):
     assert new.class_instance_id != instance.id  # a future instance
     assert new.class_instance.template_id == instance.template_id  # same slot
     assert new.lead_id == lead_id  # attribution preserved
+
+    # Selectable rebook: staff picks a specific upcoming instance
+    pick_id = new.class_instance_id  # the slot they were just booked into
+    new.status = BookingStatus.cancelled.value  # free them up again
+    db.session.commit()
+    pick = db.session.get(ClassInstance, pick_id)
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "rebook",
+            "booking_id": str(booking.id),
+            "instance_id": str(pick.id),
+        },
+        follow_redirects=True,
+    )
+    assert b"rebooked into" in r.data
+    assert (
+        db.session.query(Booking)
+        .filter_by(attendee_id=booking.attendee_id, class_instance_id=pick.id,
+                   status=BookingStatus.booked.value)
+        .count()
+        == 1
+    )
     after = (
         db.session.query(Message)
         .filter_by(template="booking_confirmation", channel="email")
         .count()
     )
-    assert after == before + 1  # fresh confirmation sent
+    assert after == before + 2  # a fresh confirmation for each rebook

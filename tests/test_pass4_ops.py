@@ -1490,3 +1490,50 @@ def test_rebook_no_show_into_next_slot(app, client, client_account):
         .count()
     )
     assert after == before + 2  # a fresh confirmation for each rebook
+
+
+def test_reschedule_upcoming_booking_releases_old_seat(app, client, client_account):
+    """A still-upcoming booked class can be rescheduled to another class:
+    the member moves, the original seat is released, one fresh confirmation."""
+    from app.services.scheduling import upcoming_instances
+
+    instance = _first_instance(client_account, "kids_7_10")
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    assert booking.status == BookingStatus.booked.value  # upcoming, live
+    guardian_id = booking.attendee.user_id
+
+    # pick a different upcoming instance of the same type
+    with app.test_request_context():
+        occ = upcoming_instances(client_account.id, class_type_id=instance.class_type_id)
+    target = next(o["instance"] for o in occ if o["instance"].id != instance.id)
+
+    staff = _admin(app)
+    r = staff.get(f"/ops/members/{guardian_id}")
+    assert b"Reschedule" in r.data
+    r = staff.post(
+        f"/ops/members/{guardian_id}",
+        data={
+            "action": "rebook",
+            "booking_id": str(booking.id),
+            "instance_id": str(target.id),
+        },
+        follow_redirects=True,
+    )
+    assert b"rescheduled to" in r.data
+
+    db.session.refresh(booking)
+    assert booking.status == BookingStatus.cancelled.value  # old seat released
+    moved = (
+        db.session.query(Booking)
+        .filter_by(attendee_id=booking.attendee_id, class_instance_id=target.id)
+        .one()
+    )
+    assert moved.status == BookingStatus.booked.value
+    # exactly one live booking for this attendee
+    assert (
+        db.session.query(Booking)
+        .filter_by(attendee_id=booking.attendee_id, status=BookingStatus.booked.value)
+        .count()
+        == 1
+    )

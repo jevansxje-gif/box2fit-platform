@@ -964,10 +964,11 @@ def member_detail(user_id: int):
             else:
                 flash("That booking cannot be cancelled.", "error")
         elif action == "rebook":
-            # A no-show/cancelled member wants back in: book the same
-            # attendee into the NEXT occurrence of that same weekly slot
-            # (same day + time), and send a fresh confirmation.
-            from ..services import booking_flow
+            # Rebook a no-show/cancelled booking, OR reschedule a still-
+            # upcoming booked one, into a chosen (or next same-slot) class.
+            # For a live future booking this also releases the old seat and
+            # offers it to any waitlist. A fresh confirmation is sent.
+            from ..services import booking_flow, waitlist
             from ..services.scheduling import validate_bookable
             from ..services.tzutil import fmt_local, now_utc
 
@@ -1043,11 +1044,24 @@ def member_detail(user_id: int):
                 )
                 db.session.add(new)
             db.session.flush()
+            # Reschedule: if the original was a live upcoming booking, release
+            # it (and offer the freed seat to any waitlist) so they're moved,
+            # not double-booked.
+            rescheduled = (
+                bk.id != new.id
+                and bk.status == BookingStatus.booked.value
+                and old.starts_at_utc > now_utc()
+            )
+            if rescheduled:
+                bk.status = BookingStatus.cancelled.value
+                bk.cancelled_at = utcnow()
+                waitlist.promote_next(old)
             booking_flow.send_booking_confirmation(new)
             db.session.commit()
+            verb = "rescheduled to" if rescheduled else "rebooked into"
             flash(
-                f"{bk.attendee.first_name} rebooked into "
-                f"{old.class_type.name} on "
+                f"{bk.attendee.first_name} {verb} "
+                f"{target.class_type.name} on "
                 f"{fmt_local(target.starts_at_utc, '%A %b %d · %I:%M %p')} — "
                 "confirmation sent.",
                 "success",
@@ -1181,12 +1195,17 @@ def member_detail(user_id: int):
     lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
     from ..services.tzutil import now_utc
 
-    # Rebook options: upcoming classes of the same type as any missed /
-    # cancelled booking, so staff can pick a different day/time.
+    # Rebook/reschedule options: upcoming classes of the same type as any
+    # missed/cancelled booking, or any still-upcoming booked one (reschedule).
+    _now = now_utc()
     rebook_type_ids = {
         b.class_instance.class_type_id
         for b in bookings
         if b.status in (BookingStatus.no_show.value, BookingStatus.cancelled.value)
+        or (
+            b.status == BookingStatus.booked.value
+            and b.class_instance.starts_at_utc > _now
+        )
     }
     rebook_options: dict[int, list] = {}
     if rebook_type_ids:

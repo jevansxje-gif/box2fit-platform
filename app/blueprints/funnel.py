@@ -304,6 +304,107 @@ def ad_invite(token: str):
     return resp
 
 
+@bp.route("/membership/start/<token>", methods=["GET", "POST"])
+def membership_pay(token: str):
+    """Booking-less membership payment setup: for a phone/other-app member
+    who is billed through us for tracking + commission, but whose classes
+    live in the gym's own app. Staff send this signed link; the member adds
+    a card and a recurring membership starts on our Stripe."""
+    from datetime import date as _date
+
+    from ..models import (
+        AttendeeProfile,
+        PaymentMethodStatus,
+        Plan,
+        Subscription,
+        SubscriptionStatus,
+    )
+    from ..services import billing
+    from ..services.signed_links import SALT_MEMBERSHIP_SETUP, read_payload_token
+    from ..services.tax import price_with_gst_label
+
+    data = read_payload_token(token, SALT_MEMBERSHIP_SETUP)
+    if not data:
+        abort(404)
+    attendee = db.session.get(AttendeeProfile, data.get("aid"))
+    if attendee is None:
+        abort(404)
+    guardian = attendee.guardian
+    plan = db.session.get(Plan, data.get("plan")) or billing.default_plan(
+        attendee.client_account_id
+    )
+    charge_on = (
+        _date.fromisoformat(data["charge_on"]) if data.get("charge_on") else None
+    )
+
+    live = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.attendee_id == attendee.id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.pending.value,
+                    SubscriptionStatus.active.value,
+                    SubscriptionStatus.past_due.value,
+                ]
+            ),
+        )
+        .count()
+    )
+    if live:
+        return render_template(
+            "funnel/membership_pay.html", done=True, guardian=guardian
+        )
+
+    from ..models import StripeCustomer
+
+    customer = (
+        db.session.query(StripeCustomer).filter_by(user_id=guardian.id).one_or_none()
+    )
+    vaulted = (
+        customer is not None
+        and customer.payment_method_status == PaymentMethodStatus.vaulted.value
+    )
+
+    # Returning from Stripe after a successful card save, or a card already on
+    # file → confirm and start the recurring membership (no new SetupIntent).
+    if request.args.get("redirect_status") == "succeeded" or vaulted:
+        if customer and not vaulted and stripe_service.is_configured():
+            stripe_service.confirm_setup_intent_vaulted(customer)
+            db.session.commit()
+            vaulted = (
+                customer.payment_method_status == PaymentMethodStatus.vaulted.value
+            )
+        if vaulted:
+            try:
+                billing.activate_subscription(
+                    attendee, plan=plan, actor="payment_link",
+                    first_charge_on=charge_on,
+                )
+                db.session.commit()
+                return render_template(
+                    "funnel/membership_pay.html", done=True, guardian=guardian
+                )
+            except billing.ActivationError as exc:
+                flash(str(exc), "error")
+
+    # Need a card: mint the SetupIntent and render the Stripe form.
+    customer, client_secret = stripe_service.ensure_customer_with_setup_intent(
+        guardian
+    )
+    db.session.commit()
+    return render_template(
+        "funnel/membership_pay.html",
+        done=False,
+        guardian=guardian,
+        price_label=price_with_gst_label(plan.price_cents) if plan else "",
+        charge_on=charge_on,
+        stripe_publishable_key=current_app.config["STRIPE_PUBLISHABLE_KEY"],
+        client_secret=client_secret,
+        stripe_configured=stripe_service.is_configured(),
+    )
+
+
 @bp.get("/<slug>")
 def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""

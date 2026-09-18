@@ -850,6 +850,109 @@ def invite_from_ad():
     return redirect(url_for("ops_admin.members"))
 
 
+@bp.post("/members/payment-link")
+@staff_required
+def send_payment_link():
+    """Phone/other-app member: create them here and email/text a link to set
+    up a recurring membership on our Stripe. Classes stay in the gym's own
+    app; we hold the billing so it's tracked and commissioned."""
+    from datetime import date as _date
+
+    from ..models import (
+        AttendeeKind,
+        AttendeeProfile,
+        Lead,
+        LeadStatus,
+    )
+    from ..services import booking_flow
+    from ..services.billing import default_plan
+    from ..services.messaging import send_email, send_sms
+    from ..services.signed_links import SALT_MEMBERSHIP_SETUP, make_payload_token
+    from ..services.tax import price_with_gst_label
+    from ..services.urls import absolute_url
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    phone = (request.form.get("phone") or "").strip()
+    segment = request.form.get("segment") or ""
+    if not name or "@" not in email or "." not in email.split("@")[-1]:
+        flash("A name and valid email are required to send a payment link.", "error")
+        return redirect(url_for("ops_admin.members"))
+    plan = default_plan(_cid())
+    if plan is None:
+        flash("No active plan is configured to bill against.", "error")
+        return redirect(url_for("ops_admin.members"))
+
+    guardian = booking_flow.get_or_create_guardian(
+        _cid(), name=name, email=email, phone=phone or "",
+        consent_email=True, consent_sms=bool(phone),
+    )
+    db.session.flush()
+    attendee = (
+        db.session.query(AttendeeProfile)
+        .filter_by(user_id=guardian.id, kind=AttendeeKind.self_.value)
+        .one_or_none()
+    )
+    if attendee is None:
+        attendee = AttendeeProfile(
+            client_account_id=_cid(), user_id=guardian.id,
+            kind=AttendeeKind.self_.value, first_name=name.split(" ")[0],
+        )
+        db.session.add(attendee)
+        db.session.flush()
+
+    # Attribution: a phoned-in ad enquiry — tracked, and honest that it came
+    # by phone rather than a click (shows as call-in on the Marketing page).
+    seg = segment if segment in {s for s, _ in AD_INVITE_SEGMENTS} else None
+    db.session.add(
+        Lead(
+            client_account_id=_cid(), user_id=guardian.id, name=name,
+            email=email, phone=phone or "", segment=seg,
+            status=LeadStatus.new.value, utm_source="meta", utm_medium="phone",
+            utm_campaign=seg, utm_content="call-in", first_touch_at=utcnow(),
+        )
+    )
+
+    raw = (request.form.get("first_charge_on") or "").strip()
+    charge_on = None
+    if raw:
+        try:
+            when = _date.fromisoformat(raw)
+            if when > today_local():
+                charge_on = when
+        except ValueError:
+            charge_on = None
+
+    token = make_payload_token(
+        {
+            "aid": attendee.id,
+            "plan": plan.id,
+            "charge_on": charge_on.isoformat() if charge_on else None,
+        },
+        SALT_MEMBERSHIP_SETUP,
+    )
+    link = absolute_url("funnel.membership_pay", token=token)
+    html = render_template(
+        "emails/payment_link.html",
+        name=name, price_label=price_with_gst_label(plan.price_cents), link=link,
+    )
+    send_email(guardian, email, "Set up your Box2Fit membership", html,
+               "payment_link", _cid())
+    if phone:
+        send_sms(
+            guardian, phone,
+            f"Box2Fit: set up your membership payment here — {link}",
+            "payment_link", _cid(), transactional=True,
+        )
+    db.session.commit()
+    flash(
+        f"Payment link sent to {email}" + (" and texted" if phone else "")
+        + " — the membership bills through us once they add a card.",
+        "success",
+    )
+    return redirect(url_for("ops_admin.members"))
+
+
 def _member_row(u: User) -> dict:
     subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
     status = "trial"

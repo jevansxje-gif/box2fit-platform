@@ -1537,3 +1537,65 @@ def test_reschedule_upcoming_booking_releases_old_seat(app, client, client_accou
         .count()
         == 1
     )
+
+
+def test_payment_link_creates_billed_membership(app, client, client_account):
+    """Send-payment-link makes a member + attributed lead + payment-setup
+    link; following it with a card on file starts a recurring membership
+    (tracked, commissionable) — no class booking involved."""
+    from app.models import (
+        AttendeeProfile,
+        Lead,
+        Message,
+        PaymentMethodStatus,
+        StripeCustomer,
+        Subscription,
+        User,
+    )
+    from app.services.signed_links import SALT_MEMBERSHIP_SETUP, read_payload_token
+
+    staff = _admin(app)
+    r = staff.get("/ops/members")
+    assert b"Send payment link" in r.data
+
+    r = staff.post(
+        "/ops/members/payment-link",
+        data={"name": "Casey Caller", "email": "casey@example.com",
+              "phone": "", "segment": "beast"},
+        follow_redirects=True,
+    )
+    assert b"Payment link sent" in r.data
+    guardian = db.session.query(User).filter_by(email="casey@example.com").one()
+    att = db.session.query(AttendeeProfile).filter_by(user_id=guardian.id).one()
+    assert att.kind == "self"
+    lead = db.session.query(Lead).filter_by(user_id=guardian.id).one()
+    assert lead.utm_source == "meta" and lead.utm_medium == "phone"
+    assert lead.utm_campaign == "beast" and lead.utm_content == "call-in"
+
+    msg = db.session.query(Message).filter_by(template="payment_link").one()
+    token = re.search(r"/membership/start/([\w.\-]+)", msg.body_preview).group(1)
+    assert read_payload_token(token, SALT_MEMBERSHIP_SETUP)["aid"] == att.id
+
+    # No subscription until a card is on file
+    assert db.session.query(Subscription).filter_by(user_id=guardian.id).count() == 0
+
+    # Simulate the member having saved a card (Stripe unconfigured in tests,
+    # so activation creates the local subscription without live Stripe calls).
+    db.session.add(
+        StripeCustomer(
+            user_id=guardian.id, stripe_customer_id="cus_pl",
+            payment_method_status=PaymentMethodStatus.vaulted.value,
+        )
+    )
+    db.session.commit()
+
+    visitor = app.test_client()
+    r = visitor.get(f"/membership/start/{token}", follow_redirects=True)
+    assert b"all set" in r.data.lower()
+    subs = db.session.query(Subscription).filter_by(user_id=guardian.id).all()
+    assert len(subs) == 1 and subs[0].attendee_id == att.id
+    assert subs[0].mrr_cents == 18900  # Gold plan, billed through us
+
+    # Idempotent: revisiting doesn't double-subscribe
+    visitor.get(f"/membership/start/{token}", follow_redirects=True)
+    assert db.session.query(Subscription).filter_by(user_id=guardian.id).count() == 1

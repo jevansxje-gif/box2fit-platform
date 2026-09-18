@@ -13,6 +13,7 @@ SALT_UPDATE_CARD = "update-card"
 SALT_ACTIVATE = "activate-membership"
 SALT_CONFIRM_ATTEND = "confirm-attendance"
 SALT_AD_INVITE = "ad-invite"
+SALT_MEMBERSHIP_SETUP = "membership-setup"
 
 MAX_AGE = 60 * 60 * 24 * 90  # 90 days default
 

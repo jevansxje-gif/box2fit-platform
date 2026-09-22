@@ -281,6 +281,50 @@ def test_e2e_money_lifecycle(app, client, client_account):
     assert sub.cancelled_at is not None
 
 
+def test_invoice_payment_paid_event_records(app, client, client_account, monkeypatch):
+    """This account's live endpoint sends the NEWER `invoice_payment.paid`
+    event (an InvoicePayment object, only an `invoice` reference) for
+    successful charges â€” not the classic `invoice.paid` our handler was keyed
+    to. The adapter fetches the full invoice and records it through the same
+    path, so payment + 25% commission land and the member goes active.
+    Regression guard for the silent no-record bug found Sep 2026."""
+    _setup_member(app, client, client_account)
+    sub = db.session.query(Subscription).one()
+    sub.stripe_subscription_id = "sub_ip_1"
+    db.session.commit()
+
+    invoice_json = json.dumps({
+        "id": "in_ip_1", "subscription": "sub_ip_1",
+        "amount_paid": 18900, "currency": "cad", "charge": "ch_ip_1",
+    })
+
+    class _FakeInvoice:
+        @staticmethod
+        def retrieve(inv_id):
+            assert inv_id == "in_ip_1"
+            return invoice_json  # str(...) yields JSON, like a StripeObject
+
+    class _FakeStripe:
+        api_version = None
+        Invoice = _FakeInvoice
+
+    from app.services import billing as billing_mod
+    monkeypatch.setattr(billing_mod.stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        billing_mod.stripe_service, "stripe_client", lambda: _FakeStripe()
+    )
+
+    # The event object is an InvoicePayment: only an `invoice` reference.
+    _webhook(client, "invoice_payment.paid", {"invoice": "in_ip_1"})
+
+    db.session.refresh(sub)
+    payment = db.session.query(Payment).filter_by(stripe_invoice_id="in_ip_1").one()
+    assert payment.status == "paid"
+    assert payment.amount_cents == 18900
+    assert payment.agency_share_cents == round(18900 * 0.25)  # 4725
+    assert sub.status == SubscriptionStatus.active.value
+
+
 def test_no_card_falls_back_to_activation_email(app, client, client_account):
     """Without a vaulted card, attendance can't auto-start â€” the 'Loved it?'
     email with the activate link goes out instead, and the link works once a

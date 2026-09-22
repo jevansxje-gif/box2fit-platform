@@ -449,6 +449,27 @@ def handle_invoice_paid(obj: dict) -> Payment | None:
     return payment
 
 
+def handle_invoice_payment_paid(obj: dict) -> Payment | None:
+    """Adapter for Stripe's newer `invoice_payment.paid` event, which this
+    account's webhook endpoint sends for successful charges instead of the
+    classic `invoice.paid`. Its object is an InvoicePayment (only an `invoice`
+    reference — no subscription/tax/lines), so we fetch the full invoice on the
+    pinned API version and hand it to the invoice.paid handler unchanged."""
+    import json
+
+    inv_ref = obj.get("invoice")
+    if isinstance(inv_ref, dict):  # expanded — already the invoice
+        return handle_invoice_paid(inv_ref)
+    if not inv_ref or not stripe_service.is_configured():
+        return None
+    st = stripe_service.stripe_client()
+    # The handler reads top-level subscription/tax/period_end/lines — shapes
+    # the account-default (newer) API version drops, so pin the old one.
+    st.api_version = "2019-09-09"
+    invoice = json.loads(str(st.Invoice.retrieve(inv_ref)))
+    return handle_invoice_paid(invoice)
+
+
 def handle_invoice_payment_failed(obj: dict) -> None:
     sub_id = obj.get("subscription")
     if not sub_id:

@@ -82,6 +82,8 @@ def stripe_webhook():
     handlers = {
         "setup_intent.succeeded": billing.handle_setup_intent_succeeded,
         "invoice.paid": billing.handle_invoice_paid,
+        # This account's endpoint sends the newer name for successful charges.
+        "invoice_payment.paid": billing.handle_invoice_payment_paid,
         "invoice.payment_failed": billing.handle_invoice_payment_failed,
         "customer.subscription.deleted": billing.handle_subscription_deleted,
         "charge.refunded": billing.handle_charge_refunded,

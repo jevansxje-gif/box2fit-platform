@@ -1,7 +1,7 @@
-"""Backfill Payment rows (and activate subscriptions + record the agency
-commission) from Stripe's paid invoices, for charges the invoice.paid
-webhook missed. Idempotent — handle_invoice_paid skips invoices already
-recorded, so this is safe to run repeatedly.
+"""Backfill Payment rows from Stripe for charges the webhooks missed —
+both successful (records payment + commission, activates the sub) and
+FAILED attempts (records a 'failed' row for the reconciliation ledger,
+without re-sending dunning). Idempotent — safe to run repeatedly.
 
     .venv/bin/python -m scripts.backfill_payments          # report only
     .venv/bin/python -m scripts.backfill_payments --write  # apply
@@ -11,7 +11,7 @@ import sys
 
 from app import create_app
 from app.extensions import db
-from app.models import Payment, Subscription
+from app.models import ClientAccount, Payment, Subscription
 from app.services import billing
 from app.services.stripe_service import is_configured, stripe_client
 
@@ -32,37 +32,72 @@ with app.app_context():
         .all()
     )
     before = db.session.query(Payment).count()
-    processed = 0
+    recorded_paid = recorded_failed = 0
     for s in subs:
         invoices = st.Invoice.list(
-            subscription=s.stripe_subscription_id, status="paid", limit=100
-        )
+            subscription=s.stripe_subscription_id, limit=100
+        )  # all statuses, so we see failures too
         for inv in invoices.auto_paging_iter():
             # Stripe objects don't expose .get() here — use plain dicts.
             invd = json.loads(str(inv))
-            already = (
+            inv_id = invd.get("id")
+            existing = (
                 db.session.query(Payment)
-                .filter_by(stripe_invoice_id=invd.get("id"))
+                .filter_by(stripe_invoice_id=inv_id)
                 .one_or_none()
             )
-            if already:
-                continue
-            amt = invd.get("amount_paid", 0) / 100
-            tax = (invd.get("tax") or 0) / 100
-            print(
-                f"  sub {s.id} | invoice {invd.get('id')} | "
-                f"${amt} paid (tax ${tax})"
-                + ("  -> recording" if WRITE else "  (report only)")
-            )
-            if WRITE:
-                p = billing.handle_invoice_paid(invd)
-                if p is not None:
-                    processed += 1
+            status = invd.get("status")
+
+            if status == "paid":
+                amt = invd.get("amount_paid", 0)
+                if amt <= 0:
+                    continue  # $0 trial-start invoice — skip
+                if existing and existing.status == "paid":
+                    continue
+                print(
+                    f"  sub {s.id} | {inv_id} | ${amt / 100} PAID"
+                    + ("  -> recording" if WRITE else "  (report only)")
+                )
+                if WRITE and billing.handle_invoice_paid(invd) is not None:
+                    recorded_paid += 1
+
+            elif status in ("open", "uncollectible") and (
+                invd.get("attempt_count") or 0
+            ) > 0:
+                # A finalized invoice that has failed at least one charge.
+                amt = invd.get("amount_due") or invd.get("total") or 0
+                if amt <= 0 or existing:
+                    continue
+                print(
+                    f"  sub {s.id} | {inv_id} | ${amt / 100} FAILED"
+                    + ("  -> recording" if WRITE else "  (report only)")
+                )
+                if WRITE:
+                    db.session.add(
+                        Payment(
+                            client_account_id=s.client_account_id,
+                            user_id=s.user_id,
+                            subscription_id=s.id,
+                            stripe_invoice_id=inv_id,
+                            stripe_charge_id=invd.get("charge"),
+                            amount_cents=amt,
+                            tax_cents=invd.get("tax") or 0,
+                            currency=(invd.get("currency") or "cad").upper(),
+                            status="failed",
+                            agency_share_cents=0,
+                            note="payment failed — recorded on backfill",
+                        )
+                    )
+                    recorded_failed += 1
     if WRITE:
         db.session.commit()
     after = db.session.query(Payment).count()
     print("---")
     print(
         f"payments before: {before} | after: {after}"
-        + (f" | recorded {processed}" if WRITE else " | rerun with --write to apply")
+        + (
+            f" | recorded {recorded_paid} paid + {recorded_failed} failed"
+            if WRITE
+            else " | rerun with --write to apply"
+        )
     )

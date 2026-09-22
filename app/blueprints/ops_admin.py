@@ -871,17 +871,23 @@ def send_payment_link():
     from ..services.tax import price_with_gst_label
     from ..services.urls import absolute_url
 
+    # Return to whichever screen the tool was used from (Members or Payments).
+    back = url_for(
+        "ops_admin.payments"
+        if request.form.get("return_to") == "payments"
+        else "ops_admin.members"
+    )
     name = (request.form.get("name") or "").strip()
     email = (request.form.get("email") or "").strip().lower()
     phone = (request.form.get("phone") or "").strip()
     segment = request.form.get("segment") or ""
     if not name or "@" not in email or "." not in email.split("@")[-1]:
         flash("A name and valid email are required to send a payment link.", "error")
-        return redirect(url_for("ops_admin.members"))
+        return redirect(back)
     plan = default_plan(_cid())
     if plan is None:
         flash("No active plan is configured to bill against.", "error")
-        return redirect(url_for("ops_admin.members"))
+        return redirect(back)
 
     guardian = booking_flow.get_or_create_guardian(
         _cid(), name=name, email=email, phone=phone or "",
@@ -950,7 +956,7 @@ def send_payment_link():
         + " — the membership bills through us once they add a card.",
         "success",
     )
-    return redirect(url_for("ops_admin.members"))
+    return redirect(back)
 
 
 def _member_row(u: User) -> dict:
@@ -1445,7 +1451,7 @@ def payments():
     }
     return render_template(
         "ops/payments.html", rows=rows, members=members, totals=totals,
-        status=status,
+        status=status, invite_segments=AD_INVITE_SEGMENTS,
     )
 
 

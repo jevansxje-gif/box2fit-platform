@@ -1638,3 +1638,19 @@ def test_payments_page_failed_then_paid_and_reconcile(app, client, client_accoun
     assert b"Payments" in r.data and b"pay@example.com" in r.data
     r = staff.get("/ops/payments?format=csv")
     assert b"your_25pct" in r.data and b"in_pay1" in r.data
+
+
+def test_payment_link_from_payments_page_returns_there(app, client, client_account):
+    """The payment-link tool on the Payments screen returns to Payments."""
+    staff = _admin(app)
+    r = staff.get("/ops/payments")
+    assert b"Send a payment link" in r.data
+    r = staff.post(
+        "/ops/members/payment-link",
+        data={"name": "Dana Dialer", "email": "dana@example.com",
+              "phone": "", "segment": "", "return_to": "payments"},
+        follow_redirects=True,
+    )
+    assert b"Payment link sent" in r.data
+    # landed back on the Payments ledger, not the Members directory
+    assert b"reconciling against Stripe" in r.data

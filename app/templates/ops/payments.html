@@ -11,6 +11,39 @@
   </div>
   <p style="color:var(--pf-text-2);margin:0 0 16px;font-size:14px">Every charge we attempt, newest first, with the processor's outcome — for reconciling against Stripe.</p>
 
+  {# Ad-referred person who joined via the gym's app, not the site: bill their
+     membership through us so we earn the commission. Same tool as Members. #}
+  <button type="button" class="pf-btn pf-btn--dark pf-btn--sm" style="margin-bottom:12px" onclick="document.getElementById('pay-link').hidden = !document.getElementById('pay-link').hidden">+ Send a payment link</button>
+  <form id="pay-link" method="post" action="{{ url_for('ops_admin.send_payment_link') }}" hidden style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="hidden" name="return_to" value="payments" />
+    <div>
+      <label class="pf-label" style="font-size:12px">Full name</label>
+      <input class="pf-input" name="name" required placeholder="Alex Rivera" style="min-width:180px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Email</label>
+      <input class="pf-input" name="email" type="email" required placeholder="member@example.com" style="min-width:220px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Mobile (optional — also texts the link)</label>
+      <input class="pf-input" name="phone" type="tel" placeholder="(604) 555-0123" style="width:180px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">From which ad (optional)</label>
+      <select class="pf-input" name="segment" style="min-width:180px">
+        <option value="">— not from an ad —</option>
+        {% for value, label in invite_segments %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">First charge on (optional)</label>
+      <input class="pf-input" type="date" name="first_charge_on" style="width:auto" />
+    </div>
+    <button class="pf-btn pf-btn--dark pf-btn--sm">Send payment link</button>
+    <p class="note" style="width:100%;margin:4px 0 0;color:var(--pf-text-3);font-size:12.5px">Emails (and texts) a link to add a card. Their membership then bills through us — tracked here — so we earn commission on ad-referred members even when classes stay in the gym's own app.</p>
+  </form>
+
   <div class="cards-3" style="margin:0 0 16px">
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Collected (net of refunds)</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.collected) }}</div><div style="color:var(--pf-text-3);font-size:12.5px">{{ totals.paid }} successful payment(s)</div></div>
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-red)">Your commission (25%)</div><div style="font-size:26px;font-weight:800;color:var(--pf-red);font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.commission) }}</div></div>

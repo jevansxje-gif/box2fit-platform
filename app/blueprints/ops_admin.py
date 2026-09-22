@@ -1052,6 +1052,31 @@ def member_detail(user_id: int):
             u.invited_at = utcnow()
             db.session.commit()
             flash("Invite re-sent.", "success")
+        elif action == "send_card_link":
+            # "I need to change my card" — same secure Stripe Elements page
+            # the dunning email uses, sent on request (no failed payment
+            # needed, no password needed). Neutral wording, not a dunning.
+            from ..services.billing import card_update_url
+
+            url = card_update_url(u)
+            send_email(
+                u, u.email, "Your card update link — Box2Fit",
+                render_template("emails/card_update.html", guardian=u, update_url=url),
+                "card_update", _cid(),
+            )
+            if u.phone:
+                send_sms(
+                    u, u.phone,
+                    f"Box2Fit: here's your secure link to update the card on "
+                    f"your membership (takes a minute): {url}",
+                    "card_update", _cid(),
+                )
+            db.session.commit()
+            flash(
+                f"Card update link sent to {u.email}"
+                + (" and texted." if u.phone else "."),
+                "success",
+            )
         elif action == "password_reset":
             from .portal import send_password_reset
 

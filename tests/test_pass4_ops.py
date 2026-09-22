@@ -1654,3 +1654,33 @@ def test_payment_link_from_payments_page_returns_there(app, client, client_accou
     assert b"Payment link sent" in r.data
     # landed back on the Payments ledger, not the Members directory
     assert b"reconciling against Stripe" in r.data
+
+
+def test_send_card_update_link_from_member_page(app, client, client_account):
+    """A member phones the desk to change their card: one click on the member
+    page emails (and texts) the same secure signed card page the dunning flow
+    uses — no failed payment or password required, neutral wording."""
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian = db.session.get(User, booking.attendee.user_id)
+
+    staff = _admin(app)
+    r = staff.get(f"/ops/members/{guardian.id}")
+    assert b"Send card update link" in r.data
+
+    r = staff.post(
+        f"/ops/members/{guardian.id}",
+        data={"action": "send_card_link"},
+        follow_redirects=True,
+    )
+    assert b"Card update link sent" in r.data
+    email = db.session.query(Message).filter_by(template="card_update", channel="email").one()
+    assert "/portal/card/" in email.body_preview
+    assert "didn't go through" not in email.body_preview  # not a dunning
+    token = re.search(r"/portal/card/([\w\-\.]+)", email.body_preview).group(1)
+    r = client.get(f"/portal/card/{token}")  # link works without login
+    assert r.status_code == 200
+    if guardian.phone:
+        sms = db.session.query(Message).filter_by(template="card_update", channel="sms").one()
+        assert "/portal/card/" in sms.body_preview

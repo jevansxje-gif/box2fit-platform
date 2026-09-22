@@ -1397,7 +1397,9 @@ def payments():
     status = request.args.get("status") or ""
     q = (
         db.session.query(Payment)
-        .filter(Payment.client_account_id == _cid())
+        # $0 rows are trial-start invoices (no money moves) — hide them so
+        # the ledger only shows real charges to reconcile.
+        .filter(Payment.client_account_id == _cid(), Payment.amount_cents > 0)
         .order_by(Payment.created_at.desc())
     )
     if status in ("paid", "failed", "refunded"):

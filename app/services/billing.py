@@ -392,27 +392,29 @@ def handle_invoice_paid(obj: dict) -> Payment | None:
     if sub is None:
         log.warning("invoice.paid for unknown subscription %s", sub_id)
         return None
+    client = db.session.get(ClientAccount, sub.client_account_id)
     existing = (
         db.session.query(Payment).filter_by(stripe_invoice_id=invoice_id).one_or_none()
     )
-    if existing:
+    if existing and existing.status == "paid":
         return existing  # idempotent on redelivery
-
-    client = db.session.get(ClientAccount, sub.client_account_id)
-    payment = Payment(
+    payment = existing or Payment(
         client_account_id=sub.client_account_id,
         user_id=sub.user_id,
         subscription_id=sub.id,
         stripe_invoice_id=invoice_id,
-        stripe_charge_id=obj.get("charge"),
-        amount_cents=amount,
-        tax_cents=tax,
-        currency=(obj.get("currency") or "cad").upper(),
-        status="paid",
-        agency_share_cents=round(max(0, amount - tax) * client.commission_rate),
-        paid_at=utcnow(),
     )
-    db.session.add(payment)
+    # A retry that finally succeeds promotes the earlier 'failed' row to paid.
+    payment.stripe_charge_id = obj.get("charge")
+    payment.amount_cents = amount
+    payment.tax_cents = tax
+    payment.currency = (obj.get("currency") or "cad").upper()
+    payment.status = "paid"
+    payment.agency_share_cents = round(max(0, amount - tax) * client.commission_rate)
+    payment.paid_at = utcnow()
+    payment.note = None
+    if existing is None:
+        db.session.add(payment)
 
     first_payment = sub.activated_at is None
     was_past_due = sub.status == SubscriptionStatus.past_due.value
@@ -459,6 +461,32 @@ def handle_invoice_payment_failed(obj: dict) -> None:
     if sub is None:
         return
     sub.status = SubscriptionStatus.past_due.value
+    # Record the failed attempt so admins can reconcile it (upsert on the
+    # invoice — a later retry that succeeds promotes this same row to paid).
+    invoice_id = obj.get("id")
+    amount = obj.get("amount_due") or obj.get("total") or 0
+    if invoice_id:
+        pay = (
+            db.session.query(Payment)
+            .filter_by(stripe_invoice_id=invoice_id)
+            .one_or_none()
+        )
+        if pay is None:
+            pay = Payment(
+                client_account_id=sub.client_account_id,
+                user_id=sub.user_id,
+                subscription_id=sub.id,
+                stripe_invoice_id=invoice_id,
+            )
+            db.session.add(pay)
+        if pay.status != "paid":
+            pay.amount_cents = amount
+            pay.tax_cents = obj.get("tax") or 0
+            pay.currency = (obj.get("currency") or "cad").upper()
+            pay.status = "failed"
+            pay.agency_share_cents = 0
+            pay.stripe_charge_id = obj.get("charge")
+            pay.note = "payment failed — card declined or expired"
     guardian = db.session.get(User, sub.user_id)
     attendee = db.session.get(AttendeeProfile, sub.attendee_id)
     update_url = card_update_url(guardian)

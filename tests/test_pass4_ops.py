@@ -1599,3 +1599,42 @@ def test_payment_link_creates_billed_membership(app, client, client_account):
     # Idempotent: revisiting doesn't double-subscribe
     visitor.get(f"/membership/start/{token}", follow_redirects=True)
     assert db.session.query(Subscription).filter_by(user_id=guardian.id).count() == 1
+
+
+def test_payments_page_failed_then_paid_and_reconcile(app, client, client_account):
+    """Failed charges are recorded (past_due + a 'failed' payment row); a
+    retry that succeeds promotes the same row to paid with commission; the
+    admin Payments page and its CSV show it for reconciliation."""
+    from app.models import Payment, Subscription
+
+    guardian, child = _make_member(client_account, email="pay@example.com")
+    sub = db.session.query(Subscription).filter_by(user_id=guardian.id).one()
+    sub.stripe_subscription_id = "sub_pay1"
+    db.session.commit()
+
+    # a failed invoice → past_due + a 'failed' payment row (no commission)
+    _webhook(client, "invoice.payment_failed", {
+        "id": "in_pay1", "subscription": "sub_pay1",
+        "amount_due": 19845, "tax": 945,
+    })
+    p = db.session.query(Payment).filter_by(stripe_invoice_id="in_pay1").one()
+    assert p.status == "failed" and p.amount_cents == 19845
+    assert p.agency_share_cents == 0
+    db.session.refresh(sub)
+    assert sub.status == SubscriptionStatus.past_due.value
+
+    # the retry succeeds → SAME row promoted to paid, commission booked
+    _webhook(client, "invoice.paid", {
+        "id": "in_pay1", "subscription": "sub_pay1",
+        "amount_paid": 19845, "tax": 945, "charge": "ch_1",
+    })
+    assert db.session.query(Payment).filter_by(stripe_invoice_id="in_pay1").count() == 1
+    db.session.refresh(p)
+    assert p.status == "paid" and p.agency_share_cents == 4725
+
+    # admin Payments page shows it; CSV exports for reconciliation
+    staff = _admin(app)
+    r = staff.get("/ops/payments")
+    assert b"Payments" in r.data and b"pay@example.com" in r.data
+    r = staff.get("/ops/payments?format=csv")
+    assert b"your_25pct" in r.data and b"in_pay1" in r.data

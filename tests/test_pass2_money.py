@@ -260,7 +260,10 @@ def test_e2e_money_lifecycle(app, client, client_account):
     with app.test_request_context():
         err = validate_bookable(_first_instance(client_account), attendee=attendee)
     assert err is None
-    assert db.session.query(Payment).count() == 2
+    # Two successful charges recorded, plus the failed attempt (kept for the
+    # admin payments/reconciliation view).
+    assert db.session.query(Payment).filter_by(status="paid").count() == 2
+    assert db.session.query(Payment).filter_by(status="failed").count() == 1
 
     # 5. refund reverses the agency share on the net
     _webhook(client, "charge.refunded", {

@@ -1381,6 +1381,74 @@ def marketing():
 
 
 # ---------------------------------------------------------------- reports ---
+@bp.get("/payments")
+@admin_required
+def payments():
+    """Live payments ledger for reconciliation: every charge we attempt,
+    newest first, with the processor's outcome (paid / failed / refunded)."""
+    from ..models import Payment
+
+    status = request.args.get("status") or ""
+    q = (
+        db.session.query(Payment)
+        .filter(Payment.client_account_id == _cid())
+        .order_by(Payment.created_at.desc())
+    )
+    if status in ("paid", "failed", "refunded"):
+        q = q.filter(Payment.status == status)
+    rows = q.limit(500).all()
+
+    if request.args.get("format") == "csv":
+        import csv
+        import io
+
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(
+            ["when", "member", "email", "status", "amount", "gst",
+             "your_25pct", "refunded", "invoice", "charge", "note"]
+        )
+        for p in rows:
+            member = db.session.get(User, p.user_id)
+            w.writerow([
+                fmt_local(p.created_at, "%Y-%m-%d %H:%M"),
+                member.name if member else "",
+                member.email if member else "",
+                p.status,
+                f"{p.amount_cents / 100:.2f}",
+                f"{p.tax_cents / 100:.2f}",
+                f"{p.agency_share_cents / 100:.2f}",
+                f"{p.refunded_cents / 100:.2f}",
+                p.stripe_invoice_id or "",
+                p.stripe_charge_id or "",
+                p.note or "",
+            ])
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=box2fit-payments.csv"},
+        )
+
+    members = {
+        m.id: m
+        for m in db.session.query(User).filter(
+            User.id.in_([p.user_id for p in rows] or [0])
+        )
+    }
+    paid = [p for p in rows if p.status == "paid"]
+    totals = {
+        "collected": sum(p.amount_cents - p.refunded_cents for p in paid) / 100,
+        "commission": sum(p.agency_share_cents for p in paid) / 100,
+        "paid": len(paid),
+        "failed": sum(1 for p in rows if p.status == "failed"),
+        "refunded": sum(1 for p in rows if p.status == "refunded"),
+    }
+    return render_template(
+        "ops/payments.html", rows=rows, members=members, totals=totals,
+        status=status,
+    )
+
+
 @bp.get("/reports")
 @admin_required
 def reports():

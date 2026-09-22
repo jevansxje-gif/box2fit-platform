@@ -543,10 +543,12 @@ class Payment(db.Model):
     amount_cents: Mapped[int] = mapped_column(Integer)  # total collected, tax incl.
     tax_cents: Mapped[int] = mapped_column(Integer, default=0)  # GST portion
     currency: Mapped[str] = mapped_column(String(3), default="CAD")
-    status: Mapped[str] = mapped_column(String(15), default="paid")
+    status: Mapped[str] = mapped_column(String(15), default="paid")  # paid|failed|refunded
     agency_share_cents: Mapped[int] = mapped_column(Integer, default=0)  # 25% of pre-tax
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
     refunded_cents: Mapped[int] = mapped_column(Integer, default=0)
+    # Processor message for reconciliation — e.g. a decline reason on failure.
+    note: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Payments — Box2Fit Ops{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="60" />{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1040px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">
+    <h1 class="pf-h1" style="margin:0">Payments</h1>
+    <span style="color:var(--pf-text-3);font-size:12.5px">Updates as payments arrive · this page refreshes every minute</span>
+  </div>
+  <p style="color:var(--pf-text-2);margin:0 0 16px;font-size:14px">Every charge we attempt, newest first, with the processor's outcome — for reconciling against Stripe.</p>
+
+  <div class="cards-3" style="margin:0 0 16px">
+    <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Collected (net of refunds)</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.collected) }}</div><div style="color:var(--pf-text-3);font-size:12.5px">{{ totals.paid }} successful payment(s)</div></div>
+    <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-red)">Your commission (25%)</div><div style="font-size:26px;font-weight:800;color:var(--pf-red);font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.commission) }}</div></div>
+    <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Needs attention</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">{{ totals.failed }}</div><div style="color:var(--pf-text-3);font-size:12.5px">failed · {{ totals.refunded }} refunded</div></div>
+  </div>
+
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+    {% for value, label in [('', 'All'), ('paid', 'Paid'), ('failed', 'Failed'), ('refunded', 'Refunded')] %}
+    <a href="{{ url_for('ops_admin.payments', status=value) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if status == value else 'pf-btn--ghost' }}">{{ label }}</a>
+    {% endfor %}
+    <a href="{{ url_for('ops_admin.payments', status=status, format='csv') }}" class="pf-btn pf-btn--ghost pf-btn--sm" style="margin-left:auto">Export CSV</a>
+  </div>
+
+  <div style="overflow-x:auto;background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md)">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums">
+      <thead>
+        <tr style="text-align:left;color:var(--pf-text-3);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">
+          <th style="padding:12px 14px">When</th><th>Member</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th><th style="text-align:right">Your 25%</th><th>Status</th><th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in rows %}
+        {% set m = members.get(p.user_id) %}
+        <tr style="border-top:1px solid #F0EEE9">
+          <td style="padding:11px 14px;white-space:nowrap">{{ fmt_local(p.created_at, '%b %d · %I:%M %p') }}</td>
+          <td style="min-width:160px">{% if m %}<a href="{{ url_for('ops_admin.member_detail', user_id=m.id) }}" style="color:inherit;font-weight:700">{{ m.name }}</a><br /><span style="color:var(--pf-text-3);font-size:12.5px">{{ m.email }}</span>{% else %}—{% endif %}</td>
+          <td style="text-align:right;font-weight:700">${{ '%.2f'|format(p.amount_cents / 100) }}{% if p.refunded_cents %}<br /><span style="color:var(--pf-warn);font-size:12px">−${{ '%.2f'|format(p.refunded_cents / 100) }} refunded</span>{% endif %}</td>
+          <td style="text-align:right;color:var(--pf-text-2)">${{ '%.2f'|format(p.tax_cents / 100) }}</td>
+          <td style="text-align:right;color:var(--pf-red);font-weight:700">${{ '%.2f'|format(p.agency_share_cents / 100) }}</td>
+          <td><span class="pf-chip pf-chip--{{ 'success' if p.status == 'paid' else ('red' if p.status == 'failed' else 'warn') }}">{{ p.status }}</span></td>
+          <td style="color:var(--pf-text-3);font-size:12.5px;min-width:160px">{{ p.note or '' }}{% if p.stripe_invoice_id %}<br /><span style="font-family:monospace;font-size:11px">{{ p.stripe_invoice_id }}</span>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="padding:18px 14px;color:var(--pf-text-2)">No payments yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

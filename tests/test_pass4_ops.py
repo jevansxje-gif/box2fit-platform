@@ -1684,3 +1684,82 @@ def test_send_card_update_link_from_member_page(app, client, client_account):
     if guardian.phone:
         sms = db.session.query(Message).filter_by(template="card_update", channel="sms").one()
         assert "/portal/card/" in sms.body_preview
+
+
+def test_new_card_becomes_charging_card_and_retries_past_due(
+    app, client, client_account, monkeypatch
+):
+    """A replacement card must be the card Stripe CHARGES, not just a row on
+    our side: subscriptions are pinned to the card they were created with,
+    so a member who updated their card was still being retried on the old
+    one (Sep 2026). Saving a card now sets it as the customer default and on
+    every live subscription, and pays a past-due invoice on it immediately."""
+    from app.services import stripe_service
+    from app.services.signed_links import SALT_UPDATE_CARD, make_token
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian = booking.attendee.guardian
+    sc = StripeCustomer(
+        user_id=guardian.id, stripe_customer_id="cus_t2",
+        stripe_payment_method_id="pm_old",
+    )
+    db.session.add(sc)
+    from app.models import Plan
+    plan = db.session.query(Plan).filter_by(client_account_id=client_account.id).first()
+    db.session.add(Subscription(
+        client_account_id=client_account.id, user_id=guardian.id,
+        attendee_id=booking.attendee_id, plan_id=plan.id,
+        stripe_subscription_id="sub_t2", status=SubscriptionStatus.past_due.value,
+        mrr_cents=18900,
+    ))
+    db.session.commit()
+
+    calls = []
+
+    class FakeSI:
+        status = "succeeded"
+        customer = "cus_t2"
+        payment_method = "pm_new"
+
+    class FakeStripe:
+        class SetupIntent:
+            @staticmethod
+            def retrieve(_id):
+                return FakeSI()
+
+        class Customer:
+            @staticmethod
+            def modify(cus, **kw):
+                calls.append(("customer", cus, kw))
+
+        class Subscription:
+            @staticmethod
+            def modify(sid, **kw):
+                calls.append(("sub", sid, kw))
+
+        class Invoice:
+            @staticmethod
+            def list(**kw):
+                class R:
+                    data = [type("Inv", (), {"id": "in_open_1"})()]
+                return R()
+
+            @staticmethod
+            def pay(inv_id, **kw):
+                calls.append(("pay", inv_id, kw))
+                return {"status": "paid"}
+
+    monkeypatch.setattr(stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(stripe_service, "stripe_client", lambda: FakeStripe)
+
+    with app.test_request_context():
+        tok = make_token(guardian.id, SALT_UPDATE_CARD)
+    r = client.get(f"/portal/card/{tok}?setup_intent=seti_2&redirect_status=succeeded")
+    assert r.status_code == 200
+    db.session.refresh(sc)
+    assert sc.stripe_payment_method_id == "pm_new"
+    assert ("customer", "cus_t2", {"invoice_settings": {"default_payment_method": "pm_new"}}) in calls
+    assert ("sub", "sub_t2", {"default_payment_method": "pm_new"}) in calls
+    assert ("pay", "in_open_1", {"payment_method": "pm_new"}) in calls

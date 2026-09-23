@@ -370,6 +370,7 @@ def handle_setup_intent_succeeded(obj: dict) -> None:
     )
     customer.payment_method_status = PaymentMethodStatus.vaulted.value
     customer.stripe_payment_method_id = obj.get("payment_method")
+    stripe_service.make_default_card(customer, customer.stripe_payment_method_id)
     if not already_vaulted:
         guardian = db.session.get(User, customer.user_id)
         enqueue_event(

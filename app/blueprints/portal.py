@@ -719,6 +719,7 @@ def update_card(token: str):
                     PaymentMethodStatus.vaulted.value
                 )
                 customer.stripe_payment_method_id = si.payment_method
+                stripe_service.make_default_card(customer, si.payment_method)
                 db.session.commit()
         # If an attended trial is waiting on activation, hand them the
         # one remaining tap instead of a dead end.

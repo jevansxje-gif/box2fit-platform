@@ -9,6 +9,7 @@ retries any past-due invoice on it.
     .venv/bin/python -m scripts.check_card scarlett
     .venv/bin/python -m scripts.check_card scarlett --fix
 """
+import json
 import sys
 from datetime import datetime
 
@@ -27,6 +28,11 @@ if not args:
     raise SystemExit("usage: -m scripts.check_card <name-or-email> [--fix]")
 needle = f"%{args[0]}%"
 app = create_app()
+
+
+def d(obj):
+    # StripeObject has no .get() in this library — work on plain dicts.
+    return json.loads(str(obj))
 
 
 def when(ts):
@@ -72,7 +78,7 @@ with app.app_context():
             key=lambda pm: pm.created,
             reverse=True,
         )
-        cus = st.Customer.retrieve(c.stripe_customer_id)
+        cus = d(st.Customer.retrieve(c.stripe_customer_id))
         cus_default = (cus.get("invoice_settings") or {}).get("default_payment_method")
         for pm in cards:
             tag = " <- customer default" if pm.id == cus_default else ""
@@ -92,7 +98,7 @@ with app.app_context():
             .all()
         )
         for s in subs:
-            ss = st.Subscription.retrieve(s.stripe_subscription_id)
+            ss = d(st.Subscription.retrieve(s.stripe_subscription_id))
             sub_pm = ss.get("default_payment_method") or cus_default
             pm_obj = next((p for p in cards if p.id == sub_pm), None)
             charging = f"**** {pm_obj.card.last4}" if pm_obj else (sub_pm or "NONE")
@@ -104,10 +110,11 @@ with app.app_context():
             open_invs = st.Invoice.list(
                 subscription=s.stripe_subscription_id, status="open", limit=5
             ).data
-            for inv in open_invs:
+            for raw in open_invs:
+                inv = d(raw)
                 print(
-                    f"      OPEN invoice {inv.id} ${inv.amount_due / 100:.2f} "
-                    f"attempts={inv.attempt_count} "
+                    f"      OPEN invoice {inv['id']} ${inv['amount_due'] / 100:.2f} "
+                    f"attempts={inv.get('attempt_count')} "
                     f"next retry: {when(inv.get('next_payment_attempt'))}"
                 )
         if FIX and cards:

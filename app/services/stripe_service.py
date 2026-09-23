@@ -160,6 +160,89 @@ def make_default_card(customer: StripeCustomer, pm_id: str | None) -> dict:
     return out
 
 
+def _d(obj) -> dict:
+    """StripeObject has no .get() in this library — work on plain dicts."""
+    import json
+
+    return json.loads(str(obj))
+
+
+def card_summary(user: User) -> dict | None:
+    """What the front desk needs to answer "did my card go through?":
+    every card Stripe holds for the guardian, which one it will actually
+    CHARGE (subscription default, else customer default), the next charge
+    date, and any failed payment awaiting retry. Live from Stripe, so it
+    is the truth rather than our cached status. None when there's nothing
+    to show (no Stripe customer yet); never raises — an outage becomes an
+    'error' the page can display."""
+    from datetime import datetime
+
+    customer = (
+        db.session.query(StripeCustomer).filter_by(user_id=user.id).one_or_none()
+    )
+    if not is_configured() or customer is None or not customer.stripe_customer_id:
+        return None
+    out = {"cards": [], "charging": None, "subs": [], "error": None}
+    ts = lambda v: datetime.utcfromtimestamp(int(v)) if v else None  # noqa: E731
+    try:
+        stripe = stripe_client()
+        pms = _d(stripe.PaymentMethod.list(
+            customer=customer.stripe_customer_id, type="card"
+        ))["data"]
+        cus = _d(stripe.Customer.retrieve(customer.stripe_customer_id))
+        cus_default = (cus.get("invoice_settings") or {}).get("default_payment_method")
+        subs = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.user_id == user.id,
+                Subscription.stripe_subscription_id.isnot(None),
+                Subscription.status.in_(LIVE_SUB_STATUSES),
+            )
+            .all()
+        )
+        sub_pm = None
+        for sub in subs:
+            # Pinned version: top-level period_end / invoice fields, as the
+            # webhook handlers expect (the account default reshapes them).
+            ss = _d(stripe.Subscription.retrieve(
+                sub.stripe_subscription_id, stripe_version="2019-09-09"
+            ))
+            pm = ss.get("default_payment_method") or cus_default
+            sub_pm = sub_pm or pm
+            entry = {
+                "status": ss.get("status"),
+                "period_end": ts(ss.get("current_period_end")),
+                "open_invoice": None,
+            }
+            open_invs = _d(stripe.Invoice.list(
+                subscription=sub.stripe_subscription_id, status="open", limit=1,
+                stripe_version="2019-09-09",
+            ))["data"]
+            if open_invs:
+                inv = open_invs[0]
+                entry["open_invoice"] = {
+                    "amount_cents": inv.get("amount_due") or 0,
+                    "attempts": inv.get("attempt_count") or 0,
+                    "next_retry": ts(inv.get("next_payment_attempt")),
+                }
+            out["subs"].append(entry)
+        charging_id = sub_pm or cus_default
+        for pm in sorted(pms, key=lambda x: x.get("created") or 0, reverse=True):
+            card = pm.get("card") or {}
+            out["cards"].append({
+                "brand": card.get("brand") or "card",
+                "last4": card.get("last4") or "????",
+                "exp": f"{card.get('exp_month')}/{str(card.get('exp_year'))[-2:]}",
+                "added": ts(pm.get("created")),
+                "is_charging": pm.get("id") == charging_id,
+            })
+        out["charging"] = next((c for c in out["cards"] if c["is_charging"]), None)
+    except Exception:  # noqa: BLE001
+        log.exception("card summary for user %s", user.id)
+        out["error"] = "Couldn't reach Stripe just now"
+    return out
+
+
 def confirm_setup_intent_vaulted(customer: StripeCustomer) -> bool:
     """Server-side verification on Elements return. Webhooks (Pass 2) are the
     source of truth; this covers the redirect path."""

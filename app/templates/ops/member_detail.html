@@ -79,6 +79,36 @@
     </div>
   </div>
 
+  {# Live from Stripe: the card that will actually be charged, plus any
+     failed payment awaiting retry. Answers "did my card go through?" at
+     the desk without a script (Robyn/Scarlett, Sep 2026). #}
+  {% if card is not none %}
+  <div class="pf-card pf-card--pad" style="margin:0 0 18px">
+    <div class="pf-kicker" style="color:var(--pf-text-3)">Card on file <span style="font-weight:400;text-transform:none;letter-spacing:0">· live from Stripe</span></div>
+    {% if card.error %}
+    <p style="margin:8px 0 0;color:var(--pf-warn)">{{ card.error }} — reload in a minute.</p>
+    {% elif not card.cards %}
+    <p style="margin:8px 0 0;color:var(--pf-text-2)">No card saved yet — they reached the card page but didn't finish. Use <b>Send card update link</b> above.</p>
+    {% else %}
+    {% for c in card.cards %}
+    <p style="margin:8px 0 0"><b>{{ c.brand|capitalize }} •••• {{ c.last4 }}</b> <span style="color:var(--pf-text-3);font-size:12.5px">exp {{ c.exp }}{% if c.added %} · added {{ fmt_local(c.added, '%b %d') }}{% endif %}</span>
+      {% if c.is_charging %}<span class="pf-chip pf-chip--success" style="font-size:11px">charges this card</span>{% endif %}</p>
+    {% endfor %}
+    {% if card.cards and not card.charging %}
+    <p style="margin:8px 0 0;color:var(--pf-warn);font-size:13px">No card is set to be charged — ask them to save a card again (or run check_card --fix).</p>
+    {% endif %}
+    {% for s in card.subs %}
+    <p style="margin:8px 0 0;font-size:13.5px">
+      {% if s.open_invoice %}
+      <span class="pf-chip pf-chip--red" style="font-size:11px">${{ '%.2f'|format(s.open_invoice.amount_cents / 100) }} payment failed</span>
+      {% if s.open_invoice.next_retry %}Stripe retries it {{ fmt_local(s.open_invoice.next_retry, '%b %d · %I:%M %p') }} on the card above.{% else %}No retry scheduled.{% endif %}
+      {% elif s.period_end %}<span style="color:var(--pf-text-2)">Paid up · next charge {{ fmt_local(s.period_end, '%b %d') }}</span>{% endif %}
+    </p>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="pf-panel">
     <h2>Notes <span style="font-weight:400;font-size:13px;color:var(--pf-text-3)">(staff-visible only)</span></h2>
     <form method="post" style="display:flex;gap:10px;align-items:end;margin-bottom:14px">

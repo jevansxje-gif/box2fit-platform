@@ -1358,6 +1358,8 @@ def member_detail(user_id: int):
         for i in upcoming:
             rebook_options.setdefault(i.class_type_id, []).append(i)
 
+    from ..services import stripe_service
+
     return render_template(
         "ops/member_detail.html",
         u=u,
@@ -1369,6 +1371,7 @@ def member_detail(user_id: int):
         lead=lead,
         now=now_utc(),
         rebook_options=rebook_options,
+        card=stripe_service.card_summary(u),  # live: "did my card go through?"
     )
 
 

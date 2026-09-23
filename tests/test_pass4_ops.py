@@ -1763,3 +1763,72 @@ def test_new_card_becomes_charging_card_and_retries_past_due(
     assert ("customer", "cus_t2", {"invoice_settings": {"default_payment_method": "pm_new"}}) in calls
     assert ("sub", "sub_t2", {"default_payment_method": "pm_new"}) in calls
     assert ("pay", "in_open_1", {"payment_method": "pm_new"}) in calls
+
+
+def test_member_page_shows_card_on_file_live_from_stripe(
+    app, client, client_account, monkeypatch
+):
+    """"Did my card go through?" is answerable on the member page: every
+    card Stripe holds, which one it will charge, and a failed payment
+    awaiting retry — live, not our cached status."""
+    import json
+
+    from app.models import Plan
+    from app.services import stripe_service
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian = booking.attendee.guardian
+    db.session.add(StripeCustomer(
+        user_id=guardian.id, stripe_customer_id="cus_t3",
+        stripe_payment_method_id="pm_new",
+    ))
+    plan = db.session.query(Plan).filter_by(client_account_id=client_account.id).first()
+    db.session.add(Subscription(
+        client_account_id=client_account.id, user_id=guardian.id,
+        attendee_id=booking.attendee_id, plan_id=plan.id,
+        stripe_subscription_id="sub_t3", status=SubscriptionStatus.past_due.value,
+        mrr_cents=18900,
+    ))
+    db.session.commit()
+
+    class J(dict):  # str() -> JSON, like a StripeObject
+        def __str__(self):
+            return json.dumps(self)
+
+    class FakeStripe:
+        class PaymentMethod:
+            @staticmethod
+            def list(**kw):
+                return J(data=[
+                    {"id": "pm_old", "created": 100, "card": {"brand": "mastercard", "last4": "6210", "exp_month": 4, "exp_year": 2030}},
+                    {"id": "pm_new", "created": 200, "card": {"brand": "visa", "last4": "6118", "exp_month": 8, "exp_year": 2031}},
+                ])
+
+        class Customer:
+            @staticmethod
+            def retrieve(_id):
+                return J(invoice_settings={"default_payment_method": "pm_new"})
+
+        class Subscription:
+            @staticmethod
+            def retrieve(_id, **kw):
+                return J(status="past_due", default_payment_method="pm_new", current_period_end=1792000000)
+
+        class Invoice:
+            @staticmethod
+            def list(**kw):
+                return J(data=[{"id": "in_open", "amount_due": 19845, "attempt_count": 1, "next_payment_attempt": 1790000000}])
+
+    monkeypatch.setattr(stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(stripe_service, "stripe_client", lambda: FakeStripe)
+
+    r = _admin(app).get(f"/ops/members/{guardian.id}")
+    html = r.data.decode()
+    assert "Card on file" in html
+    assert "6118" in html and "6210" in html
+    # the chip sits on the new Visa, not the old Mastercard
+    assert html.index("6118") < html.index("charges this card") < html.index("6210")
+    assert "$198.45 payment failed" in html
+    assert "Stripe retries it" in html

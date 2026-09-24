@@ -1293,18 +1293,26 @@ def member_detail(user_id: int):
                     else "First-charge date cleared (standard 48-hour lead).",
                     "success",
                 )
-        elif action == "cancel_sub":
+        elif action in ("cancel_sub", "cancel_sub_now"):
             from ..services import billing
 
             sub = db.session.get(Subscription, request.form.get("sub_id", type=int))
             if sub and sub.user_id == u.id:
+                # "now" = goodwill/refund case: ends today, no notice period,
+                # no further charges. Default = the terms' 30-day notice.
+                now = action == "cancel_sub_now"
                 billing.cancel_subscription(
                     sub,
-                    reason=request.form.get("reason") or "staff_initiated",
+                    reason=request.form.get("reason") or ("goodwill" if now else "staff_initiated"),
                     note=f"by {current_user.email}",
+                    immediate=now,
                 )
                 db.session.commit()
-                flash("Membership cancelled.", "success")
+                flash(
+                    "Membership ended now — no further charges. Issue any refund in Stripe."
+                    if now else "Membership cancelled (30-day notice recorded).",
+                    "success",
+                )
         return redirect(url_for("ops_admin.member_detail", user_id=u.id))
 
     row = _member_row(u)

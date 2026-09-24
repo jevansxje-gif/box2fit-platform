@@ -1832,3 +1832,44 @@ def test_member_page_shows_card_on_file_live_from_stripe(
     assert html.index("6118") < html.index("charges this card") < html.index("6210")
     assert "$198.45 payment failed" in html
     assert "Stripe retries it" in html
+
+
+def test_end_membership_now_for_refund_case(app, client, client_account):
+    """A goodwill/refund cancellation must end the membership immediately with
+    no 30-day notice, so no further charge follows the refund. The default
+    staff cancel keeps the terms' notice period."""
+    from app.models import Plan
+    from app.services import billing
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    guardian = booking.attendee.guardian
+    plan = db.session.query(Plan).filter_by(client_account_id=client_account.id).first()
+    sub = Subscription(
+        client_account_id=client_account.id, user_id=guardian.id,
+        attendee_id=booking.attendee_id, plan_id=plan.id,
+        status=SubscriptionStatus.active.value, mrr_cents=18900,
+        activated_at=utcnow(),
+    )
+    db.session.add(sub); db.session.commit()
+
+    staff = _admin(app)
+    r = staff.post(f"/ops/members/{guardian.id}", data={"action": "cancel_sub_now", "sub_id": str(sub.id)}, follow_redirects=True)
+    assert b"ended now" in r.data
+    db.session.refresh(sub)
+    assert sub.status == SubscriptionStatus.cancelled.value
+    assert sub.cancelled_at is not None
+    assert sub.cancel_requested_at is None  # no notice period recorded
+    assert sub.cancel_reason == "goodwill"
+
+    # default path on another activated sub: notice, not immediate
+    sub2 = Subscription(
+        client_account_id=client_account.id, user_id=guardian.id,
+        attendee_id=booking.attendee_id, plan_id=plan.id,
+        status=SubscriptionStatus.active.value, mrr_cents=18900, activated_at=utcnow(),
+    )
+    db.session.add(sub2); db.session.commit()
+    billing.cancel_subscription(sub2, reason="staff_initiated")
+    assert sub2.status == SubscriptionStatus.active.value
+    assert sub2.cancel_requested_at is not None and sub2.cancel_effective_at is not None

@@ -300,12 +300,17 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
 NOTICE_DAYS = 30  # mandatory cancellation notice per the membership terms
 
 
-def cancel_subscription(sub: Subscription, reason: str, note: str | None = None) -> None:
+def cancel_subscription(
+    sub: Subscription, reason: str, note: str | None = None, immediate: bool = False
+) -> None:
     """Cancel per the client's membership terms:
     - BEFORE the first charge (free-trial window): immediate, no obligation.
     - AFTER activation: a 30-day notice is recorded; dues continue through
       the notice period and the subscription ends at the effective date
       (Stripe cancel_at; the subscription.deleted webhook finalizes it).
+    - immediate=True (staff goodwill, e.g. alongside a refund): ends now,
+      no notice period, no further charges. The refund itself is issued in
+      Stripe; the charge.refunded webhook records it.
     """
     if sub.status == SubscriptionStatus.cancelled.value or sub.cancel_requested_at:
         return
@@ -313,7 +318,7 @@ def cancel_subscription(sub: Subscription, reason: str, note: str | None = None)
     sub.cancel_reason_note = note
 
     never_charged = sub.activated_at is None
-    if never_charged:
+    if never_charged or immediate:
         if sub.stripe_subscription_id and stripe_service.is_configured():
             stripe = stripe_service.stripe_client()
             try:

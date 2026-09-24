@@ -63,7 +63,8 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <input type="hidden" name="sub_id" value="{{ s.id }}" />
         <input type="hidden" name="reason" value="staff_initiated" />
-        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub">Cancel membership</button>
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub" title="Per the terms: 30-day notice, dues continue through the notice period">Cancel membership</button>
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub_now" style="margin-left:6px" title="Goodwill / refund case: ends today, no notice period, no further charges. Refund the payment in Stripe." formnovalidate onclick="return confirm('End this membership NOW with no notice period and no further charges? Use this with a refund.')">End now (refund case)</button>
       </form>
       {% endif %}
       {% else %}<p style="margin:8px 0 0;color:var(--pf-text-2)">Trial only.</p>{% endfor %}

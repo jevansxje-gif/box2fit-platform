@@ -61,17 +61,24 @@ with app.app_context():
             )
             for b in bks:
                 ci = b.class_instance
-                print(f"    BOOKING #{b.id} {b.kind} | class {L(ci.starts_at_utc)} | status={b.status} | booked {L(b.created_at)}"
-                      + (f" | first_charge_on={b.first_charge_on}" if getattr(b, 'first_charge_on', None) else ""))
+                extra = []
+                if b.first_charge_on: extra.append(f"first_charge_on={b.first_charge_on}")
+                if b.checked_in_at: extra.append(f"checked in {L(b.checked_in_at)} by {b.attendance_marked_by or '?'}")
+                if b.cancelled_at: extra.append(f"cancelled {L(b.cancelled_at)}")
+                print(f"    BOOKING #{b.id} {b.kind} | class {L(ci.starts_at_utc)} | status={b.status} | booked {L(b.booked_at)}" + (" | " + " | ".join(extra) if extra else ""))
         sc = db.session.query(StripeCustomer).filter_by(user_id=uid).one_or_none()
-        if sc:
+        if sc:  # noqa
             print(f"  CARD: status={sc.payment_method_status} customer={sc.stripe_customer_id} pm={sc.stripe_payment_method_id} (row created {L(sc.created_at)})")
         for s in db.session.query(Subscription).filter_by(user_id=uid).order_by(Subscription.id):
-            print(f"  SUBSCRIPTION #{s.id} {s.status} ${s.mrr_cents/100:.0f}/4wk {s.cohort_label or ''} | created {L(s.created_at)} | first_charge_at {L(s.first_charge_at)} | activated_at {L(s.activated_at)}"
+            print(f"  SUBSCRIPTION #{s.id} {s.status} ${s.mrr_cents/100:.0f}/4wk {s.cohort_label or ''} | first_charge_at {L(s.first_charge_at)} | activated_at {L(s.activated_at)}"
                   + (f" | cancel requested {L(s.cancel_requested_at)} effective {L(s.cancel_effective_at)} reason={s.cancel_reason}" if s.cancel_requested_at else "")
                   + f" | stripe {s.stripe_subscription_id}")
-        for p in db.session.query(Payment).filter_by(user_id=uid).order_by(Payment.created_at):
-            print(f"  PAYMENT {L(p.created_at)} | {p.status} ${p.amount_cents/100:.2f} (GST ${p.tax_cents/100:.2f}) | refunded ${ (p.refunded_cents or 0)/100:.2f} | {p.stripe_invoice_id} | {p.note or ''}")
+        try:
+          pays = db.session.query(Payment).filter_by(user_id=uid).order_by(Payment.id).all()
+        except Exception as e:  # noqa: BLE001
+          db.session.rollback(); pays = []; print(f"  PAYMENTS: could not read ({type(e).__name__})")
+        for p in pays:
+            print(f"  PAYMENT {L(getattr(p, 'paid_at', None) or getattr(p, 'created_at', None))} | {p.status} ${p.amount_cents/100:.2f} (GST ${p.tax_cents/100:.2f}) | refunded ${ (p.refunded_cents or 0)/100:.2f} | {p.stripe_invoice_id} | {p.note or ''}")
         print("  MESSAGES (time order):")
         msgs = db.session.query(Message).filter_by(user_id=uid).order_by(Message.sent_at).all()
         first_charge = min([s.first_charge_at for s in db.session.query(Subscription).filter_by(user_id=uid) if s.first_charge_at] or [None])

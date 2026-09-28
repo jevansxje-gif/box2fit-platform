@@ -44,6 +44,62 @@
     <p class="note" style="width:100%;margin:4px 0 0;color:var(--pf-text-3);font-size:12.5px">Emails (and texts) a link to add a card. Their membership then bills through us — tracked here — so we earn commission on ad-referred members even when classes stay in the gym's own app.</p>
   </form>
 
+  {# One-off amounts (punch cards, privates, anything fixed): a signed link to
+     Stripe Checkout; staff get an email when it is paid. Usage is tracked at
+     the desk, not here. #}
+  <button type="button" class="pf-btn pf-btn--ghost pf-btn--sm" style="margin:0 0 12px 8px" onclick="document.getElementById('one-off').hidden = !document.getElementById('one-off').hidden">+ Charge a one-off amount (punch card, etc.)</button>
+  <form id="one-off" method="post" action="{{ url_for('ops_admin.send_one_off_charge') }}" hidden style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div>
+      <label class="pf-label" style="font-size:12px">Full name</label>
+      <input class="pf-input" name="name" required placeholder="Pat Punch" style="min-width:170px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Email</label>
+      <input class="pf-input" name="email" type="email" required placeholder="member@example.com" style="min-width:210px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Mobile (optional, also texts the link)</label>
+      <input class="pf-input" name="phone" type="tel" placeholder="(604) 555-0123" style="width:170px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">What it's for</label>
+      <input class="pf-input" name="description" required value="10-class punch card" maxlength="120" style="min-width:200px" />
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:12px">Amount, before GST ($)</label>
+      <input class="pf-input" name="amount" type="number" step="0.01" min="1" max="5000" required placeholder="150.00" style="width:130px" />
+    </div>
+    <button class="pf-btn pf-btn--dark pf-btn--sm">Send payment link</button>
+    <p class="note" style="width:100%;margin:4px 0 0;color:var(--pf-text-3);font-size:12.5px">5% GST is added automatically and shown to the customer. They pay once on Stripe's secure page; the payment appears in this ledger and the staff alert addresses get an email the moment it lands.</p>
+  </form>
+
+  {% if one_offs %}
+  <div style="overflow-x:auto;background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);margin:0 0 16px">
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums">
+      <thead><tr style="text-align:left;color:var(--pf-text-3);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em"><th style="padding:10px 14px">Payment link</th><th>Who</th><th>For</th><th style="text-align:right">Total incl. GST</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for c in one_offs %}
+        {% set m = members.get(c.user_id) %}
+        <tr style="border-top:1px solid #F0EEE9">
+          <td style="padding:9px 14px;white-space:nowrap">{{ fmt_local(c.created_at, '%b %d · %I:%M %p') }}</td>
+          <td>{% if m %}<a href="{{ url_for('ops_admin.member_detail', user_id=m.id) }}" style="color:inherit;font-weight:700">{{ m.name }}</a><br /><span style="color:var(--pf-text-3);font-size:12px">{{ m.email }}</span>{% endif %}</td>
+          <td>{{ c.description }}</td>
+          <td style="text-align:right;font-weight:700">${{ '%.2f'|format(c.total_cents / 100) }}</td>
+          <td><span class="pf-chip pf-chip--{{ 'success' if c.status == 'paid' else ('warn' if c.status == 'pending' else 'red') }}">{{ 'paid ' + fmt_local(c.paid_at, '%b %d') if c.status == 'paid' and c.paid_at else c.status }}</span></td>
+          <td style="white-space:nowrap">
+            {% if c.status == 'pending' %}
+            <form method="post" action="{{ url_for('ops_admin.one_off_charge_action', charge_id=c.id, what='resend') }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><button class="pf-btn pf-btn--ghost pf-btn--sm">Resend</button></form>
+            <form method="post" action="{{ url_for('ops_admin.one_off_charge_action', charge_id=c.id, what='cancel') }}" style="display:inline" onsubmit="return confirm('Cancel this payment link?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><button class="pf-btn pf-btn--ghost pf-btn--sm">Cancel</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   <div class="cards-3" style="margin:0 0 16px">
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Collected (net of refunds)</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.collected) }}</div><div style="color:var(--pf-text-3);font-size:12.5px">{{ totals.paid }} successful payment(s)</div></div>
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-red)">Your commission (25%)</div><div style="font-size:26px;font-weight:800;color:var(--pf-red);font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.commission) }}</div></div>

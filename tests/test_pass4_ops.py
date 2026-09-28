@@ -1873,3 +1873,62 @@ def test_end_membership_now_for_refund_case(app, client, client_account):
     billing.cancel_subscription(sub2, reason="staff_initiated")
     assert sub2.status == SubscriptionStatus.active.value
     assert sub2.cancel_requested_at is not None and sub2.cancel_effective_at is not None
+
+
+def test_one_off_charge_link_and_payment(app, client, client_account):
+    """Punch card: staff type an amount, the customer gets a signed pay link
+    (GST added and shown), Stripe's checkout.session.completed records the
+    payment with commission and emails the staff alert list. Idempotent."""
+    import json as _json
+
+    from app.models import Message, OneOffCharge, User
+
+    staff = _admin(app)
+    r = staff.get("/ops/payments")
+    assert b"Charge a one-off amount" in r.data
+    r = staff.post(
+        "/ops/payments/one-off",
+        data={"name": "Pat Punch", "email": "pat@example.com", "phone": "",
+              "description": "10-class punch card", "amount": "150"},
+        follow_redirects=True,
+    )
+    assert b"Payment link sent to pat@example.com" in r.data
+    charge = db.session.query(OneOffCharge).one()
+    assert (charge.amount_cents, charge.tax_cents, charge.total_cents, charge.status) == (15000, 750, 15750, "pending")
+    guardian = db.session.query(User).filter_by(email="pat@example.com").one()
+    link_msg = db.session.query(Message).filter_by(template="one_off_link", channel="email").one()
+    token = re.search(r"/pay/([\w\-\.]+)", link_msg.body_preview).group(1)
+
+    # public page shows the breakdown, no login
+    r = client.get(f"/pay/{token}")
+    assert r.status_code == 200 and b"157.50" in r.data and b"10-class punch card" in r.data
+    # pending link is listed on the Payments page
+    r = staff.get("/ops/payments")
+    assert b"pending" in r.data and b"Pat Punch" in r.data
+
+    # Stripe tells us it was paid
+    event = {"type": "checkout.session.completed", "data": {"object": {
+        "id": "cs_test_1", "payment_status": "paid", "payment_intent": "pi_test_1",
+        "metadata": {"one_off_charge_id": str(charge.id)},
+    }}}
+    r = client.post("/api/v1/webhooks/stripe", data=_json.dumps(event), content_type="application/json")
+    assert r.status_code == 200
+    db.session.refresh(charge)
+    assert charge.status == "paid" and charge.payment_id
+    pay = db.session.query(Payment).filter_by(user_id=guardian.id).one()
+    assert pay.status == "paid" and pay.amount_cents == 15750 and pay.tax_cents == 750
+    assert pay.agency_share_cents == round(15000 * 0.25)  # commission on pre-tax
+    assert pay.note.startswith("one-off")
+    assert db.session.query(Message).filter_by(template="one_off_paid_admin", recipient="staff-alerts@test.local").count() == 1
+    assert db.session.query(Message).filter_by(template="one_off_receipt", recipient="pat@example.com").count() == 1
+
+    # redelivery changes nothing
+    client.post("/api/v1/webhooks/stripe", data=_json.dumps(event), content_type="application/json")
+    assert db.session.query(Payment).filter_by(user_id=guardian.id).count() == 1
+    assert db.session.query(Message).filter_by(template="one_off_paid_admin").count() == 1
+
+    # the link now shows paid, and the ledger has the row
+    r = client.get(f"/pay/{token}")
+    assert b"Paid. Thank you" in r.data
+    r = staff.get("/ops/payments")
+    assert b"one-off: 10-class punch card" in r.data

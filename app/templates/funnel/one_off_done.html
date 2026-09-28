@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Paid' if paid else 'Payment' }} — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="pf-shell" style="max-width:520px;margin:0 auto;padding:28px 16px">
+  <div class="pf-kicker" style="color:var(--pf-red)">Box2Fit White Rock</div>
+  {% if paid %}
+  <h1 class="pf-h1" style="margin:6px 0 4px">Paid. Thank you, {{ guardian.name.split(' ')[0] }}.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">{{ charge.description }}: {{ fmt(charge.total_cents) }} CAD (includes {{ fmt(charge.tax_cents) }} GST). A receipt is on its way to {{ guardian.email }}, and the gym has been told.</p>
+  <div class="pf-card pf-card--pad"><p style="margin:0">Just show up: the front desk has your name. See you in the gym.</p></div>
+  {% else %}
+  <h1 class="pf-h1" style="margin:6px 0 4px">Almost there</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">We haven't received confirmation of this payment yet. If you completed it on Stripe's page a moment ago, give it a minute and refresh; otherwise <a href="{{ url_for('funnel.one_off_pay', token=request.view_args.token) }}">go back and pay</a>.</p>
+  {% endif %}
+  <p style="color:var(--pf-text-3);font-size:12.5px;margin-top:14px">Questions? Call (778) 384-6284.</p>
+</div>
+{% endblock %}

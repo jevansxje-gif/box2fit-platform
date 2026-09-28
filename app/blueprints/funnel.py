@@ -897,3 +897,51 @@ def cancel_booking(token: str):
         waitlist.promote_next(booking.class_instance)
         db.session.commit()
     return render_template("funnel/cancelled.html", booking=booking)
+
+
+# ------------------------------------------------ one-off charge payment page ---
+@bp.route("/pay/<token>", methods=["GET", "POST"])
+def one_off_pay(token: str):
+    """Signed link from staff: pay a fixed amount (e.g. a 10-class punch card)
+    on Stripe Checkout. Shows the breakdown, one button, no account needed."""
+    from flask import abort, redirect, render_template, request
+
+    from ..models import OneOffCharge, User
+    from ..services import billing
+    from ..services.signed_links import SALT_ONE_OFF, read_token
+    from ..services.tax import fmt_cents
+
+    cid = read_token(token, SALT_ONE_OFF, max_age=60 * 60 * 24 * 60)
+    charge = db.session.get(OneOffCharge, cid) if cid else None
+    if charge is None or charge.status == "cancelled":
+        abort(404)
+    guardian = db.session.get(User, charge.user_id)
+    if charge.status == "paid":
+        return render_template("funnel/one_off_done.html", charge=charge, guardian=guardian, fmt=fmt_cents, paid=True)
+    error = None
+    if request.method == "POST":
+        url = billing.start_one_off_checkout(charge, guardian)
+        db.session.commit()
+        if url:
+            return redirect(url)
+        error = "Online payment isn't available right now. Please call the gym at (778) 384-6284."
+    return render_template("funnel/one_off_pay.html", charge=charge, guardian=guardian, fmt=fmt_cents, error=error)
+
+
+@bp.get("/pay/<token>/done")
+def one_off_done(token: str):
+    from flask import abort, render_template, request
+
+    from ..models import OneOffCharge, User
+    from ..services import billing
+    from ..services.signed_links import SALT_ONE_OFF, read_token
+    from ..services.tax import fmt_cents
+
+    cid = read_token(token, SALT_ONE_OFF, max_age=60 * 60 * 24 * 60)
+    charge = db.session.get(OneOffCharge, cid) if cid else None
+    if charge is None:
+        abort(404)
+    guardian = db.session.get(User, charge.user_id)
+    paid = billing.confirm_one_off_return(charge, request.args.get("session_id"))
+    db.session.commit()
+    return render_template("funnel/one_off_done.html", charge=charge, guardian=guardian, fmt=fmt_cents, paid=paid)

@@ -344,6 +344,191 @@ def cancel_subscription(
             log.exception("stripe cancel_at scheduling failed (id=%s)", sub.id)
 
 
+# ---------------------------------------------------------- one-off charges ---
+# Staff type an amount + description (e.g. "10-class punch card"); the customer
+# gets a signed link, pays on Stripe Checkout, and staff are emailed when the
+# money lands. Usage of what was bought is the gym's to track.
+
+def create_one_off_charge(client_account_id, guardian, description, amount_cents, created_by=None):
+    from ..models import OneOffCharge
+    from .tax import gst_cents
+
+    tax = gst_cents(amount_cents)
+    charge = OneOffCharge(
+        client_account_id=client_account_id,
+        user_id=guardian.id,
+        description=(description or "One-off payment").strip()[:120],
+        amount_cents=amount_cents,
+        tax_cents=tax,
+        total_cents=amount_cents + tax,
+        created_by=created_by,
+    )
+    db.session.add(charge)
+    db.session.flush()
+    return charge
+
+
+def one_off_pay_url(charge) -> str:
+    from .signed_links import SALT_ONE_OFF
+
+    return absolute_url("funnel.one_off_pay", token=make_token(charge.id, SALT_ONE_OFF))
+
+
+def send_one_off_link(charge, guardian) -> str:
+    from .tax import fmt_cents
+
+    link = one_off_pay_url(charge)
+    html = render_template(
+        "emails/one_off_link.html", guardian=guardian, charge=charge, link=link, fmt=fmt_cents
+    )
+    send_email(
+        guardian, guardian.email,
+        f"Your Box2Fit payment link: {charge.description}",
+        html, "one_off_link", charge.client_account_id,
+    )
+    if guardian.phone:
+        send_sms(
+            guardian, guardian.phone,
+            f"Box2Fit: pay for {charge.description} ({fmt_cents(charge.total_cents)} incl. GST) here: {link}",
+            "one_off_link", charge.client_account_id,
+        )
+    return link
+
+
+def start_one_off_checkout(charge, guardian) -> str | None:
+    """Create the Stripe Checkout Session for this charge and return its URL
+    (None when Stripe isn't configured). Uses a current API version for this
+    call only, because the account default (2019-09-09) predates Checkout's
+    hosted URL; the webhook payload shape is unaffected."""
+    import json
+
+    from .signed_links import SALT_ONE_OFF
+    from .tax import fmt_cents
+
+    if not stripe_service.is_configured():
+        return None
+    stripe = stripe_service.stripe_client()
+    token = make_token(charge.id, SALT_ONE_OFF)
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        customer_email=guardian.email,
+        line_items=[{
+            "quantity": 1,
+            "price_data": {
+                "currency": charge.currency.lower(),
+                "unit_amount": charge.total_cents,
+                "product_data": {
+                    "name": f"Box2Fit: {charge.description}",
+                    "description": f"Includes 5% GST ({fmt_cents(charge.tax_cents)})",
+                },
+            },
+        }],
+        success_url=absolute_url("funnel.one_off_done", token=token) + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=absolute_url("funnel.one_off_pay", token=token),
+        metadata={"one_off_charge_id": str(charge.id)},
+        payment_intent_data={
+            "description": f"Box2Fit {charge.description}",
+            "metadata": {"one_off_charge_id": str(charge.id)},
+        },
+        stripe_version="2023-10-16",
+    )
+    sd = json.loads(str(session))
+    charge.stripe_checkout_session_id = sd.get("id")
+    return sd.get("url")
+
+
+def record_one_off_paid(charge, payment_intent_id=None) -> Payment:
+    """Idempotent: the ledger row, the staff alert and the customer receipt."""
+    from .booking_flow import admin_alert_recipients
+    from .tax import fmt_cents
+
+    if charge.status == "paid" and charge.payment_id:
+        return db.session.get(Payment, charge.payment_id)
+    client = db.session.get(ClientAccount, charge.client_account_id)
+    guardian = db.session.get(User, charge.user_id)
+    if isinstance(payment_intent_id, dict):
+        payment_intent_id = payment_intent_id.get("id")
+    pay = Payment(
+        client_account_id=charge.client_account_id,
+        user_id=charge.user_id,
+        subscription_id=None,
+        stripe_charge_id=payment_intent_id or charge.stripe_payment_intent_id,
+        amount_cents=charge.total_cents,
+        tax_cents=charge.tax_cents,
+        currency=charge.currency,
+        status="paid",
+        agency_share_cents=round(charge.amount_cents * client.commission_rate),
+        paid_at=utcnow(),
+        note=f"one-off: {charge.description}",
+    )
+    db.session.add(pay)
+    db.session.flush()
+    charge.status = "paid"
+    charge.paid_at = utcnow()
+    charge.payment_id = pay.id
+    charge.stripe_payment_intent_id = payment_intent_id or charge.stripe_payment_intent_id
+
+    ctx = dict(guardian=guardian, charge=charge, fmt=fmt_cents)
+    send_email(
+        guardian, guardian.email,
+        f"Payment received: {charge.description}",
+        render_template("emails/one_off_receipt.html", **ctx),
+        "one_off_receipt", charge.client_account_id,
+    )
+    for to in admin_alert_recipients():
+        send_email(
+            None, to,
+            f"Paid: {charge.description}, {fmt_cents(charge.total_cents)} from {guardian.name}",
+            render_template("emails/one_off_paid_admin.html", **ctx),
+            "one_off_paid_admin", charge.client_account_id,
+        )
+    return pay
+
+
+def handle_checkout_completed(obj: dict) -> None:
+    """Stripe `checkout.session.completed` for a one-off charge."""
+    from ..models import OneOffCharge
+
+    meta = obj.get("metadata") or {}
+    charge = None
+    if meta.get("one_off_charge_id"):
+        charge = db.session.get(OneOffCharge, int(meta["one_off_charge_id"]))
+    if charge is None and obj.get("id"):
+        charge = (
+            db.session.query(OneOffCharge)
+            .filter_by(stripe_checkout_session_id=obj.get("id"))
+            .one_or_none()
+        )
+    if charge is None:
+        log.warning("checkout.session.completed for unknown charge: %s", obj.get("id"))
+        return
+    if obj.get("payment_status") not in (None, "paid"):
+        return  # not paid yet (delayed methods); an async_payment_succeeded would follow
+    record_one_off_paid(charge, obj.get("payment_intent"))
+
+
+def confirm_one_off_return(charge, session_id) -> bool:
+    """Customer came back from Checkout: verify with Stripe and record, so we
+    never depend on the webhook alone (lesson of September)."""
+    import json
+
+    if charge.status == "paid":
+        return True
+    if not session_id or not stripe_service.is_configured():
+        return False
+    stripe = stripe_service.stripe_client()
+    try:
+        sd = json.loads(str(stripe.checkout.Session.retrieve(session_id, stripe_version="2023-10-16")))
+    except Exception:  # noqa: BLE001
+        log.exception("one-off: could not retrieve checkout session %s", session_id)
+        return False
+    if sd.get("payment_status") == "paid" and (sd.get("metadata") or {}).get("one_off_charge_id") == str(charge.id):
+        record_one_off_paid(charge, sd.get("payment_intent"))
+        return True
+    return False
+
+
 def guardian_is_past_due(guardian_user_id: int) -> bool:
     """Past-due blocks booking (resolved policy). Checked at booking time."""
     return (

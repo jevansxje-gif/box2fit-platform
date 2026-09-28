@@ -1487,9 +1487,23 @@ def payments():
         "failed": sum(1 for p in rows if p.status == "failed"),
         "refunded": sum(1 for p in rows if p.status == "refunded"),
     }
+    # One-off payment links (punch cards etc.): pending ones need chasing,
+    # paid ones already appear in the ledger above via their Payment row.
+    from ..models import OneOffCharge
+
+    one_offs = (
+        db.session.query(OneOffCharge)
+        .filter(OneOffCharge.client_account_id == _cid(), OneOffCharge.status != "cancelled")
+        .order_by(OneOffCharge.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    for c in one_offs:
+        if c.user_id not in members:
+            members[c.user_id] = db.session.get(User, c.user_id)
     return render_template(
         "ops/payments.html", rows=rows, members=members, totals=totals,
-        status=status, invite_segments=AD_INVITE_SEGMENTS,
+        status=status, invite_segments=AD_INVITE_SEGMENTS, one_offs=one_offs,
     )
 
 
@@ -1808,3 +1822,73 @@ def reviews():
         google_rating=SiteSetting.get("google_rating", "5.0"),
         google_review_count=SiteSetting.get("google_review_count", "0"),
     )
+
+
+# ------------------------------------------------------------ one-off charges ---
+@bp.post("/payments/one-off")
+@admin_required
+def send_one_off_charge():
+    """Punch cards and other fixed amounts: staff type name, email, what it is
+    and the pre-tax amount; the customer gets a signed link to pay on Stripe
+    Checkout; staff are emailed when it lands. No usage tracking here."""
+    from decimal import Decimal, InvalidOperation
+
+    from ..services import billing, booking_flow
+    from ..services.tax import fmt_cents
+
+    back = url_for("ops_admin.payments")
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    phone = (request.form.get("phone") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    raw_amount = (request.form.get("amount") or "").strip().replace("$", "").replace(",", "")
+    if not name or "@" not in email or "." not in email.split("@")[-1]:
+        flash("A name and a valid email are required.", "error")
+        return redirect(back)
+    if not description:
+        flash("Say what the payment is for (e.g. 10-class punch card).", "error")
+        return redirect(back)
+    try:
+        cents = int((Decimal(raw_amount) * 100).to_integral_value())
+    except (InvalidOperation, ValueError):
+        cents = 0
+    if cents < 100 or cents > 500000:
+        flash("Enter an amount between $1 and $5,000 (before GST).", "error")
+        return redirect(back)
+
+    guardian = booking_flow.get_or_create_guardian(
+        _cid(), name=name, email=email, phone=phone or "",
+        consent_email=True, consent_sms=bool(phone),
+    )
+    db.session.flush()
+    charge = billing.create_one_off_charge(
+        _cid(), guardian, description, cents, created_by=current_user.email
+    )
+    billing.send_one_off_link(charge, guardian)
+    db.session.commit()
+    flash(
+        f"Payment link sent to {email}" + (" and texted" if phone else "")
+        + f": {description}, {fmt_cents(charge.total_cents)} incl. GST. You'll get an email when it's paid.",
+        "success",
+    )
+    return redirect(back)
+
+
+@bp.post("/payments/one-off/<int:charge_id>/<string:what>")
+@admin_required
+def one_off_charge_action(charge_id: int, what: str):
+    from ..models import OneOffCharge
+    from ..services import billing
+
+    charge = db.session.get(OneOffCharge, charge_id)
+    if charge is None or charge.client_account_id != _cid():
+        abort(404)
+    guardian = db.session.get(User, charge.user_id)
+    if what == "resend" and charge.status == "pending":
+        billing.send_one_off_link(charge, guardian)
+        flash(f"Payment link re-sent to {guardian.email}.", "success")
+    elif what == "cancel" and charge.status == "pending":
+        charge.status = "cancelled"
+        flash("Payment link cancelled; it no longer works.", "success")
+    db.session.commit()
+    return redirect(url_for("ops_admin.payments"))

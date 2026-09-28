@@ -682,3 +682,30 @@ class SiteSetting(db.Model):
             row.value = value
         else:
             db.session.add(SiteSetting(key=key, value=value))
+
+
+class OneOffCharge(db.Model):
+    """A staff-created one-time charge (e.g. a 10-class punch card), paid by
+    the customer through a signed link to Stripe Checkout. What was bought
+    is tracked by the gym; we hold the money trail, the staff alert and the
+    commission. status: pending | paid | cancelled."""
+
+    __tablename__ = "one_off_charges"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_account_id: Mapped[int] = mapped_column(
+        ForeignKey("client_accounts.id"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    description: Mapped[str] = mapped_column(String(120))
+    amount_cents: Mapped[int] = mapped_column(Integer)  # pre-tax, what staff typed
+    tax_cents: Mapped[int] = mapped_column(Integer, default=0)  # 5% GST added
+    total_cents: Mapped[int] = mapped_column(Integer)  # what the customer pays
+    currency: Mapped[str] = mapped_column(String(3), default="CAD")
+    status: Mapped[str] = mapped_column(String(12), default="pending")
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(128))
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(64))
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"))
+    created_by: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)

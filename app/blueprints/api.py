@@ -87,6 +87,7 @@ def stripe_webhook():
         "invoice.payment_failed": billing.handle_invoice_payment_failed,
         "customer.subscription.deleted": billing.handle_subscription_deleted,
         "charge.refunded": billing.handle_charge_refunded,
+        "checkout.session.completed": billing.handle_checkout_completed,  # one-off charges
     }
     handler = handlers.get(event_type)
     if handler:

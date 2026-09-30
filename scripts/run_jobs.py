@@ -20,6 +20,7 @@ from app.tasks.jobs import (
     drain_event_outbox,
     payment_health_check,
     release_expired_waitlist_offers,
+    send_challenge_renewal_reminders,
     send_due_reminders,
     send_trial_followups,
     weekly_ops_digest,
@@ -34,6 +35,7 @@ with app.app_context():
     released = release_expired_waitlist_offers.apply().get()
     followups = send_trial_followups.apply().get()
     drained = drain_event_outbox.apply().get()
+    renewals = send_challenge_renewal_reminders.apply().get()
 
     generated = pruned = 0
     if datetime.now().minute < 10:  # top-of-hour run only
@@ -55,5 +57,6 @@ with app.app_context():
     print(
         f"[{stamp}] reminders={reminders} noshows={noshows} "
         f"waitlist_released={released} followups={followups} outbox={drained} "
-        f"generated={generated} pruned={pruned} health={health} digest={digest}"
+        f"generated={generated} pruned={pruned} health={health} digest={digest} "
+        f"challenge_reminders={renewals}"
     )

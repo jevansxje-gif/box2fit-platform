@@ -1961,3 +1961,75 @@ def test_suggest_another_time_is_recorded_and_reported(app, client, client_accou
 
     r = _admin(app).get("/ops/marketing")
     assert b"Times people asked for" in r.data and b"Morning (7 to 9)" in r.data and b"7:30 after nights" in r.data
+
+
+def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, client_account):
+    """The 5-Week Guided Boxing Challenge: landing page with spots left, a
+    sign-up that captures the waiver, a first payment that sends the
+    challenge welcome + staff alert (not the membership welcome), a renewal
+    reminder before the membership continues, and a cancel-before-renewal
+    that stops the renewal without a notice period."""
+    import json as _json
+    from datetime import timedelta
+
+    from app.models import Lead, Message, User, WaiverSignature
+    from app.services import challenge as ch
+    from app.services.signed_links import SALT_CANCEL_BEFORE_CHARGE, make_token
+    from app.tasks.jobs import send_challenge_renewal_reminders
+
+    r = client.get("/challenge?utm_source=meta&utm_campaign=guided&utm_content=guided-g1")
+    assert r.status_code == 200
+    assert b"5-Week Guided Boxing Challenge" in r.data and b"12 of 12 spots left" in r.data
+    assert b"Tell us when you could train" in r.data and b"261.45" in r.data
+
+    base = {"name": "Sam Starter", "email": "sam@example.com", "phone": "604-330-2671",
+            "goal": "finish a full class", "notes": "left knee"}
+    r = client.post("/challenge/join", data=base)
+    assert b"tick the box" in r.data and db.session.query(Subscription).count() == 0
+
+    r = client.post("/challenge/join", data={**base, "waiver_agree": "1", "signature": "Sam Starter"})
+    assert b"You're in, Sam" in r.data
+    g = db.session.query(User).filter_by(email="sam@example.com").one()
+    sub = db.session.query(Subscription).one()
+    assert sub.challenge_key == ch.CHALLENGE["key"] and sub.status == "pending"
+    assert sub.first_charge_at == ch.renew_at_utc()
+    assert db.session.query(WaiverSignature).filter_by(signed_by_user_id=g.id).count() == 1
+    lead = db.session.query(Lead).filter_by(user_id=g.id).one()
+    assert lead.segment == "guided" and lead.utm_content == "guided-g1"
+
+    # Stripe: the first invoice ($249 + GST) is paid
+    sub.stripe_subscription_id = "sub_ch_1"
+    db.session.commit()
+    event = {"type": "invoice.paid", "data": {"object": {
+        "id": "in_ch_1", "subscription": "sub_ch_1", "amount_paid": 26145, "tax": 1245,
+        "currency": "cad", "charge": "ch_ch_1"}}}
+    client.post("/api/v1/webhooks/stripe", data=_json.dumps(event), content_type="application/json")
+    db.session.refresh(sub)
+    assert sub.status == "active"
+    pay = db.session.query(Payment).filter_by(user_id=g.id).one()
+    assert pay.amount_cents == 26145 and pay.agency_share_cents == round(24900 * 0.25)
+    assert db.session.query(Message).filter_by(template="challenge_welcome", channel="email").count() == 1
+    assert db.session.query(Message).filter_by(template="challenge_admin", recipient="staff-alerts@test.local").count() == 1
+    assert db.session.query(Message).filter_by(template="membership_welcome").count() == 0
+    assert ch.spots_left(client_account.id) == 11
+    assert b"1 <span" in _admin(app).get("/ops/marketing").data  # "1 of 12 spots taken"
+
+    # renewal reminder: only inside the notice window, and only once
+    sub.first_charge_at = utcnow() + timedelta(days=10)
+    db.session.commit()
+    assert send_challenge_renewal_reminders.apply().get() == 0
+    sub.first_charge_at = utcnow() + timedelta(hours=48)
+    db.session.commit()
+    assert send_challenge_renewal_reminders.apply().get() == 1
+    assert send_challenge_renewal_reminders.apply().get() == 0
+    reminder = db.session.query(Message).filter_by(template="pre_charge_reminder", channel="email").one()
+    assert "cancel-membership" in reminder.body_preview
+
+    # one-click cancel before the renewal: no notice period, renewal stopped
+    with app.test_request_context():
+        tok = make_token(sub.id, SALT_CANCEL_BEFORE_CHARGE)
+    r = client.get(f"/cancel-membership/{tok}")
+    assert b"won't renew" in r.data
+    db.session.refresh(sub)
+    assert sub.status == "active" and sub.cancel_effective_at == sub.first_charge_at
+    assert send_challenge_renewal_reminders.apply().get() == 0

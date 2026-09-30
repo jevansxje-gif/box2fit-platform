@@ -1446,7 +1446,12 @@ def _time_suggestion_summary() -> dict:
                 counts[t] += 1
     labels = dict(TIME_SLOTS)
     ranked = [(labels.get(k, k), n) for k, n in counts.most_common()]
-    return {"time_rows": rows[:25], "time_ranked": ranked, "time_total": len(rows), "time_labels": labels}
+    from ..services import challenge as ch
+
+    return {
+        "time_rows": rows[:25], "time_ranked": ranked, "time_total": len(rows), "time_labels": labels,
+        "challenge": ch.CHALLENGE, "challenge_taken": ch.spots_taken(_cid()),
+    }
 
 
 # ---------------------------------------------------------------- reports ---

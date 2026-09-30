@@ -6,7 +6,10 @@
 <div class="flow">
   <div class="confirm-card">
     <div class="pf-kicker">All done</div>
-    {% if not charged_yet %}
+    {% if in_challenge %}
+      <div class="big">Your membership won't renew.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">There are no further charges. Your 5-Week Challenge carries on as planned through its last class, and you're welcome back any time after.</p>
+    {% elif not charged_yet %}
       <div class="big">You won't be charged.</div>
       <p style="margin:18px 0 4px;color:var(--pf-text-2)">The membership was cancelled before any charge — the free trial carries no obligation. The ring's here whenever you're ready.</p>
     {% else %}

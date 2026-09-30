@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Join the 5-Week Challenge — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow" style="max-width:640px;margin:0 auto;padding:24px 16px">
+  <div class="pf-kicker" style="color:var(--pf-red)">5-Week Guided Boxing Challenge</div>
+  <h1 class="pf-h1" style="margin:6px 0 4px">Claim your spot</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">Starts {{ c.start.strftime('%A, %B %d') }} · {{ c.class_days }} at {{ c.class_time }} · {{ spots_left }} of {{ c.spots }} spots left</p>
+
+  {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+
+    <div class="pf-panel">
+      <h2>About you</h2>
+      <div class="pf-field"><label class="pf-label">Full name</label><input class="pf-input" name="name" required value="{{ form.name }}" autocomplete="name" /></div>
+      <div class="pf-field"><label class="pf-label">Email</label><input class="pf-input" name="email" type="email" required value="{{ form.email }}" autocomplete="email" /></div>
+      <div class="pf-field"><label class="pf-label">Mobile</label><input class="pf-input" name="phone" type="tel" required value="{{ form.phone }}" autocomplete="tel" placeholder="(604) 330-2671" /></div>
+      <label class="pf-check"><input type="checkbox" name="consent_sms" value="1" checked /> <span class="t">Text me reminders about my sessions</span></label>
+    </div>
+
+    <div class="pf-panel">
+      <h2>For your coach</h2>
+      <div class="pf-field"><label class="pf-label">What do you want out of the five weeks? (optional)</label><input class="pf-input" name="goal" maxlength="200" value="{{ form.goal }}" placeholder="e.g. get through a full class without stopping" /></div>
+      <div class="pf-field"><label class="pf-label">Any injury or condition we should know about? (optional)</label><input class="pf-input" name="notes" maxlength="300" value="{{ form.notes }}" placeholder="e.g. left knee, fine to train, no deep squats" /></div>
+      <p class="note">You'll go through this properly in your personal session. This just means your coach isn't starting from zero.</p>
+    </div>
+
+    <div class="pf-panel" id="waiver-panel">
+      <h2>Waiver &amp; membership terms</h2>
+      <p class="note">Open and read each section below; the box unlocks once all three have been opened.</p>
+      {% for title, body in waiver_sections %}
+      <details class="waiver-sec" style="border:1px solid var(--pf-line);border-radius:var(--pf-r-md);margin-bottom:8px;background:var(--pf-paper-2)">
+        <summary style="cursor:pointer;padding:13px 16px;font-weight:700;font-size:15px;color:var(--pf-ink)">{{ title }}</summary>
+        <div style="padding:0 16px 14px;font-size:13.5px;line-height:1.65;color:var(--pf-text-2);white-space:pre-line">{{ body }}</div>
+      </details>
+      {% endfor %}
+      <label class="pf-check" style="margin-top:14px"><input type="checkbox" name="waiver_agree" value="1" id="waiver-agree" disabled /> <span class="t">I have read and agree to the waiver and the membership terms <em id="waiver-hint" style="color:var(--pf-text-3);font-style:normal;font-size:13px">(open all three sections above first)</em></span></label>
+      <div class="pf-field" style="margin:14px 0 0"><label class="pf-label">Type your full legal name to sign</label><input class="pf-input" name="signature" required value="{{ form.signature }}" autocomplete="off" /></div>
+    </div>
+
+    <div class="pf-panel" style="border:2px solid var(--pf-ink)">
+      <h2>What you pay</h2>
+      <p style="margin:0 0 8px"><strong>Today: {{ price_total }}</strong> ({{ price }} + {{ price_gst }} GST) for the five weeks, your personal session, gloves and wraps.</p>
+      <p style="margin:0 0 8px"><strong>From {{ c.renew.strftime('%A, %B %d') }}: {{ renew_total }}</strong> ({{ renew_price }} + GST) every 4 weeks, unless you cancel before then.</p>
+      <p class="note" style="margin:0">We'll email and text a reminder three days before, with a one-click cancel link. Cancel before {{ c.renew.strftime('%B %d') }} and you pay nothing more; after that, month to month with 30 days' notice.</p>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" style="margin-top:6px">Continue to secure payment: {{ price_total }}</button>
+    <p class="note" style="text-align:center;margin-top:10px">Card details are entered on Stripe's secure page and never touch our servers.</p>
+  </form>
+</div>
+<script>
+  (function () {
+    var secs = document.querySelectorAll('.waiver-sec'), box = document.getElementById('waiver-agree'), hint = document.getElementById('waiver-hint');
+    var opened = new Set();
+    secs.forEach(function (d, i) {
+      d.addEventListener('toggle', function () {
+        if (d.open) opened.add(i);
+        if (opened.size === secs.length) { box.disabled = false; if (hint) hint.style.display = 'none'; }
+      });
+    });
+  })();
+</script>
+{% endblock %}

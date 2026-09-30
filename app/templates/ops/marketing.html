@@ -99,6 +99,12 @@
     {% endif %}
   </div>
 
+  <div class="pf-card pf-card--pad" style="margin-top:18px">
+    <div class="pf-kicker" style="color:var(--pf-text-3)">{{ challenge.name }} · starts {{ challenge.start.strftime('%b %d') }}</div>
+    <div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">{{ challenge_taken }} <span style="font-size:15px;font-weight:600;color:var(--pf-text-3)">of {{ challenge.spots }} spots taken</span></div>
+    <div style="color:var(--pf-text-3);font-size:12.5px">Sign-up page: /challenge · members appear under Members with "5-Week Challenge"</div>
+  </div>
+
   {# Is the schedule the blocker? Answers to "Tell us when you could train". #}
   <div class="pf-card pf-card--pad" style="margin-top:18px">
     <div class="pf-kicker" style="color:var(--pf-text-3)">Times people asked for · {{ time_total }} answer(s), all programs</div>

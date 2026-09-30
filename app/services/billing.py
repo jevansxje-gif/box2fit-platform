@@ -317,6 +317,24 @@ def cancel_subscription(
     sub.cancel_reason = reason
     sub.cancel_reason_note = note
 
+    # Paid challenge, before the membership renews: the weeks already paid
+    # for stand, the renewal simply never happens. No notice period.
+    in_challenge = bool(
+        sub.challenge_key and sub.first_charge_at and utcnow() < sub.first_charge_at
+    )
+    if in_challenge and not immediate:
+        sub.cancel_requested_at = utcnow()
+        sub.cancel_effective_at = sub.first_charge_at
+        if sub.stripe_subscription_id and stripe_service.is_configured():
+            stripe = stripe_service.stripe_client()
+            try:
+                stripe.Subscription.modify(
+                    sub.stripe_subscription_id, cancel_at_period_end=True
+                )
+            except Exception:
+                log.exception("stripe cancel-at-renewal failed (id=%s)", sub.id)
+        return
+
     never_charged = sub.activated_at is None
     if never_charged or immediate:
         if sub.stripe_subscription_id and stripe_service.is_configured():
@@ -491,6 +509,11 @@ def handle_checkout_completed(obj: dict) -> None:
     from ..models import OneOffCharge
 
     meta = obj.get("metadata") or {}
+    if meta.get("challenge_key"):
+        from . import challenge
+
+        challenge.finalize(obj)
+        return
     charge = None
     if meta.get("one_off_charge_id"):
         charge = db.session.get(OneOffCharge, int(meta["one_off_charge_id"]))
@@ -634,7 +657,12 @@ def handle_invoice_paid(obj: dict) -> Payment | None:
             currency="CAD",
             subscription_id=sub.id,
         )
-        _send_welcome(sub)
+        if sub.challenge_key:
+            from . import challenge
+
+            challenge.send_welcome(sub)
+        else:
+            _send_welcome(sub)
     elif was_past_due:
         _send_recovered(sub)
     return payment

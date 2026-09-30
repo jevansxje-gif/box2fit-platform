@@ -257,6 +257,20 @@ def automark_no_shows() -> int:
     return marked
 
 
+@shared_task(name="app.tasks.jobs.send_challenge_renewal_reminders")
+def send_challenge_renewal_reminders() -> int:
+    """Challenge members: notice before the membership renews (email + SMS
+    with the one-click cancel link). Card-network rule and plain fairness."""
+    from ..services import billing, challenge
+
+    n = 0
+    for sub in challenge.due_renewal_reminders():
+        billing._send_pre_charge_reminder(sub)
+        n += 1
+    db.session.commit()
+    return n
+
+
 @shared_task(name="app.tasks.jobs.payment_health_check")
 def payment_health_check() -> int:
     """Daily self-audit: reconcile Stripe's paid invoices against our Payment

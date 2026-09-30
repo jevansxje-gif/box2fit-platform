@@ -425,7 +425,10 @@ def suggest_time():
     from ..models import TimeSuggestion
 
     program = (request.form.get("program") or "")[:40]
-    back = url_for("funnel.landing", slug=program) if program else "/"
+    back = (
+        url_for("funnel.challenge_landing") if program == "challenge"
+        else url_for("funnel.landing", slug=program) if program else "/"
+    )
     if request.form.get("website"):  # honeypot
         return redirect(back + "?time=thanks#other-time")
     valid = {k for k, _ in TIME_SLOTS}
@@ -873,12 +876,18 @@ def cancel_membership(token: str):
         abort(404)
     sub = db.session.get(Subscription, sub_id) or abort(404)
     charged_yet = sub.activated_at is not None
+    from ..models import utcnow as _now
+
+    in_challenge = bool(
+        sub.challenge_key and sub.first_charge_at and _now() < sub.first_charge_at
+    )
     billing.cancel_subscription(
         sub, reason="cancelled_before_charge" if not charged_yet else "one_click_link"
     )
     db.session.commit()
     return render_template(
-        "funnel/membership_cancelled.html", charged_yet=charged_yet, sub=sub
+        "funnel/membership_cancelled.html", charged_yet=charged_yet, sub=sub,
+        in_challenge=in_challenge,
     )
 
 
@@ -996,3 +1005,126 @@ def one_off_done(token: str):
     paid = billing.confirm_one_off_return(charge, request.args.get("session_id"))
     db.session.commit()
     return render_template("funnel/one_off_done.html", charge=charge, guardian=guardian, fmt=fmt_cents, paid=paid)
+
+
+# ------------------------------------------- 5-Week Guided Boxing Challenge ---
+def _challenge_ctx(client):
+    from ..services import challenge as ch
+    from ..services.billing import default_plan
+    from ..services.tax import fmt_cents, gst_cents, total_with_gst_cents
+
+    plan = default_plan(client.id)
+    c = ch.CHALLENGE
+    return dict(
+        c=c,
+        spots_left=ch.spots_left(client.id),
+        price=fmt_cents(c["price_cents"]),
+        price_gst=fmt_cents(gst_cents(c["price_cents"])),
+        price_total=fmt_cents(total_with_gst_cents(c["price_cents"])),
+        renew_price=fmt_cents(plan.price_cents) if plan else "",
+        renew_total=fmt_cents(total_with_gst_cents(plan.price_cents)) if plan else "",
+        waiver_sections=__import__("app.legal", fromlist=["WAIVER_SECTIONS"]).WAIVER_SECTIONS,
+    )
+
+
+@bp.get("/challenge")
+def challenge_landing():
+    client = get_client()
+    resp = make_response(
+        render_template(
+            "funnel/challenge.html",
+            slug="challenge",
+            time_slots=TIME_SLOTS,
+            time_state=request.args.get("time"),
+            **_challenge_ctx(client),
+        )
+    )
+    capture_first_touch(request, resp, landing_variant=f"challenge:{request.args.get('v', 'a')[:20]}")
+    return resp
+
+
+@bp.route("/challenge/join", methods=["GET", "POST"])
+@limiter.limit("10/hour", methods=["POST"])
+def challenge_join():
+    from ..models import Lead, LeadStatus
+    from ..services import booking_flow
+    from ..services import challenge as ch
+
+    client = get_client()
+    ctx = _challenge_ctx(client)
+    form = {k: (request.form.get(k) or "").strip() for k in ("name", "email", "phone", "goal", "notes", "signature")}
+    error = None
+    if request.method == "POST":
+        email = form["email"].lower()
+        if request.form.get("website"):  # honeypot
+            return redirect(url_for("funnel.challenge_landing"))
+        if not form["name"] or "@" not in email or "." not in email.split("@")[-1]:
+            error = "Please enter your full name and a valid email."
+        elif len("".join(ch_ for ch_ in form["phone"] if ch_.isdigit())) < 10:
+            error = "Please enter a mobile number so your coach can reach you."
+        elif not request.form.get("waiver_agree") or not form["signature"]:
+            error = "Please open and read the three sections, tick the box and type your full name to sign."
+        elif ctx["spots_left"] <= 0:
+            error = "This challenge is full. Tell us which time would suit you below and you'll be first to hear about the next one."
+        if error is None:
+            guardian = booking_flow.get_or_create_guardian(
+                client.id, name=form["name"], email=email, phone=form["phone"],
+                consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
+            )
+            db.session.flush()
+            attendee = booking_flow.create_self_attendee(
+                guardian, {"notes": form["notes"], "challenge_goal": form["goal"]}
+            )
+            if ch.existing_sub(attendee):
+                db.session.commit()
+                return render_template("funnel/challenge_done.html", already=True, guardian=guardian, **ctx)
+            booking_flow.sign_waiver(attendee, guardian, form["signature"])
+            touch = read_first_touch(request) or {}
+            if not db.session.query(Lead).filter_by(user_id=guardian.id).first():
+                db.session.add(
+                    Lead(
+                        client_account_id=client.id, user_id=guardian.id, name=guardian.name,
+                        email=guardian.email, phone=guardian.phone or "", segment="guided",
+                        status=LeadStatus.new.value,
+                        utm_source=touch.get("utm_source"), utm_medium=touch.get("utm_medium"),
+                        utm_campaign=touch.get("utm_campaign"), utm_content=touch.get("utm_content"),
+                        landing_variant=touch.get("landing_variant"),
+                        submit_ip=(request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip())[:64],
+                    )
+                )
+            db.session.commit()
+            url = ch.start_checkout(guardian, attendee)
+            if url:
+                return redirect(url)
+            # Stripe not configured (dev/test): hold the spot locally.
+            ch._local_sub(attendee, None)
+            db.session.commit()
+            return render_template("funnel/challenge_done.html", already=False, guardian=guardian, paid=False, **ctx)
+    return render_template("funnel/challenge_join.html", form=form, error=error, **ctx)
+
+
+@bp.get("/challenge/done")
+def challenge_done():
+    """Back from Stripe Checkout: verify the session and record everything
+    here as well as on the webhook."""
+    import json as _json
+
+    from ..models import User
+    from ..services import challenge as ch
+    from ..services import stripe_service as _ss
+
+    client = get_client()
+    ctx = _challenge_ctx(client)
+    sid = request.args.get("session_id")
+    guardian, paid = None, False
+    if sid and _ss.is_configured():
+        try:
+            session = _json.loads(str(_ss.stripe_client().checkout.Session.retrieve(sid, stripe_version="2023-10-16")))
+            sub = ch.finalize(session)
+            db.session.commit()
+            if sub is not None:
+                guardian = db.session.get(User, sub.user_id)
+                paid = sub.activated_at is not None
+        except Exception:  # noqa: BLE001
+            log.exception("challenge done: could not verify session %s", sid)
+    return render_template("funnel/challenge_done.html", already=False, guardian=guardian, paid=paid, **ctx)

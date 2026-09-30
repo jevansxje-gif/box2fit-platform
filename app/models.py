@@ -515,6 +515,9 @@ class Subscription(db.Model):
     mrr_cents: Mapped[int] = mapped_column(Integer, default=0)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime)
     first_charge_at: Mapped[datetime | None] = mapped_column(DateTime)  # trial end
+    # Set when the membership began as a paid cohort challenge: the up-front
+    # fee covers the weeks until first_charge_at, when the membership renews.
+    challenge_key: Mapped[str | None] = mapped_column(String(40), index=True)
     pre_charge_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)

@@ -44,7 +44,33 @@ final_headline: "Two weeks to find out."
 booking_lede: "Pick a She Hits session. Come to any She Hits class during your two weeks."
 intro_offer:
   label: "Start your 2 weeks: $94.50"
+  today: "$99.23 ($94.50 + GST)"
   endpoint: "funnel.shehits_start"
   line: "Two weeks of She Hits, any sessions you like, for $94.50 + GST, half the four-week price. Then $189 + GST every 4 weeks only if you choose to continue."
   secondary: "Prefer to try one class first? It's free."
 review_tags: ["shehits"]
+time_line: "She Hits · Women only · Monday to Friday, 9 AM"
+hero_video: hero-shehits
+short_name: "She Hits sessions"
+objections_headline: "Straight answers, before you decide."
+objections:
+  - key: s1
+    q: "I hate being watched."
+    a: "Women only. Coached small groups. Nobody's staring, because everyone's hitting pads. You'll be too busy to notice anyone, and so will they."
+    proof: "65% of women have avoided a gym over fear of judgment. This room was built for exactly that."
+  - key: s2
+    q: "I want to feel strong, not just thin."
+    a: "You'll learn to hit properly, and there is nothing like landing a clean combination for making you feel strong. Strength, confidence, and a coach who knows your name."
+    proof: "Non-contact boxing shows some of the strongest evidence of any workout for stress and confidence."
+  - key: s3
+    q: "I've never boxed."
+    a: "Nearly everyone in She Hits started with zero experience. Everything is taught from the ground up, in a room where beginners are the norm."
+    proof: "Two weeks, any sessions you like, to find out at your own pace."
+  - key: s4
+    q: "I can't make 9 AM."
+    a: "Then tell us which time would work, at the bottom of this page. If enough women ask for the same slot, we open it. That's how 9 AM happened."
+    proof: "Class times are set by what people ask for."
+  - key: s5
+    q: "What's the catch with two weeks for $94.50?"
+    a: "There isn't one. It's half the four-week price, paid once, nothing renews. If you want to carry on after, membership is $189 + GST every 4 weeks, and you choose that then."
+    proof: "One-time payment on Stripe's secure page. No card kept on file for renewal."

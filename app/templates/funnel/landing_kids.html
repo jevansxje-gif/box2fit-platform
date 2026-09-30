@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 
 {% set book_url = url_for('funnel.step_class', segment='kids') %}
+{% set objections = [
+  {"key": "f1", "q": "Is boxing safe for my kid?", "a": "No sparring. No head contact. A coach runs every round: pads, bags, footwork and games. Ages 6 to 10 and 11 to 18 train separately. Confidence, not combat.", "proof": "Only 65% of parents allow contact sports. This isn't one."},
+  {"key": "f2", "q": "They spend all day on a screen.", "a": "Three afternoons a week, Mon/Wed/Fri or Tue/Thu/Sat at 4 pm, they'll be too busy hitting pads to look at one.", "proof": "54% of Canadian kids blow through the daily screen limit. Kids who stay under it are twice as likely to be active."},
+  {"key": "f3", "q": "They quit everything.", "a": "Kids quit when it stops being fun or there's no one they know. So it's small groups, the same coach and the same crew every week, and pads instead of pressure.", "proof": "Kids rank fun (48%) and friends (47%) first. The average child quits organized sport by 11 when those go missing."},
+  {"key": "f4", "q": "Is it worth $189?", "a": "Three sessions a week for $189 + GST every 4 weeks. No team fees, no tournaments, no 6 am ice. Less than a season of U9 hockey, and it fits around it.", "proof": "U9 hockey: $1,130 registration plus $1,000 to $4,500 in team fees."},
+  {"key": "f6", "q": "Won't it make them rougher?", "a": "The research says the opposite: structured combat-sport training makes kids calmer and better at self-control. Every session is rules, focus and discipline.", "proof": "A review of 12 studies found less aggression after martial-arts training, across ages and genders."},
+  {"key": "f7", "q": "What if 4 pm doesn't work?", "a": "Tell us which time would, at the bottom of this page. If enough parents ask for the same slot, we open it.", "proof": "Class times are set by what people ask for."},
+] %}
+{% set hero_obj = objections | selectattr('key', 'equalto', variant) | first %}
 
 {% block title %}Kids Boxing — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Confidence, focus, and real skills for kids ages 6 to 10. Their first week is free at Box2Fit White Rock.{% endblock %}
@@ -14,8 +23,13 @@
     <div class="wrap">
       <div>
         <div class="pf-kicker" style="color:var(--pf-red-bright)">Kids Boxing · Ages 6 to 10 · White Rock</div>
+        {% if hero_obj %}
+        <h1 style="text-transform:none;font-size:clamp(2rem,4.6vw,3.4rem)">“{{ hero_obj.q }}”</h1>
+        <p class="sub">{{ hero_obj.a }}</p>
+        {% else %}
         <h1>Watch your kid <span class="accent">light up.</span></h1>
         <p class="sub">Confidence, focus, and real skills in a welcoming, supportive room. Small groups, real coaching, no sparring, and a first week that's completely free.</p>
+        {% endif %}
         <div class="pf-google">
           <span class="stars">★★★★★</span>
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
@@ -25,7 +39,35 @@
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
         </div>
       </div>
-      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/youth-kids-bags.jpg') }}" alt="Kids boxing class at Box2Fit" />
+      <div class="hero-media">
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-kids.jpg') }}" aria-label="Kids boxing class at Box2Fit">
+          <source src="{{ url_for('static', filename='video/hero-kids.mp4') }}" type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <div class="time-strip">
+    <div class="wrap"><span>Kids Boxing · Ages 6 to 10 · 4 pm, Mon/Wed/Fri or Tue/Thu/Sat</span><a href="#other-time">Can't make 4 pm? Tell us when →</a></div>
+  </div>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">What parents ask us</div>
+        <h2>Straight answers, before you decide.</h2>
+      </div>
+      <div class="qa">
+        {% for o in objections %}
+        <article{% if hero_obj and o.key == hero_obj.key %} class="hi"{% endif %}><p class="q">“{{ o.q }}”</p><p class="a">{{ o.a }}</p><p class="proof">{{ o.proof }}</p></article>
+        {% endfor %}
+      </div>
+      <div class="offer">
+        <div class="pf-kicker">What it costs</div>
+        <p style="margin:8px 0 6px;font-size:17px"><strong>Their first week is free.</strong> Any kids classes within 7 days of the first one. Nothing is charged to book.</p>
+        <p style="margin:0;color:var(--pf-text-2)">To keep going after that: {{ member_price }} + GST every 4 weeks, three sessions a week in their group, month to month with 30 days' notice. Family pricing from the second child. You'll be reminded before any charge, with a one-click cancel link.</p>
+        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:16px">Book their free week</a>
+      </div>
     </div>
   </section>
 
@@ -104,6 +146,8 @@
       </div>
     </div>
   </section>
+
+  {% with slug="kids" %}{% include "funnel/_other_time.html" %}{% endwith %}
 
   <section class="final">
     <div class="wrap">

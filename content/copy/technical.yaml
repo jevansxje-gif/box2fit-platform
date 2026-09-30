@@ -42,3 +42,28 @@ final_kicker: "Real Boxing. Really Taught."
 final_headline: "Find out what you've got."
 booking_lede: "Pick a Technical Boxing session. Your first week is free: any classes in the 7 days from your first one."
 review_tags: ["technical"]
+time_line: "Technical Boxing · Monday to Friday, 6 PM · 60 minutes"
+hero_video: hero-adults
+short_name: "Technical Boxing sessions"
+objections_headline: "Straight answers, before you decide."
+objections:
+  - key: t1
+    q: "I've never boxed."
+    a: "Good. Technical Boxing is taught from the ground up: stance, guard, the jab, then combinations. Beginners are the point of the class, not an exception to it."
+    proof: "Most members started with no boxing background."
+  - key: t2
+    q: "Will I get hit?"
+    a: "No. There's no sparring and no head contact. You work with a coach on pads and bags. Contact is never part of this class."
+    proof: "Amateur boxing's injuries come from bouts, not bag work. This class has no bouts."
+  - key: t3
+    q: "Am I too old to learn?"
+    a: "The class is mostly adults in their thirties to fifties. Technique doesn't care how old you are; it rewards patience, and you have more of that now."
+    proof: "Every drill is coached rep by rep, at your pace."
+  - key: t4
+    q: "I'm not fit enough."
+    a: "Technique first, conditioning second. You'll get fitter because you're moving for an hour, but nobody is racing you."
+    proof: "Your first week is free; find out at your own pace."
+  - key: t5
+    q: "What do I need?"
+    a: "Runners, water and athletic clothing. Gloves and wraps are provided until you want your own."
+    proof: "Free underground parking at 1522 Finlay St."

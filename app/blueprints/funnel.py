@@ -240,6 +240,8 @@ def landing_kids():
     resp = make_response(
         render_template(
             "funnel/landing_kids.html",
+            variant=request.args.get("v", "a")[:20],
+            member_price=_member_price_label(client.id),
             google_rating=SiteSetting.get("google_rating", "5.0"),
             google_review_count=SiteSetting.get("google_review_count", "28"),
             reviews=reviews,
@@ -457,6 +459,14 @@ def suggest_time():
     return redirect(back + "?time=thanks#other-time")
 
 
+def _member_price_label(client_account_id: int) -> str:
+    from ..services.billing import default_plan
+    from ..services.tax import fmt_cents
+
+    plan = default_plan(client_account_id)
+    return fmt_cents(plan.price_cents) if plan else "$189"
+
+
 @bp.get("/<slug>")
 def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""
@@ -485,6 +495,8 @@ def landing(slug: str):
             google_review_count=SiteSetting.get("google_review_count", "28"),
             reviews=reviews,
             slug=slug,
+            variant=variant,
+            member_price=_member_price_label(client.id),
             time_slots=TIME_SLOTS,
             time_state=request.args.get("time"),
         )

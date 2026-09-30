@@ -4,10 +4,20 @@
 {% set full = spots_left <= 0 %}
 {% set cta = "Tell us a time that suits you" if full else "Claim my spot" %}
 {% set cta_url = "#other-time" if full else join_url %}
+{% set objections = [
+  {"key": "g1", "q": "I wouldn't know what to do.", "a": "You never will have to guess. A coach runs every round of the five weeks: what to hit, how hard, when to rest.", "proof": "60% of gym-goers say not knowing what to do is their biggest worry."},
+  {"key": "g2", "q": "I'm not fit enough to start.", "a": "Nobody's first visit is a test. Your personal session sets your starting point, and every 6 am round is pitched to it, not to the fittest person in the room.", "proof": "37% of non-exercisers feel too unhealthy to begin. That's the person this was designed for."},
+  {"key": "g3", "q": "I've quit gyms before.", "a": "Gym memberships fail because nobody notices when you stop coming. Five weeks, a goal you set with a coach, and the same 12 people every morning who notice.", "proof": "Coached small groups keep 84% of sessions vs 69% for self-directed training."},
+  {"key": "g4", "q": "I don't have time.", "a": "6 am, 50 minutes, done before the day starts. Five mornings a week if you want it, three if that's what fits, and the whole thing is over in five weeks.", "proof": "Time is the top reason people give for not training. A fixed slot beats a promise of flexibility."},
+  {"key": "g5", "q": "Boxing is for fighters.", "a": "No sparring. No head contact. Gloves, pads, bags, footwork and conditioning. A fitter, calmer you, and a skill you didn't have before.", "proof": "Non-contact boxing: lower stress and higher confidence in 15 of 16 studies reviewed."},
+  {"key": "g6", "q": "Why not just do a HIIT class?", "a": "Because in five weeks you'll be fitter and you'll be able to box. Same price as the studios down the road; this one comes with a coach who knows your goal.", "proof": "$249 + GST for five weeks, with gloves, wraps and a personal session included."},
+  {"key": "g8", "q": "6 am is too early for me.", "a": "Then tell us which time would work, at the bottom of this page. If enough people ask for the same slot, the next challenge runs there.", "proof": "Class times are set by what people ask for."},
+] %}
+{% set hero_obj = objections | selectattr('key', 'equalto', request.args.get('v', '')) | first %}
 
 {% block title %}5-Week Beast Camp Challenge — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Five weeks, a coach, a plan and a goal. 6 am, {{ c.spots }} spots, gloves and wraps included. Starts {{ c.start.strftime('%B %d') }} at Box2Fit White Rock.{% endblock %}
-{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/adults-sparring.jpg') }}{% endblock %}
+{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='video/hero-beast.jpg') }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
 
 {% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ cta_url }}">{{ cta }}</a>{% endblock %}
@@ -17,18 +27,45 @@
     <div class="wrap">
       <div>
         <div class="pf-kicker" style="color:var(--pf-red-bright)">Beast Camp · 6 am · Starts {{ c.start.strftime('%A, %B %d') }} · White Rock</div>
+        {% if hero_obj %}
+        <h1 style="text-transform:none;font-size:clamp(2rem,4.6vw,3.4rem)">“{{ hero_obj.q }}”</h1>
+        <p class="sub">{{ hero_obj.a }}</p>
+        {% else %}
         <h1>Five weeks. A coach, a plan, <span class="accent">a goal to hit.</span></h1>
         <p class="sub">Beast Camp is the 6 am hour that built this gym: boxing, strength and conditioning, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
+        {% endif %}
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">{% if full %}This one is full{% else %}{{ spots_left }} of {{ c.spots }} spots left{% endif %} · {{ price }} + GST</span>
         </div>
       </div>
-      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/adults-sparring.jpg') }}" alt="Coached boxing at Box2Fit White Rock" />
+      <div class="hero-media">
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Beast Camp at Box2Fit White Rock">
+          <source src="{{ url_for('static', filename='video/hero-beast.mp4') }}" type="video/mp4" />
+        </video>
+      </div>
     </div>
   </section>
 
+  <div class="time-strip">
+    <div class="wrap"><span>{{ c.class_days }}, {{ c.class_time }} · starts {{ c.start.strftime('%B %d') }}</span><a href="#other-time">Can't make 6 am? Tell us when you could train →</a></div>
+  </div>
+
   <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">You might be thinking</div>
+        <h2>Straight answers, before you decide.</h2>
+      </div>
+      <div class="qa">
+        {% for o in objections %}
+        <article{% if hero_obj and o.key == hero_obj.key %} class="hi"{% endif %}><p class="q">“{{ o.q }}”</p><p class="a">{{ o.a }}</p><p class="proof">{{ o.proof }}</p></article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
         <div class="pf-kicker">What you get for {{ price }}</div>

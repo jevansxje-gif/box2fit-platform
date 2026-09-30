@@ -4,7 +4,11 @@
 {% set trial_url = url_for('funnel.step_class', segment=copy.book_segment) %}
 {% set intro = copy.intro_offer %}
 {% set book_url = url_for(intro.endpoint) if intro else trial_url %}
-{% set cta = intro.label if intro else ("Book their free week" if copy.book_segment == 'youth' else "Start your free week") %}
+{% set is_parent = copy.book_segment == 'youth' %}
+{% set cta = intro.label if intro else ("Book their free week" if is_parent else "Start your free week") %}
+{# The ad someone clicked (?v=) picks the objection the page opens with, so
+   the page continues the conversation the ad started. #}
+{% set hero_obj = (copy.objections or []) | selectattr('key', 'equalto', variant) | first %}
 
 {% block title %}{{ copy.page_title }}{% endblock %}
 {% block meta_description %}{{ copy.subhead }}{% endblock %}
@@ -18,37 +22,77 @@
     <div class="wrap">
       <div>
         <div class="pf-kicker" style="color:var(--pf-red-bright)">{{ copy.eyebrow }} · White Rock</div>
+        {% if hero_obj %}
+        <h1 style="text-transform:none;font-size:clamp(2rem,4.6vw,3.4rem)">“{{ hero_obj.q }}”</h1>
+        <p class="sub">{{ hero_obj.a }}</p>
+        {% else %}
         <h1>{{ copy.headline }} <span class="accent">{{ copy.headline_accent }}</span></h1>
         <p class="sub">{{ copy.subhead }}</p>
+        {% endif %}
         <div class="pf-google">
           <span class="stars">★★★★★</span>
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
         </div>
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
-          <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ "Two weeks, $94.50 + GST" if intro else "Free week · no card needed to book" }}</span>
           {% if intro %}<div style="flex-basis:100%;margin-top:10px;color:var(--pf-on-dark-2);font-size:14.5px;line-height:1.5">{{ intro.line }}<br /><a href="{{ trial_url }}" style="color:inherit;text-decoration:underline">{{ intro.secondary }}</a></div>{% endif %}
         </div>
       </div>
-      <img class="hero-photo" src="{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}" alt="{{ copy.hero_photo_alt }}" />
+      <div class="hero-media">
+        {% if copy.hero_video %}
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/' + copy.hero_video + '.jpg') }}" aria-label="{{ copy.hero_photo_alt }}">
+          <source src="{{ url_for('static', filename='video/' + copy.hero_video + '.mp4') }}" type="video/mp4" />
+        </video>
+        {% else %}
+        <img src="{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}" alt="{{ copy.hero_photo_alt }}" />
+        {% endif %}
+      </div>
     </div>
   </section>
+
+  {# The time, and the way out if it doesn't fit: this is the single most
+     useful thing we can learn from people who don't book. #}
+  <div class="time-strip">
+    <div class="wrap"><span>{{ copy.time_line or copy.eyebrow }}</span><a href="#other-time">Can't make it? Tell us when you could train →</a></div>
+  </div>
 
   <section class="section">
     <div class="wrap">
       <div class="section-head">
-        <div class="pf-kicker">{{ copy.benefits_eyebrow }}</div>
-        <h2>{{ copy.benefits_headline }}</h2>
+        <div class="pf-kicker">{{ "What parents ask us" if is_parent else "You might be thinking" }}</div>
+        <h2>{{ copy.objections_headline or "Straight answers, before you decide." }}</h2>
       </div>
-      <div class="cards-3">
-        {% for b in copy.benefits %}
-        <div class="pf-card pf-card--pad">
-          <div class="bnum">{{ b.num }}</div>
-          <h3 class="pf-h3">{{ b.title }}</h3>
-          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">{{ b.body }}</p>
-          <p style="color:var(--pf-text-3);font-size:12px;margin:10px 0 0;text-transform:uppercase;letter-spacing:.04em;font-weight:700">{{ b.source }}</p>
-        </div>
+      <div class="qa">
+        {% for o in copy.objections %}
+        <article{% if hero_obj and o.key == hero_obj.key %} class="hi"{% endif %}>
+          <p class="q">“{{ o.q }}”</p>
+          <p class="a">{{ o.a }}</p>
+          {% if o.proof %}<p class="proof">{{ o.proof }}</p>{% endif %}
+        </article>
         {% endfor %}
+      </div>
+      <div class="offer">
+        <div class="pf-kicker">{{ "What it costs" }}</div>
+        {% if intro %}
+        <p style="margin:8px 0 6px;font-size:17px"><strong>Today: {{ intro.today }}</strong> for two weeks of She Hits, any sessions you like. One-time payment, nothing renews.</p>
+        <p style="margin:0;color:var(--pf-text-2)">If you want to carry on after, membership is {{ member_price }} + GST every 4 weeks, month to month with 30 days' notice. You choose that then, not now.</p>
+        {% else %}
+        <p style="margin:8px 0 6px;font-size:17px"><strong>{{ "Their" if is_parent else "Your" }} first week is free.</strong> Any {{ copy.short_name or 'classes' }} within 7 days of the first one. Nothing is charged to book.</p>
+        <p style="margin:0;color:var(--pf-text-2)">To keep going after that: {{ member_price }} + GST every 4 weeks, three sessions a week, month to month with 30 days' notice. You'll be reminded before any charge, with a one-click cancel link.</p>
+        {% endif %}
+        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:16px">{{ cta }}</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--pf-paper-2);padding-top:48px;padding-bottom:48px">
+    <div class="wrap coach" style="display:grid;grid-template-columns:1fr 1.1fr;gap:34px;align-items:center">
+      <img src="{{ url_for('static', filename='img/photos/' + copy.coach_photo) }}" alt="Coaching at Box2Fit" style="border-radius:var(--pf-r-xl);box-shadow:var(--pf-sh-md);aspect-ratio:4/3;object-fit:cover;width:100%" />
+      <div>
+        <div class="pf-kicker">{{ copy.coach_eyebrow }}</div>
+        <h2 style="margin:10px 0 14px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.6rem,3.2vw,2.2rem)">{{ copy.coach_headline }}</h2>
+        <p style="font-size:17px;line-height:1.6;color:var(--pf-text-2)">{{ copy.coach_body }}</p>
       </div>
     </div>
   </section>
@@ -73,23 +117,11 @@
   </section>
   {% endif %}
 
-  <section class="section" style="background:var(--pf-paper-2)">
-    <div class="wrap coach" style="display:grid;grid-template-columns:1fr 1.1fr;gap:34px;align-items:center">
-      <img src="{{ url_for('static', filename='img/photos/' + copy.coach_photo) }}" alt="Coaching at Box2Fit" style="border-radius:var(--pf-r-xl);box-shadow:var(--pf-sh-md);aspect-ratio:4/3;object-fit:cover;width:100%" />
-      <div>
-        <div class="pf-kicker">{{ copy.coach_eyebrow }}</div>
-        <h2 style="margin:10px 0 14px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.6rem,3.2vw,2.2rem)">{{ copy.coach_headline }}</h2>
-        <p style="font-size:17px;line-height:1.6;color:var(--pf-text-2)">{{ copy.coach_body }}</p>
-        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:12px">{{ cta }}</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
+  <section class="section" style="padding-top:48px">
     <div class="wrap">
       <div class="section-head">
-        <div class="pf-kicker">Before your first class</div>
-        <h2>Questions, answered.</h2>
+        <div class="pf-kicker">The practical bits</div>
+        <h2>Before {{ "their" if is_parent else "your" }} first class.</h2>
       </div>
       <div class="faq">
         {% for f in copy.faqs %}

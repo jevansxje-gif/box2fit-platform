@@ -42,3 +42,28 @@ final_kicker: "Confidence. Discipline. Real Skills."
 final_headline: "Their first class is on us."
 booking_lede: "Pick a session. Their first class is free."
 review_tags: ["youth"]
+time_line: "Youth Confidence · Ages 11 to 18 · Monday to Friday, 7 PM"
+hero_video: hero-youth
+short_name: "Youth Confidence sessions"
+objections_headline: "Straight answers for parents."
+objections:
+  - key: f5
+    q: "She won't go to a gym."
+    a: "This isn't a gym. It's a coach, a small group of the same faces each week, no sparring and nobody watching. The opposite of the room she's picturing."
+    proof: "Only 8% of teenage girls in Canada get enough activity, against 33% of boys."
+  - key: y2
+    q: "Is boxing safe for my teen?"
+    a: "No sparring. No head contact. Pads, bags, footwork and conditioning, coached every round. It's boxing training, not fighting."
+    proof: "Coach-led and non-contact, every session."
+  - key: y3
+    q: "They quit everything."
+    a: "Teens quit when it stops being fun or there's no one they know. So it's the same coach and the same crew every week, and progress they can see from one session to the next."
+    proof: "Kids rank fun and friends above everything else in sport, and most quit by 11 when those go missing."
+  - key: y4
+    q: "Won't it make them more aggressive?"
+    a: "The research says the reverse: structured combat-sport training makes young people calmer and better at self-control, because every session is about rules, focus and discipline."
+    proof: "A review of 12 studies found less aggression after martial-arts training, across ages and genders."
+  - key: y5
+    q: "Is it worth $189?"
+    a: "Three sessions a week, every week, for $189 + GST every 4 weeks. No team fees, no tournaments, no early ice. It fits around hockey and soccer season rather than competing with it."
+    proof: "U9 hockey alone is $1,130 plus $1,000 to $4,500 in team fees."

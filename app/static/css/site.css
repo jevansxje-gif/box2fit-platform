@@ -25,6 +25,19 @@ img{ display:block; max-width:100%; }
 .hero h1 .accent{ color:var(--pf-red-bright); display:block; }
 .hero .sub{ margin:18px 0 0; font-size:18px; line-height:1.55; color:var(--pf-on-dark-2); max-width:46ch; }
 .hero-photo{ border-radius:var(--pf-r-xl); box-shadow:var(--pf-sh-lg); aspect-ratio:4/5; object-fit:cover; width:100%; }
+.hero-media{ position:relative; border-radius:var(--pf-r-xl); box-shadow:var(--pf-sh-lg); aspect-ratio:4/5; overflow:hidden; background:#000; }
+.hero-media video,.hero-media img{ width:100%; height:100%; object-fit:cover; display:block; }
+.time-strip{ background:#fff; border-bottom:1px solid var(--pf-line); }
+.time-strip .wrap{ display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:14px 20px; font-weight:700; color:var(--pf-ink); }
+.time-strip a{ color:var(--pf-red); font-weight:800; text-decoration:none; }
+.qa{ display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:28px; }
+.qa article{ background:#fff; border:1px solid var(--pf-line); border-radius:var(--pf-r-xl); padding:26px 26px 22px; }
+.qa .q{ font-weight:900; font-size:clamp(1.35rem,2.6vw,1.75rem); letter-spacing:-.02em; line-height:1.08; color:var(--pf-ink); margin:0 0 12px; text-wrap:balance; }
+.qa .a{ color:var(--pf-text-2); font-size:16px; line-height:1.6; margin:0; }
+.qa .proof{ margin:14px 0 0; padding-top:12px; border-top:1px solid var(--pf-line); font-size:12.5px; color:var(--pf-text-3); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+.qa article.hi{ background:var(--pf-ink); border-color:var(--pf-ink); }
+.qa article.hi .q{ color:#fff; } .qa article.hi .a{ color:rgba(255,255,255,.86); } .qa article.hi .proof{ color:rgba(255,255,255,.6); border-color:rgba(255,255,255,.2); }
+.offer{ background:#fff; border:2px solid var(--pf-ink); border-radius:var(--pf-r-xl); padding:24px 26px; margin-top:28px; }
 .hero-cta{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:28px; }
 .hero .pf-google{ margin-top:22px; }
 /* the badge is a white pill — pin its text to ink regardless of section */
@@ -121,6 +134,8 @@ img{ display:block; max-width:100%; }
 .roster-row form{ display:inline; }
 
 @media (max-width:840px){
+  .qa{ grid-template-columns:1fr; }
+  .time-strip .wrap{ font-size:14.5px; }
   .hero .wrap{ grid-template-columns:1fr; gap:28px; }
   .hero-photo{ aspect-ratio:16/10; order:-1; }
   .cards-3,.cards-4{ grid-template-columns:1fr; }

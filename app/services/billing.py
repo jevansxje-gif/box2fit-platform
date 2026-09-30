@@ -367,12 +367,16 @@ def cancel_subscription(
 # gets a signed link, pays on Stripe Checkout, and staff are emailed when the
 # money lands. Usage of what was bought is the gym's to track.
 
-def create_one_off_charge(client_account_id, guardian, description, amount_cents, created_by=None):
+def create_one_off_charge(client_account_id, guardian, description, amount_cents, created_by=None,
+                          attendee=None, pass_days=None, pass_segment=None):
     from ..models import OneOffCharge
     from .tax import gst_cents
 
     tax = gst_cents(amount_cents)
     charge = OneOffCharge(
+        attendee_id=attendee.id if attendee is not None else None,
+        pass_days=pass_days,
+        pass_segment=pass_segment,
         client_account_id=client_account_id,
         user_id=guardian.id,
         description=(description or "One-off payment").strip()[:120],
@@ -413,7 +417,7 @@ def send_one_off_link(charge, guardian) -> str:
     return link
 
 
-def start_one_off_checkout(charge, guardian) -> str | None:
+def start_one_off_checkout(charge, guardian, success_url=None, cancel_url=None) -> str | None:
     """Create the Stripe Checkout Session for this charge and return its URL
     (None when Stripe isn't configured). Uses a current API version for this
     call only, because the account default (2019-09-09) predates Checkout's
@@ -442,8 +446,8 @@ def start_one_off_checkout(charge, guardian) -> str | None:
                 },
             },
         }],
-        success_url=absolute_url("funnel.one_off_done", token=token) + "?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url=absolute_url("funnel.one_off_pay", token=token),
+        success_url=(success_url or absolute_url("funnel.one_off_done", token=token)) + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=cancel_url or absolute_url("funnel.one_off_pay", token=token),
         metadata={"one_off_charge_id": str(charge.id)},
         payment_intent_data={
             "description": f"Box2Fit {charge.description}",
@@ -485,6 +489,13 @@ def record_one_off_paid(charge, payment_intent_id=None) -> Payment:
     charge.status = "paid"
     charge.paid_at = utcnow()
     charge.payment_id = pay.id
+    if charge.attendee_id and charge.pass_days:
+        from .tzutil import today_local
+
+        att = db.session.get(AttendeeProfile, charge.attendee_id)
+        if att is not None:
+            att.pass_until = today_local() + timedelta(days=charge.pass_days - 1)
+            att.pass_segment = charge.pass_segment
     charge.stripe_payment_intent_id = payment_intent_id or charge.stripe_payment_intent_id
 
     ctx = dict(guardian=guardian, charge=charge, fmt=fmt_cents)

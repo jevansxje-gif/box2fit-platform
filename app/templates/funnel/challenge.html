@@ -5,7 +5,7 @@
 {% set cta = "Tell us a time that suits you" if full else "Claim my spot" %}
 {% set cta_url = "#other-time" if full else join_url %}
 
-{% block title %}5-Week Guided Boxing Challenge — Box2Fit White Rock{% endblock %}
+{% block title %}5-Week Beast Camp Challenge — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Five weeks, a coach, a plan and a goal. 6 am, {{ c.spots }} spots, gloves and wraps included. Starts {{ c.start.strftime('%B %d') }} at Box2Fit White Rock.{% endblock %}
 {% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/adults-sparring.jpg') }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
@@ -16,9 +16,9 @@
   <section class="hero">
     <div class="wrap">
       <div>
-        <div class="pf-kicker" style="color:var(--pf-red-bright)">Guided Boxing · Starts {{ c.start.strftime('%A, %B %d') }} · White Rock</div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">Beast Camp · 6 am · Starts {{ c.start.strftime('%A, %B %d') }} · White Rock</div>
         <h1>Five weeks. A coach, a plan, <span class="accent">a goal to hit.</span></h1>
-        <p class="sub">The 5-Week Guided Boxing Challenge: set your goals one to one with a coach, train with the same small group at {{ c.class_time }}, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
+        <p class="sub">Beast Camp is the 6 am hour that built this gym: boxing, strength and conditioning, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">{% if full %}This one is full{% else %}{{ spots_left }} of {{ c.spots }} spots left{% endif %} · {{ price }} + GST</span>

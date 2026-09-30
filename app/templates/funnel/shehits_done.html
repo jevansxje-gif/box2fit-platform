@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ "You're in" if paid else "Payment" }} — She Hits — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    {% if paid %}
+      <div class="pf-kicker">She Hits · two weeks</div>
+      <div class="big">You're in{% if guardian %}, {{ guardian.name.split(' ')[0] }}{% endif %}.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Your {{ days }} days start today. Come to any She Hits session, weekdays at 9 AM, 1522 Finlay St, Unit 216, White Rock. Free underground parking; gloves and wraps provided.</p>
+      <p style="margin:12px 0 4px"><a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.step_class', segment='shehits') }}">Book your first session</a></p>
+      <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A receipt is on its way by email. Nothing renews automatically; if you'd like to keep going after two weeks, we'll show you the membership then.</p>
+    {% else %}
+      <div class="pf-kicker">Almost there</div>
+      <div class="big">We haven't seen the payment yet.</div>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">If you finished paying a moment ago, refresh this page in a minute. Otherwise <a href="{{ url_for('funnel.shehits_start') }}">go back and complete your sign-up</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

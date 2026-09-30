@@ -1,12 +1,12 @@
-# Women — /shehits (10 AM weekdays)
+# Women — /shehits (9 AM weekdays)
 # ANGLE: the mid-morning hour that's actually yours. Drop-off done, the house
-# quiet, the day not yet loud — a women-only room at 10 AM every weekday.
+# quiet, the day not yet loud — a women-only room at 9 AM every weekday.
 page_title: "She Hits · Women-only boxing — Box2Fit White Rock"
 register: warm
-eyebrow: "She Hits · Women-only · Weekdays 10 AM"
+eyebrow: "She Hits · Women-only · Weekdays 9 AM"
 headline: "Strong looks"
 headline_accent: "good on you."
-subhead: "She Hits is our women-only boxing class, every weekday at 10 AM — the hour after drop-off that's actually yours. Real strength and real confidence in a room that has your back. Beginners welcome, always."
+subhead: "She Hits is our women-only boxing class, every weekday at 9 AM, the hour after drop-off that's actually yours. Real strength and real confidence in a room that has your back. Beginners welcome, always. Two weeks for $94.50, any sessions you like."
 hero_photo: adult-woman-cables.jpg
 hero_photo_alt: "She Hits training at Box2Fit"
 benefits_eyebrow: "Why She Hits"
@@ -16,10 +16,10 @@ benefits:
     title: "Women-only room"
     body: "Train hard in a supportive space led by our She Hits coach."
     source: "She Hits · women-only class"
-  - num: "10 AM"
+  - num: "9 AM"
     title: "Your hour, every weekday"
-    body: "Kids at school, inbox can wait. Five mornings a week to build a routine that actually sticks."
-    source: "Mon–Fri at 10 AM"
+    body: "Drop-off done, inbox can wait. Five mornings a week to build a routine that actually sticks."
+    source: "Mon–Fri at 9 AM"
   - num: "5.0★"
     title: "From 28 Google reviews"
     body: "A challenge every session, while keeping the fun."
@@ -36,8 +36,15 @@ faqs:
   - q: "What should I bring?"
     a: "Comfortable athletic clothing, indoor training shoes, and a water bottle. Gloves and wraps can be provided."
   - q: "Where are you located?"
-    a: "1522 Finlay Street, Unit 216, White Rock. Book your free first class below."
+    a: "1522 Finlay Street, Unit 216, White Rock. Start your two weeks below."
+  - q: "Can't make 9 AM?"
+    a: "Tell us which time would work, at the bottom of this page. If enough women ask for the same time, we open it."
 final_kicker: "Train Smarter. Get Results."
-final_headline: "Your first class is on us."
-booking_lede: "Pick a She Hits session. Your first class is free."
+final_headline: "Two weeks to find out."
+booking_lede: "Pick a She Hits session. Come to any She Hits class during your two weeks."
+intro_offer:
+  label: "Start your 2 weeks: $94.50"
+  endpoint: "funnel.shehits_start"
+  line: "Two weeks of She Hits, any sessions you like, for $94.50 + GST, half the four-week price. Then $189 + GST every 4 weeks only if you choose to continue."
+  secondary: "Prefer to try one class first? It's free."
 review_tags: ["shehits"]

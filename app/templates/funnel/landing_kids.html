@@ -3,11 +3,11 @@
 {% set book_url = url_for('funnel.step_class', segment='kids') %}
 
 {% block title %}Kids Boxing — Box2Fit White Rock{% endblock %}
-{% block meta_description %}Confidence, focus, and real skills for kids ages 6 to 10. Their first class is free at Box2Fit White Rock.{% endblock %}
+{% block meta_description %}Confidence, focus, and real skills for kids ages 6 to 10. Their first week is free at Box2Fit White Rock.{% endblock %}
 {% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/youth-kids-bags.jpg') }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
 
-{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Free week</a>{% endblock %}
 
 {% block content %}
   <section class="hero">
@@ -15,13 +15,13 @@
       <div>
         <div class="pf-kicker" style="color:var(--pf-red-bright)">Kids Boxing · Ages 6 to 10 · White Rock</div>
         <h1>Watch your kid <span class="accent">light up.</span></h1>
-        <p class="sub">Confidence, focus, and real skills in a welcoming, supportive room. Small groups, real coaching, and a first class that's completely free.</p>
+        <p class="sub">Confidence, focus, and real skills in a welcoming, supportive room. Small groups, real coaching, no sparring, and a first week that's completely free.</p>
         <div class="pf-google">
           <span class="stars">★★★★★</span>
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
         </div>
         <div class="hero-cta">
-          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">Book their free first class</a>
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">Book their free week</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
         </div>
       </div>
@@ -100,7 +100,7 @@
         <details><summary>Is boxing safe for kids?</summary><p>Youth classes focus on fitness, footwork, pads and bags. Structured, supervised, and non-contact for beginners.</p></details>
         <details><summary>Can I stay and watch?</summary><p>Absolutely. Parents are welcome to stay, especially for the first class.</p></details>
         <details><summary>What should they bring?</summary><p>Comfortable athletic clothing, indoor shoes, and a water bottle. Gloves and wraps are provided.</p></details>
-        <details><summary>What does it cost after the free class?</summary><p>Nothing is charged unless you choose to continue — the free class carries no obligation. Memberships are month to month with a 30-day cancellation notice.</p></details>
+        <details><summary>What does it cost after the free week?</summary><p>Nothing is charged unless you choose to continue — the free week carries no obligation. Memberships are month to month with a 30-day cancellation notice.</p></details>
       </div>
     </div>
   </section>
@@ -109,14 +109,14 @@
     <div class="wrap">
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Train Smarter. Get Results.</div>
       <h2>Their first class is on us.</h2>
-      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">Book their free first class</a>
-      <div class="fine">Limited spots per class · Free first class · White Rock</div>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">Book their free week</a>
+      <div class="fine">Limited spots per class · Free first week · White Rock</div>
     </div>
   </section>
 {% endblock %}
 
 {% block after_body %}
 <div class="mobile-cta pf-sticky">
-  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">Book their free first class</a>
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">Book their free week</a>
 </div>
 {% endblock %}

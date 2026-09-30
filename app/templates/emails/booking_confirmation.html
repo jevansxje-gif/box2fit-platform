@@ -4,7 +4,7 @@
     <h1 style="margin:0 0 8px;font-size:24px;color:#14161A">
       {% if is_child %}{{ attendee.first_name }} is booked, {{ guardian.name.split(' ')[0] }}!{% else %}You're booked, {{ guardian.name.split(' ')[0] }}!{% endif %}
     </h1>
-    <p style="font-size:16px;line-height:1.5;margin:0 0 16px">The <b>free first class</b> is confirmed:</p>
+    <p style="font-size:16px;line-height:1.5;margin:0 0 16px">The first class of the <b>free week</b> is confirmed (any classes in the 7 days from it are free too):</p>
     <p style="font-size:18px;font-weight:bold;color:#C8132B;margin:0 0 16px">{{ class_name }}<br />{{ when }}</p>
     <p style="font-size:14px;line-height:1.6;margin:0 0 16px">
       <b>Where:</b> {{ address }}<br />

@@ -1979,7 +1979,7 @@ def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, cli
 
     r = client.get("/challenge?utm_source=meta&utm_campaign=guided&utm_content=guided-g1")
     assert r.status_code == 200
-    assert b"5-Week Guided Boxing Challenge" in r.data and b"12 of 12 spots left" in r.data
+    assert b"5-Week Beast Camp Challenge" in r.data and b"12 of 12 spots left" in r.data
     assert b"Tell us when you could train" in r.data and b"261.45" in r.data
 
     base = {"name": "Sam Starter", "email": "sam@example.com", "phone": "604-330-2671",
@@ -2033,3 +2033,59 @@ def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, cli
     db.session.refresh(sub)
     assert sub.status == "active" and sub.cancel_effective_at == sub.first_charge_at
     assert send_challenge_renewal_reminders.apply().get() == 0
+
+
+def test_free_week_and_she_hits_intro_pass(app, client, client_account):
+    """Adults and kids get a free WEEK (any classes within 7 days of the first
+    trial class); She Hits sells a paid 2-week intro that grants a class pass;
+    members are sent to the portal. /beast redirects to the challenge."""
+    from datetime import timedelta
+
+    from app.models import AttendeeProfile, ClassInstance, Message, OneOffCharge, User
+    from app.services import booking_flow
+
+    assert client.get("/beast").status_code == 302
+    r = client.get("/bootcamp")
+    assert b"Start your free week" in r.data and b"Free first week" in r.data
+    r = client.get("/kids")
+    assert b"Book their free week" in r.data
+    r = client.get("/shehits")
+    assert b"9 AM" in r.data and b"Start your 2 weeks: $94.50" in r.data and b"try one class first" in r.data
+
+    # free week rule
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    booking = db.session.query(Booking).one()
+    att = booking.attendee
+    others = (
+        db.session.query(ClassInstance)
+        .filter(ClassInstance.client_account_id == client_account.id, ClassInstance.id != instance.id)
+        .order_by(ClassInstance.starts_at_utc).limit(2).all()
+    )
+    within, later = others
+    within.local_date = instance.local_date + timedelta(days=3)
+    later.local_date = instance.local_date + timedelta(days=9)
+    db.session.commit()
+    assert booking_flow.trial_window_error(att, within) is None
+    assert "free week ran" in booking_flow.trial_window_error(att, later)
+
+    # She Hits paid intro -> pass covers she hits classes for 14 days
+    r = client.get("/shehits/start")
+    assert r.status_code == 200 and b"94.50" in r.data
+    r = client.post("/shehits/start", data={"name": "Ana Intro", "email": "ana@example.com", "phone": "604-330-2671",
+                                            "waiver_agree": "1", "signature": "Ana Intro"}, follow_redirects=True)
+    assert b"You're in" in r.data
+    g = db.session.query(User).filter_by(email="ana@example.com").one()
+    a = db.session.query(AttendeeProfile).filter_by(user_id=g.id).one()
+    ch = db.session.query(OneOffCharge).one()
+    assert ch.status == "paid" and ch.total_cents == 9923  # $94.50 + $4.73 GST, half-up like Stripe and ch.attendee_id == a.id
+    assert a.pass_segment == "shehits" and a.pass_until is not None
+    assert db.session.query(Message).filter_by(template="one_off_paid_admin").count() == 1
+    sh = (
+        db.session.query(ClassInstance).join(ClassInstance.class_type)
+        .filter(ClassInstance.client_account_id == client_account.id)
+        .all()
+    )
+    sh_inst = next((i for i in sh if getattr(i.class_type, "segment_tag", None) == "shehits" and i.local_date <= a.pass_until), None)
+    if sh_inst is not None:
+        assert booking_flow.trial_window_error(a, sh_inst) is None

@@ -180,6 +180,10 @@ class AttendeeProfile(db.Model):
     # Family asked to stop the trial chase (injury, changed mind): silences
     # the nudge email and removes them from the front-desk call list.
     trial_closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # A paid intro (e.g. She Hits 2 weeks): may book that program's classes
+    # up to and including this date, without a membership.
+    pass_until: Mapped[date | None] = mapped_column(Date)
+    pass_segment: Mapped[str | None] = mapped_column(String(40))
     trial_closed_reason: Mapped[str | None] = mapped_column(String(120))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -709,6 +713,10 @@ class OneOffCharge(db.Model):
     stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(128))
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(64))
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"))
+    # When paid, grant the attendee a class pass for this many days.
+    attendee_id: Mapped[int | None] = mapped_column(ForeignKey("attendee_profiles.id"))
+    pass_days: Mapped[int | None] = mapped_column(Integer)
+    pass_segment: Mapped[str | None] = mapped_column(String(40))
     created_by: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)

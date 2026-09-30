@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 
 {% set dark = copy.register == 'beast' %}
-{% set book_url = url_for('funnel.step_class', segment=copy.book_segment) %}
-{% set cta = "Book their free first class" if copy.book_segment == 'youth' else "Claim your free first class" %}
+{% set trial_url = url_for('funnel.step_class', segment=copy.book_segment) %}
+{% set intro = copy.intro_offer %}
+{% set book_url = url_for(intro.endpoint) if intro else trial_url %}
+{% set cta = intro.label if intro else ("Book their free week" if copy.book_segment == 'youth' else "Start your free week") %}
 
 {% block title %}{{ copy.page_title }}{% endblock %}
 {% block meta_description %}{{ copy.subhead }}{% endblock %}
 {% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
 
-{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">Book a free class</a>{% endblock %}
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ book_url }}">{{ "Start: $94.50" if intro else "Free week" }}</a>{% endblock %}
 
 {% block content %}
   <section class="hero">
@@ -25,6 +27,7 @@
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
+          {% if intro %}<div style="flex-basis:100%;margin-top:10px;color:var(--pf-on-dark-2);font-size:14.5px;line-height:1.5">{{ intro.line }}<br /><a href="{{ trial_url }}" style="color:inherit;text-decoration:underline">{{ intro.secondary }}</a></div>{% endif %}
         </div>
       </div>
       <img class="hero-photo" src="{{ url_for('static', filename='img/photos/' + copy.hero_photo) }}" alt="{{ copy.hero_photo_alt }}" />
@@ -103,7 +106,7 @@
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">{{ copy.final_kicker }}</div>
       <h2>{{ copy.final_headline }}</h2>
       <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
-      <div class="fine">Limited spots per class · Free first class · White Rock</div>
+      <div class="fine">Limited spots per class · {{ "Two weeks, $94.50 + GST" if intro else "Free first week" }} · White Rock</div>
     </div>
   </section>
 {% endblock %}

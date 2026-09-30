@@ -20,7 +20,11 @@ GST_PERCENT = 5.0  # what Stripe's TaxRate wants
 
 
 def gst_cents(pre_tax_cents: int) -> int:
-    return round(pre_tax_cents * GST_RATE)
+    # Half-up, as Stripe rounds its tax line (Python's round() is half-even:
+    # $94.50 would show $99.22 here and charge $99.23 there).
+    from decimal import ROUND_HALF_UP, Decimal
+
+    return int((Decimal(pre_tax_cents) * Decimal(str(GST_RATE))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def total_with_gst_cents(pre_tax_cents: int) -> int:

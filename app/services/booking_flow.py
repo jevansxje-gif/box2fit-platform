@@ -162,6 +162,57 @@ def sign_waiver(attendee: AttendeeProfile, guardian: User, signature_name: str) 
     return sig
 
 
+FREE_WEEK_DAYS = 7
+
+
+def trial_window_error(attendee: AttendeeProfile, instance: ClassInstance) -> str | None:
+    """The free week: any classes within 7 days of the first trial class. A
+    paid pass (e.g. She Hits 2 weeks) covers its program until pass_until.
+    Live members book from the portal, not the trial flow."""
+    from datetime import timedelta
+
+    from ..models import BookingStatus, Subscription, SubscriptionStatus
+
+    live = (
+        db.session.query(Subscription)
+        .filter(
+            Subscription.attendee_id == attendee.id,
+            Subscription.status.in_([
+                SubscriptionStatus.pending.value, SubscriptionStatus.active.value,
+                SubscriptionStatus.past_due.value,
+            ]),
+        )
+        .count()
+    )
+    if live:
+        return "You already have a membership. Book your classes from your member portal."
+    seg = getattr(instance.class_type, "segment_tag", None)
+    if attendee.pass_until and instance.local_date <= attendee.pass_until and (
+        not attendee.pass_segment or attendee.pass_segment == seg
+    ):
+        return None
+    first = (
+        db.session.query(ClassInstance.local_date)
+        .join(Booking, Booking.class_instance_id == ClassInstance.id)
+        .filter(
+            Booking.attendee_id == attendee.id,
+            Booking.status != BookingStatus.cancelled.value,
+        )
+        .order_by(ClassInstance.local_date)
+        .first()
+    )
+    if first is None:
+        return None
+    start = first[0]
+    end = start + timedelta(days=FREE_WEEK_DAYS - 1)
+    if instance.local_date > end:
+        return (
+            f"The free week ran {start.strftime('%b %d')} to {end.strftime('%b %d')}. "
+            "Ready for more? Start a membership and book any class."
+        )
+    return None
+
+
 def create_trial_booking(
     instance: ClassInstance,
     attendee: AttendeeProfile,
@@ -272,9 +323,9 @@ def send_booking_confirmation(booking: Booking) -> None:
         ics_url=ics_download_url(booking),
     )
     subject = (
-        f"{attendee.first_name} is booked — free first class at Box2Fit"
+        f"{attendee.first_name} is booked — free week at Box2Fit"
         if is_child
-        else "You're booked — free first class at Box2Fit"
+        else "You're booked — free week at Box2Fit"
     )
     send_email(
         guardian, guardian.email, subject, html, "booking_confirmation",
@@ -284,7 +335,7 @@ def send_booking_confirmation(booking: Booking) -> None:
     send_sms(
         guardian,
         guardian.phone,
-        f"Box2Fit: {who} free first class is booked. {instance.class_type.name}, "
+        f"Box2Fit: {who} free week starts with {instance.class_type.name}, "
         f"{when}. {STUDIO_ADDRESS}. Can't make it? {cancel_url}",
         "booking_confirmation",
         booking.client_account_id,

@@ -2,11 +2,11 @@
 
 {% block flow %}
   {% if segment in ('kids', 'youth') %}
-  <h1>Pick their free class</h1>
-  <p class="lede">Choose the age group and a time that fits your week. The first class is free.</p>
+  <h1>Pick their first class</h1>
+  <p class="lede">Choose the age group and a time. Their first week is free: any classes in the 7 days from this one.</p>
   {% else %}
-  <h1>Pick your free class</h1>
-  <p class="lede">Choose a time that fits your week. The first class is free.</p>
+  <h1>Pick your first class</h1>
+  <p class="lede">Choose a time. Your first week is free: any classes in the 7 days from this one.</p>
   {% endif %}
 
   {% if not occurrences %}

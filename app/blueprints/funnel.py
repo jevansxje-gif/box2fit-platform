@@ -26,6 +26,7 @@ from flask import (
 )
 
 from ..extensions import db, limiter
+from ..services.urls import absolute_url
 from ..models import (
     Booking,
     BookingStatus,
@@ -461,6 +462,8 @@ def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""
     from ..services.copy_loader import load_copy
 
+    if slug == "beast":  # Beast Camp's offer is the challenge while it's open
+        return redirect(url_for("funnel.challenge_landing"), 302)
     copy = load_copy(slug)
     if copy is None:
         abort(404)
@@ -575,6 +578,12 @@ def step_details(segment: str):
         if age_err:
             db.session.rollback()
             flash(age_err, "error")
+            return redirect(url_for("funnel.step_class", segment=segment))
+
+        window_err = booking_flow.trial_window_error(attendee, instance)
+        if window_err:
+            db.session.rollback()
+            flash(window_err, "error")
             return redirect(url_for("funnel.step_class", segment=segment))
 
         booking_flow.sign_waiver(attendee, guardian, form.signature.data.strip())
@@ -1128,3 +1137,102 @@ def challenge_done():
         except Exception:  # noqa: BLE001
             log.exception("challenge done: could not verify session %s", sid)
     return render_template("funnel/challenge_done.html", already=False, guardian=guardian, paid=paid, **ctx)
+
+
+# ---------------------------------------------- She Hits: 2 weeks for $94.50 ---
+SHEHITS_INTRO_CENTS = 9450
+SHEHITS_INTRO_DAYS = 14
+
+
+@bp.route("/shehits/start", methods=["GET", "POST"])
+@limiter.limit("10/hour", methods=["POST"])
+def shehits_start():
+    """Paid intro: two weeks of She Hits, any sessions, half the four-week
+    price. Waiver + signature here, card on Stripe Checkout, then a class
+    pass lets them book She Hits sessions for 14 days."""
+    from ..legal import WAIVER_SECTIONS
+    from ..models import Lead, LeadStatus
+    from ..services import billing, booking_flow
+    from ..services.tax import fmt_cents, gst_cents, total_with_gst_cents
+
+    client = get_client()
+    ctx = dict(
+        price=fmt_cents(SHEHITS_INTRO_CENTS), price_gst=fmt_cents(gst_cents(SHEHITS_INTRO_CENTS)),
+        price_total=fmt_cents(total_with_gst_cents(SHEHITS_INTRO_CENTS)), days=SHEHITS_INTRO_DAYS,
+        waiver_sections=WAIVER_SECTIONS,
+    )
+    form = {k: (request.form.get(k) or "").strip() for k in ("name", "email", "phone", "notes", "signature")}
+    error = None
+    if request.method == "POST":
+        email = form["email"].lower()
+        if request.form.get("website"):
+            return redirect(url_for("funnel.landing", slug="shehits"))
+        if not form["name"] or "@" not in email or "." not in email.split("@")[-1]:
+            error = "Please enter your full name and a valid email."
+        elif len("".join(c for c in form["phone"] if c.isdigit())) < 10:
+            error = "Please enter a mobile number."
+        elif not request.form.get("waiver_agree") or not form["signature"]:
+            error = "Please open and read the three sections, tick the box and type your full name to sign."
+        if error is None:
+            guardian = booking_flow.get_or_create_guardian(
+                client.id, name=form["name"], email=email, phone=form["phone"],
+                consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
+            )
+            db.session.flush()
+            attendee = booking_flow.create_self_attendee(guardian, {"notes": form["notes"]})
+            booking_flow.sign_waiver(attendee, guardian, form["signature"])
+            touch = read_first_touch(request) or {}
+            if not db.session.query(Lead).filter_by(user_id=guardian.id).first():
+                db.session.add(Lead(
+                    client_account_id=client.id, user_id=guardian.id, name=guardian.name, email=guardian.email,
+                    phone=guardian.phone or "", segment="shehits", status=LeadStatus.new.value,
+                    utm_source=touch.get("utm_source"), utm_medium=touch.get("utm_medium"),
+                    utm_campaign=touch.get("utm_campaign"), utm_content=touch.get("utm_content"),
+                    landing_variant=touch.get("landing_variant"),
+                ))
+            charge = billing.create_one_off_charge(
+                client.id, guardian, "She Hits: 2-week intro", SHEHITS_INTRO_CENTS, created_by="web",
+                attendee=attendee, pass_days=SHEHITS_INTRO_DAYS, pass_segment="shehits",
+            )
+            db.session.commit()
+            url = billing.start_one_off_checkout(
+                charge, guardian,
+                success_url=absolute_url("funnel.shehits_start_done"),
+                cancel_url=absolute_url("funnel.shehits_start"),
+            )
+            db.session.commit()
+            if url:
+                return redirect(url)
+            billing.record_one_off_paid(charge)  # Stripe not configured (dev/test)
+            db.session.commit()
+            return render_template("funnel/shehits_done.html", paid=True, guardian=guardian, **ctx)
+    return render_template("funnel/shehits_start.html", form=form, error=error, **ctx)
+
+
+@bp.get("/shehits/start/done")
+def shehits_start_done():
+    import json as _json
+
+    from ..models import OneOffCharge, User
+    from ..services import billing
+    from ..services import stripe_service as _ss
+    from ..services.tax import fmt_cents, gst_cents, total_with_gst_cents
+
+    ctx = dict(
+        price=fmt_cents(SHEHITS_INTRO_CENTS), price_gst=fmt_cents(gst_cents(SHEHITS_INTRO_CENTS)),
+        price_total=fmt_cents(total_with_gst_cents(SHEHITS_INTRO_CENTS)), days=SHEHITS_INTRO_DAYS,
+    )
+    sid = request.args.get("session_id")
+    guardian, paid = None, False
+    if sid and _ss.is_configured():
+        try:
+            sd = _json.loads(str(_ss.stripe_client().checkout.Session.retrieve(sid, stripe_version="2023-10-16")))
+            cid = (sd.get("metadata") or {}).get("one_off_charge_id")
+            charge = db.session.get(OneOffCharge, int(cid)) if cid else None
+            if charge is not None:
+                paid = billing.confirm_one_off_return(charge, sid)
+                db.session.commit()
+                guardian = db.session.get(User, charge.user_id)
+        except Exception:  # noqa: BLE001
+            log.exception("she hits done: could not verify session %s", sid)
+    return render_template("funnel/shehits_done.html", paid=paid, guardian=guardian, **ctx)

@@ -72,7 +72,7 @@ def _login(client, email, password="password123"):
 def test_public_and_landing_pages_render(client):
     for path in ("/", "/schedule", "/trainers", "/pricing", "/contact",
                  "/privacy", "/terms", "/kids", "/youth", "/technical",
-                 "/bootcamp", "/shehits", "/beast"):
+                 "/bootcamp", "/shehits", "/challenge"):
         r = client.get(path)
         assert r.status_code == 200, path
 
@@ -86,9 +86,9 @@ def test_public_and_landing_pages_render(client):
     assert b"/book/kids" in client.get("/kids").data
     assert b"/book/youth" in client.get("/youth").data
     assert b"/book/technical" in client.get("/technical").data
-    # beast register renders
+    # /beast sends people to the challenge while it is open
     r = client.get("/beast")
-    assert b"hardest hour" in r.data.lower()
+    assert r.status_code == 302 and "/challenge" in r.headers["Location"]
 
 
 def test_forgot_password_and_admin_reset(app, client, client_account):

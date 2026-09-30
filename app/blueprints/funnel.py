@@ -472,7 +472,7 @@ def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""
     from ..services.copy_loader import load_copy
 
-    if slug == "beast":  # Beast Camp's offer is the challenge while it's open
+    if slug == "beast":  # Guided Boxing (6 am): its offer is the challenge while it's open
         return redirect(url_for("funnel.challenge_landing"), 302)
     copy = load_copy(slug)
     if copy is None:

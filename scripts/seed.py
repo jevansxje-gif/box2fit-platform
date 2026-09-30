@@ -36,7 +36,7 @@ CLASS_TYPES = [
     ("technical", "Technical Boxing", "technical", None, None, 60, 16),
     ("bootcamp", "Boxing Bootcamp", "bootcamp", None, None, 45, 16),
     ("she_hits", "She Hits", "shehits", None, None, 60, 16),
-    ("beast", "Beast Camp", "beast", None, None, 50, 16),
+    ("beast", "Guided Boxing", "beast", None, None, 50, 16),
 ]
 
 # Retired catalog entries: deleted on reseed IF nothing references them.
@@ -160,6 +160,8 @@ def seed():
             ct.age_min = amin
             ct.age_max = amax
             ct.active = True
+            if key == "beast" and ct.name == "Beast Camp":
+                ct.name = name  # 2026-09-30: the 6 am program is Guided Boxing
         types[key] = ct
     print(f"class types: {len(types)}")
 

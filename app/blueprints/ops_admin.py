@@ -288,7 +288,7 @@ def schedule_builder():
             ("technical", "Technical Boxing (/technical)"),
             ("bootcamp", "Boxing Bootcamp (/bootcamp)"),
             ("shehits", "She Hits (/shehits)"),
-            ("beast", "Beast Camp (/beast)"),
+            ("beast", "Guided Boxing (/beast)"),
         ],
     )
 
@@ -803,7 +803,7 @@ AD_INVITE_SEGMENTS = [
     ("kids", "Kids Boxing (6–10)"),
     ("youth", "Youth Confidence (11–18)"),
     ("shehits", "She Hits (women)"),
-    ("beast", "Beast Camp"),
+    ("beast", "Guided Boxing"),
 ]
 
 

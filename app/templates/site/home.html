@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Box2Fit White Rock — Boxing & Fitness for Every Age{% endblock %}
-{% block meta_description %}Family-driven boxing and fitness in White Rock. Youth groups, She Hits, Beast Camp and more. Your first class is free.{% endblock %}
+{% block meta_description %}Family-driven boxing and fitness in White Rock. Youth groups, She Hits, Guided Boxing and more. Your first class is free.{% endblock %}
 
 {% block head %}
 <script type="application/ld+json">
@@ -20,7 +20,7 @@
       <div>
         <div class="pf-kicker" style="color:var(--pf-red-bright)">Boxing &amp; Fitness · White Rock</div>
         <h1>The best hour of your day, <span class="accent">with people who know your name.</span></h1>
-        <p class="sub">A family-driven boxing community for every age: youth groups, women-only She Hits, Beast Camp, and everyday fitness boxing. Beginners genuinely welcome.</p>
+        <p class="sub">A family-driven boxing community for every age: youth groups, women-only She Hits, Guided Boxing, and everyday fitness boxing. Beginners genuinely welcome.</p>
         <div class="pf-google">
           <span class="stars">★★★★★</span>
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
@@ -57,7 +57,7 @@
       <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap">
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='bootcamp') }}">Boxing Bootcamp · 5 PM</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='shehits') }}">She Hits · 10 AM</a>
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='beast') }}">Beast Camp · 6 AM</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='beast') }}">Guided Boxing · 6 AM</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_schedule') }}">Full schedule</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_pricing') }}">Memberships &amp; pricing</a>
       </div>

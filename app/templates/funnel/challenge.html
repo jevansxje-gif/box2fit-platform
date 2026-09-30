@@ -15,7 +15,7 @@
 ] %}
 {% set hero_obj = objections | selectattr('key', 'equalto', request.args.get('v', '')) | first %}
 
-{% block title %}5-Week Beast Camp Challenge — Box2Fit White Rock{% endblock %}
+{% block title %}5-Week Guided Boxing Challenge — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Five weeks, a coach, a plan and a goal. 6 am, {{ c.spots }} spots, gloves and wraps included. Starts {{ c.start.strftime('%B %d') }} at Box2Fit White Rock.{% endblock %}
 {% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='video/hero-beast.jpg') }}{% endblock %}
 {% block body_class %}has-mobile-cta{% endblock %}
@@ -26,13 +26,13 @@
   <section class="hero">
     <div class="wrap">
       <div>
-        <div class="pf-kicker" style="color:var(--pf-red-bright)">Beast Camp · 6 am · Starts {{ c.start.strftime('%A, %B %d') }} · White Rock</div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">Guided Boxing · 6 am · Starts {{ c.start.strftime('%A, %B %d') }} · White Rock</div>
         {% if hero_obj %}
         <h1 style="text-transform:none;font-size:clamp(2rem,4.6vw,3.4rem)">“{{ hero_obj.q }}”</h1>
         <p class="sub">{{ hero_obj.a }}</p>
         {% else %}
         <h1>Five weeks. A coach, a plan, <span class="accent">a goal to hit.</span></h1>
-        <p class="sub">Beast Camp is the 6 am hour that built this gym: boxing, strength and conditioning, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
+        <p class="sub">Guided Boxing is the 6 am hour: boxing, strength and conditioning with a coach running every round, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
         {% endif %}
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
@@ -40,7 +40,7 @@
         </div>
       </div>
       <div class="hero-media">
-        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Beast Camp at Box2Fit White Rock">
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Guided Boxing at Box2Fit White Rock">
           <source src="{{ url_for('static', filename='video/hero-beast.mp4') }}" type="video/mp4" />
         </video>
       </div>

@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 CHALLENGE = {
     "key": "guided-2026-10-26",
-    "name": "5-Week Beast Camp Challenge",
+    "name": "5-Week Guided Boxing Challenge",
     "start": date(2026, 10, 26),      # first class (Monday)
     "end": date(2026, 11, 27),        # last class (Friday)
     "renew": date(2026, 11, 30),      # membership continues from here
@@ -99,7 +99,7 @@ def _local_sub(attendee: AttendeeProfile, stripe_subscription_id: str | None) ->
             user_id=attendee.user_id,
             attendee_id=attendee.id,
             plan_id=plan.id,
-            cohort_label="Beast Camp Challenge · 6 am",
+            cohort_label="Guided Boxing Challenge · 6 am",
             status=SubscriptionStatus.pending.value,
             mrr_cents=plan.price_cents,
             first_charge_at=renew_at_utc(),
@@ -147,7 +147,7 @@ def start_checkout(guardian: User, attendee: AttendeeProfile) -> str | None:
                     "unit_amount": CHALLENGE["price_cents"],
                     "product_data": {
                         "name": "Box2Fit " + CHALLENGE["name"],
-                        "description": "Five weeks of coached Beast Camp at 6 am, gloves, wraps and one personal training session.",
+                        "description": "Five weeks of coached Guided Boxing at 6 am, gloves, wraps and one personal training session.",
                     },
                 },
             },
@@ -236,7 +236,7 @@ def send_welcome(sub: Subscription) -> None:
         notes=(attendee.health_json or {}).get("notes"),
     )
     send_email(
-        guardian, guardian.email, "You're in: the 5-Week Beast Camp Challenge",
+        guardian, guardian.email, "You're in: the 5-Week Guided Boxing Challenge",
         render_template("emails/challenge_welcome.html", **ctx),
         "challenge_welcome", sub.client_account_id, attendee_id=attendee.id,
     )

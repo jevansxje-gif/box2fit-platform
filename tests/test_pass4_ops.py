@@ -1979,7 +1979,7 @@ def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, cli
 
     r = client.get("/challenge?utm_source=meta&utm_campaign=guided&utm_content=guided-g1")
     assert r.status_code == 200
-    assert b"5-Week Beast Camp Challenge" in r.data and b"12 of 12 spots left" in r.data
+    assert b"5-Week Guided Boxing Challenge" in r.data and b"12 of 12 spots left" in r.data
     assert b"Tell us when you could train" in r.data and b"261.45" in r.data
 
     base = {"name": "Sam Starter", "email": "sam@example.com", "phone": "604-330-2671",

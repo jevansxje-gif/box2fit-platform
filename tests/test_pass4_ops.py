@@ -1932,3 +1932,32 @@ def test_one_off_charge_link_and_payment(app, client, client_account):
     assert b"Paid. Thank you" in r.data
     r = staff.get("/ops/payments")
     assert b"one-off: 10-class punch card" in r.data
+
+
+def test_suggest_another_time_is_recorded_and_reported(app, client, client_account):
+    """Landing pages ask "Time doesn't work? Tell us when you could train";
+    the answer is stored with the ad that brought the visitor and summarised
+    on the Marketing page, so we can see if the schedule is the blocker."""
+    from app.models import TimeSuggestion
+
+    r = client.get("/bootcamp?v=g4&utm_source=meta&utm_campaign=guided&utm_content=guided-g4")
+    assert r.status_code == 200 and b"Tell us when you could train" in r.data
+    r = client.post(
+        "/suggest-time",
+        data={"program": "bootcamp", "times": ["morning", "evening"], "other": "7:30 after nights",
+              "name": "Nia", "contact": "nia@example.com"},
+        follow_redirects=True,
+    )
+    assert b"Thank you, noted" in r.data
+    s = db.session.query(TimeSuggestion).one()
+    assert s.program == "bootcamp" and s.times == "morning,evening" and s.other == "7:30 after nights"
+    assert s.utm_campaign == "guided" and s.utm_content == "guided-g4"
+
+    # nothing picked: asked again, nothing stored; honeypot: silently dropped
+    r = client.post("/suggest-time", data={"program": "bootcamp"}, follow_redirects=True)
+    assert b"Pick at least one time" in r.data
+    client.post("/suggest-time", data={"program": "bootcamp", "times": ["late"], "website": "spam"})
+    assert db.session.query(TimeSuggestion).count() == 1
+
+    r = _admin(app).get("/ops/marketing")
+    assert b"Times people asked for" in r.data and b"Morning (7 to 9)" in r.data and b"7:30 after nights" in r.data

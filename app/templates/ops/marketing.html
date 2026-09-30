@@ -98,5 +98,31 @@
     <p class="note">No ad-attributed leads yet — they'll appear here the moment the first parent books.</p>
     {% endif %}
   </div>
+
+  {# Is the schedule the blocker? Answers to "Tell us when you could train". #}
+  <div class="pf-card pf-card--pad" style="margin-top:18px">
+    <div class="pf-kicker" style="color:var(--pf-text-3)">Times people asked for · {{ time_total }} answer(s), all programs</div>
+    {% if time_ranked %}
+    <div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr 40px;gap:6px 10px;align-items:center;margin:10px 0 14px;font-size:14px">
+      {% set top = time_ranked[0][1] %}
+      {% for label, n in time_ranked %}
+      <div>{{ label }}</div>
+      <div style="background:#F0EEE9;border-radius:4px;height:14px"><div style="background:var(--pf-ink);border-radius:4px;height:14px;width:{{ (100 * n / top)|round|int }}%"></div></div>
+      <div style="text-align:right;font-weight:800;font-variant-numeric:tabular-nums">{{ n }}</div>
+      {% endfor %}
+    </div>
+    {% for r in time_rows %}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;border-top:1px solid #F0EEE9;padding:7px 0;font-size:13.5px">
+      <span class="pf-chip" style="font-size:11px">{{ r.program }}</span>
+      <span>{% for t in (r.times or '').split(',') if t %}{{ time_labels.get(t, t) }}{{ ', ' if not loop.last }}{% endfor %}{% if r.other %}{{ ' · ' if r.times }}"{{ r.other }}"{% endif %}</span>
+      {% if r.name or r.contact %}<span style="color:var(--pf-text-2)">{{ r.name or '' }} {{ r.contact or '' }}</span>{% endif %}
+      {% if r.utm_content %}<span class="pf-chip" style="font-size:11px">{{ r.utm_content }}</span>{% endif %}
+      <span style="margin-left:auto;color:var(--pf-text-3);font-size:12.5px">{{ fmt_local(r.created_at, '%b %d · %I:%M %p') }}</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="note">Nothing yet. Every landing page now asks "Time doesn't work? Tell us when you could train"; answers land here.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

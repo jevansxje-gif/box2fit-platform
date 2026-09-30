@@ -96,6 +96,39 @@
     </div>
   </section>
 
+  {# "This time doesn't work for me": tells us whether the schedule is the
+     blocker. Contact details optional; we only use them to say when a class
+     opens at that time. #}
+  <section class="section" id="other-time" style="background:#fff;border-top:1px solid var(--pf-line)">
+    <div class="wrap" style="max-width:720px">
+      <div class="pf-kicker">Time doesn't work?</div>
+      <h2 style="margin:8px 0 8px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.4rem,2.8vw,1.9rem)">Tell us when you could train.</h2>
+      {% if time_state == 'thanks' %}
+      <p style="font-size:17px;color:var(--pf-text-2)"><strong>Thank you, noted.</strong> If we open a class at that time, you'll be the first to hear.</p>
+      {% else %}
+      <p style="color:var(--pf-text-2);margin:0 0 14px">We set class times by what people ask for. Tap the times that would work for you; it takes ten seconds.</p>
+      {% if time_state == 'pick' %}<p style="color:var(--pf-red);font-weight:700">Pick at least one time, or tell us in your own words.</p>{% endif %}
+      <form method="post" action="{{ url_for('funnel.suggest_time') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="program" value="{{ slug }}" />
+        <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          {% for value, label in time_slots %}
+          <label style="border:1.5px solid var(--pf-ink);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14.5px;cursor:pointer"><input type="checkbox" name="times" value="{{ value }}" style="margin-right:6px" />{{ label }}</label>
+          {% endfor %}
+        </div>
+        <input class="pf-input" name="other" maxlength="200" placeholder="Or in your own words, e.g. 7:30 am after a night shift" style="width:100%;margin-bottom:10px" />
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <input class="pf-input" name="name" maxlength="120" placeholder="First name (optional)" style="flex:1;min-width:160px" />
+          <input class="pf-input" name="contact" maxlength="160" placeholder="Email or mobile (optional)" style="flex:1.4;min-width:200px" />
+        </div>
+        <button class="pf-btn pf-btn--dark">Send</button>
+        <span style="color:var(--pf-text-3);font-size:12.5px;margin-left:10px">We'll only contact you about a class at the time you picked.</span>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+
   <section class="final">
     <div class="wrap">
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">{{ copy.final_kicker }}</div>

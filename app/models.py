@@ -709,3 +709,28 @@ class OneOffCharge(db.Model):
     created_by: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class TimeSuggestion(db.Model):
+    """"The class time doesn't work for me — here's when I could train."
+    Captured on landing pages so we can tell whether the schedule (not the
+    offer or the ad) is what stops people signing up. Attributed to the ad
+    that brought them; contact details are optional."""
+
+    __tablename__ = "time_suggestions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_account_id: Mapped[int] = mapped_column(
+        ForeignKey("client_accounts.id"), index=True
+    )
+    program: Mapped[str] = mapped_column(String(40))  # landing slug, e.g. bootcamp
+    times: Mapped[str] = mapped_column(String(200))  # comma-joined preset slots
+    other: Mapped[str | None] = mapped_column(String(200))  # free text
+    name: Mapped[str | None] = mapped_column(String(120))
+    contact: Mapped[str | None] = mapped_column(String(160))  # email or phone
+    utm_source: Mapped[str | None] = mapped_column(String(80))
+    utm_campaign: Mapped[str | None] = mapped_column(String(80))
+    utm_content: Mapped[str | None] = mapped_column(String(80))
+    landing_variant: Mapped[str | None] = mapped_column(String(60))
+    submit_ip: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

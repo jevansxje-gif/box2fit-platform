@@ -405,6 +405,54 @@ def membership_pay(token: str):
     )
 
 
+TIME_SLOTS = [
+    ("early", "Early morning (before 7)"),
+    ("morning", "Morning (7 to 9)"),
+    ("midmorning", "Mid-morning (9 to 11)"),
+    ("lunch", "Lunchtime (11 to 1)"),
+    ("afternoon", "Afternoon (1 to 4)"),
+    ("evening", "After work (5 to 7)"),
+    ("late", "Later evening (7 to 9)"),
+    ("weekend", "Weekend morning"),
+]
+
+
+@bp.post("/suggest-time")
+@limiter.limit("6/hour")
+def suggest_time():
+    """"This time doesn't work for me": record when they could train, with
+    the ad that brought them, so we can see if the schedule is the blocker."""
+    from ..models import TimeSuggestion
+
+    program = (request.form.get("program") or "")[:40]
+    back = url_for("funnel.landing", slug=program) if program else "/"
+    if request.form.get("website"):  # honeypot
+        return redirect(back + "?time=thanks#other-time")
+    valid = {k for k, _ in TIME_SLOTS}
+    times = [t for t in request.form.getlist("times") if t in valid]
+    other = (request.form.get("other") or "").strip()[:200]
+    if not times and not other:
+        return redirect(back + "?time=pick#other-time")
+    touch = read_first_touch(request) or {}
+    db.session.add(
+        TimeSuggestion(
+            client_account_id=get_client().id,
+            program=program or "unknown",
+            times=",".join(times),
+            other=other or None,
+            name=(request.form.get("name") or "").strip()[:120] or None,
+            contact=(request.form.get("contact") or "").strip()[:160] or None,
+            utm_source=touch.get("utm_source"),
+            utm_campaign=touch.get("utm_campaign"),
+            utm_content=touch.get("utm_content"),
+            landing_variant=touch.get("landing_variant"),
+            submit_ip=(request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip())[:64],
+        )
+    )
+    db.session.commit()
+    return redirect(back + "?time=thanks#other-time")
+
+
 @bp.get("/<slug>")
 def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""
@@ -430,6 +478,9 @@ def landing(slug: str):
             google_rating=SiteSetting.get("google_rating", "5.0"),
             google_review_count=SiteSetting.get("google_review_count", "28"),
             reviews=reviews,
+            slug=slug,
+            time_slots=TIME_SLOTS,
+            time_state=request.args.get("time"),
         )
     )
     capture_first_touch(request, resp, landing_variant=f"{slug}:{variant}")

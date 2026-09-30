@@ -1419,7 +1419,34 @@ def marketing():
         funnel=funnel,
         spend=spend,
         cpl=(spend / leads_n) if leads_n else None,
+        **_time_suggestion_summary(),
     )
+
+
+def _time_suggestion_summary() -> dict:
+    """"This time doesn't work" answers from the landing pages: counts per
+    slot and the latest rows, across all programs (the question is about the
+    schedule, not one campaign)."""
+    from collections import Counter
+
+    from ..blueprints.funnel import TIME_SLOTS
+    from ..models import TimeSuggestion
+
+    rows = (
+        db.session.query(TimeSuggestion)
+        .filter(TimeSuggestion.client_account_id == _cid())
+        .order_by(TimeSuggestion.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    counts = Counter()
+    for r in rows:
+        for t in (r.times or "").split(","):
+            if t:
+                counts[t] += 1
+    labels = dict(TIME_SLOTS)
+    ranked = [(labels.get(k, k), n) for k, n in counts.most_common()]
+    return {"time_rows": rows[:25], "time_ranked": ranked, "time_total": len(rows), "time_labels": labels}
 
 
 # ---------------------------------------------------------------- reports ---

@@ -1380,6 +1380,7 @@ def member_detail(user_id: int):
         now=now_utc(),
         rebook_options=rebook_options,
         card=stripe_service.card_summary(u),  # live: "did my card go through?"
+        guided_summary=__import__("app.services.guided", fromlist=["summary"]).summary,
     )
 
 

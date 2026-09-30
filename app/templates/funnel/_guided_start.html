@@ -1,0 +1,29 @@
+{# Guided Start: five taps so the coach knows where you're starting from.
+   Expects `guided` (the option lists) in context; every field optional. #}
+<div class="pf-panel" id="guided-start">
+  <div class="pf-kicker" style="color:var(--pf-red)">Guided Start · about a minute</div>
+  <h2 style="margin-top:6px">Tell your coach where you're starting from</h2>
+  <p class="note">Your coach reads this before you arrive and spends the first five minutes with you on it. It isn't a test; skip anything you like.</p>
+  <style>
+    .gs .chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+    .gs .chips label{border:1.5px solid var(--pf-ink);border-radius:999px;padding:8px 13px;font-weight:700;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:#fff}
+    .gs .chips input{margin:0}
+    .gs .q{font-weight:800;color:var(--pf-ink);margin:12px 0 2px}
+    .gs .h{font-size:12.5px;color:var(--pf-text-3);margin:0 0 4px}
+  </style>
+  <div class="gs">
+    <div class="q">1. What do you want out of this?</div><div class="h">Pick up to two.</div>
+    <div class="chips">{% for v, l in guided.goals %}<label><input type="checkbox" name="g_goals" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+    <div class="q">2. Where are you starting from?</div>
+    <div class="chips">{% for v, l in guided.levels %}<label><input type="radio" name="g_level" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+    <div class="q">3. What's put you off gyms before?</div><div class="h">Tap all that apply. This is the useful one.</div>
+    <div class="chips">{% for v, l in guided.before %}<label><input type="checkbox" name="g_before" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+    <div class="q">4. Anything your coach should know?</div>
+    <div class="chips">{% for v, l in guided.flags %}<label><input type="checkbox" name="g_flags" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+    <input class="pf-input" name="g_notes" maxlength="300" placeholder="Tell us a bit more (optional): e.g. left knee, fine to train, no deep squats" style="width:100%;margin-bottom:6px" />
+    <div class="q">5. Which times can you actually make?</div><div class="h">Tap all that work. We build your plan around them.</div>
+    <div class="chips">{% for v, l in guided.times %}<label><input type="checkbox" name="g_times" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+    <div class="q">6. Six weeks from now, what would make you say "this worked"?</div>
+    <input class="pf-input" name="g_success" maxlength="200" placeholder="One line, in your words (optional)" style="width:100%" />
+  </div>
+</div>

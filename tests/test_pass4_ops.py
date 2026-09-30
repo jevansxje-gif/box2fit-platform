@@ -2041,7 +2041,7 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     members are sent to the portal. /beast redirects to the challenge."""
     from datetime import timedelta
 
-    from app.models import AttendeeProfile, ClassInstance, Message, OneOffCharge, User
+    from app.models import AttendeeProfile, ClassInstance, User
     from app.services import booking_flow
 
     assert client.get("/beast").status_code == 302
@@ -2069,18 +2069,20 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     assert booking_flow.trial_window_error(att, within) is None
     assert "free week ran" in booking_flow.trial_window_error(att, later)
 
-    # She Hits paid intro -> pass covers she hits classes for 14 days
+    # She Hits paid intro -> subscription that renews on day 15 + a 14-day pass
     r = client.get("/shehits/start")
-    assert r.status_code == 200 and b"94.50" in r.data
+    assert r.status_code == 200 and b"94.50" in r.data and b"From day 15" in r.data and b"Guided Start" in r.data
     r = client.post("/shehits/start", data={"name": "Ana Intro", "email": "ana@example.com", "phone": "604-330-2671",
-                                            "waiver_agree": "1", "signature": "Ana Intro"}, follow_redirects=True)
+                                            "waiver_agree": "1", "signature": "Ana Intro",
+                                            "g_goals": ["stress"], "g_level": "none", "g_before": ["watched"], "g_notes": "left knee"},
+                    follow_redirects=True)
     assert b"You're in" in r.data
     g = db.session.query(User).filter_by(email="ana@example.com").one()
     a = db.session.query(AttendeeProfile).filter_by(user_id=g.id).one()
-    ch = db.session.query(OneOffCharge).one()
-    assert ch.status == "paid" and ch.total_cents == 9923  # $94.50 + $4.73 GST, half-up like Stripe and ch.attendee_id == a.id
+    sub = db.session.query(Subscription).filter_by(user_id=g.id).one()
+    assert sub.challenge_key == "shehits-intro" and sub.status == "pending" and sub.first_charge_at is not None
     assert a.pass_segment == "shehits" and a.pass_until is not None
-    assert db.session.query(Message).filter_by(template="one_off_paid_admin").count() == 1
+    assert a.health_json["guided"]["before"] == ["watched"] and "watched" in _admin(app).get(f"/ops/members/{g.id}").data.decode()
     sh = (
         db.session.query(ClassInstance).join(ClassInstance.class_type)
         .filter(ClassInstance.client_account_id == client_account.id)
@@ -2089,3 +2091,6 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     sh_inst = next((i for i in sh if getattr(i.class_type, "segment_tag", None) == "shehits" and i.local_date <= a.pass_until), None)
     if sh_inst is not None:
         assert booking_flow.trial_window_error(a, sh_inst) is None
+    # the class picker carries the time suggestion
+    r = client.get("/book/shehits")
+    assert b"None of these times work?" in r.data

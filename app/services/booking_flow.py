@@ -184,13 +184,13 @@ def trial_window_error(attendee: AttendeeProfile, instance: ClassInstance) -> st
         )
         .count()
     )
-    if live:
-        return "You already have a membership. Book your classes from your member portal."
     seg = getattr(instance.class_type, "segment_tag", None)
     if attendee.pass_until and instance.local_date <= attendee.pass_until and (
         not attendee.pass_segment or attendee.pass_segment == seg
     ):
         return None
+    if live:
+        return "You already have a membership. Book your classes from your member portal."
     first = (
         db.session.query(ClassInstance.local_date)
         .join(Booking, Booking.class_instance_id == ClassInstance.id)

@@ -20,6 +20,7 @@
       <p style="margin:8px 0 0"><b>{{ a.first_name }}</b> {{ '(child, b. ' + a.birth_year|string + ')' if a.kind == 'child' else '(self)' }}
         {% if a.trial_closed_at %}<span class="pf-chip pf-chip--warn" style="font-size:11px" title="No nudge emails, not on the call list">follow-ups stopped{{ ' · ' + a.trial_closed_reason if a.trial_closed_reason }}</span>{% endif %}
       </p>
+      {% if a.health_json and a.health_json.get('guided') %}<p style="margin:4px 0 0;font-size:13px;color:var(--pf-text-2)"><span class="pf-chip pf-chip--info" style="font-size:11px">Guided Start</span> {{ guided_summary(a.health_json.get('guided')) }}</p>{% endif %}
       {% if a.trial_closed_at %}
       <form method="post" style="margin:6px 0 0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />

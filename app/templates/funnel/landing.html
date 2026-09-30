@@ -75,8 +75,8 @@
       <div class="offer">
         <div class="pf-kicker">{{ "What it costs" }}</div>
         {% if intro %}
-        <p style="margin:8px 0 6px;font-size:17px"><strong>Today: {{ intro.today }}</strong> for two weeks of She Hits, any sessions you like. One-time payment, nothing renews.</p>
-        <p style="margin:0;color:var(--pf-text-2)">If you want to carry on after, membership is {{ member_price }} + GST every 4 weeks, month to month with 30 days' notice. You choose that then, not now.</p>
+        <p style="margin:8px 0 6px;font-size:17px"><strong>Today: {{ intro.today }}</strong> for two weeks of She Hits, any sessions you like.</p>
+        <p style="margin:0;color:var(--pf-text-2)">From day 15 your membership continues at {{ member_price }} + GST every 4 weeks, month to month with 30 days' notice, unless you cancel before then. We email and text a reminder three days ahead with a one-click cancel link.</p>
         {% else %}
         <p style="margin:8px 0 6px;font-size:17px"><strong>{{ "Their" if is_parent else "Your" }} first week is free.</strong> Any {{ copy.short_name or 'classes' }} within 7 days of the first one. Nothing is charged to book.</p>
         <p style="margin:0;color:var(--pf-text-2)">To keep going after that: {{ member_price }} + GST every 4 weeks, three sessions a week, month to month with 30 days' notice. You'll be reminded before any charge, with a one-click cancel link.</p>

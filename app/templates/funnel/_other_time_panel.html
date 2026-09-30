@@ -1,0 +1,28 @@
+{# Compact "none of these times work?" card for the class picker. Expects
+   slug, time_slots, time_state; posts to the same suggest-time endpoint. #}
+<div class="pf-panel" id="other-time" style="border:2px solid var(--pf-ink);background:#fff">
+  {% if time_state == 'thanks' %}
+  <h2 style="margin:0 0 4px">Thank you, noted.</h2>
+  <p class="note" style="margin:0">If we open a class at that time, you'll be the first to hear. You can still book a class below.</p>
+  {% else %}
+  <h2 style="margin:0 0 4px">None of these times work?</h2>
+  <p class="note" style="margin:0 0 10px">Tell us when you'd train. Enough people ask for the same time and we open it.</p>
+  {% if time_state == 'pick' %}<p style="color:var(--pf-red);font-weight:700;margin:0 0 8px">Pick at least one time, or tell us in your own words.</p>{% endif %}
+  <form method="post" action="{{ url_for('funnel.suggest_time') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="hidden" name="program" value="{{ slug }}" />
+    <input type="hidden" name="return_to" value="picker" />
+    <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      {% for value, label in time_slots %}
+      <label style="border:1.5px solid var(--pf-ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13.5px;cursor:pointer;background:#fff"><input type="checkbox" name="times" value="{{ value }}" style="margin-right:6px" />{{ label }}</label>
+      {% endfor %}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="pf-input" name="other" maxlength="200" placeholder="Or in your own words" style="flex:1;min-width:160px" />
+      <input class="pf-input" name="contact" maxlength="160" placeholder="Email or mobile (optional)" style="flex:1;min-width:160px" />
+      <button class="pf-btn pf-btn--dark pf-btn--sm">Send</button>
+    </div>
+  </form>
+  {% endif %}
+</div>

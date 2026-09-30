@@ -19,12 +19,7 @@
       <label class="pf-check"><input type="checkbox" name="consent_sms" value="1" checked /> <span class="t">Text me reminders about my sessions</span></label>
     </div>
 
-    <div class="pf-panel">
-      <h2>For your coach</h2>
-      <div class="pf-field"><label class="pf-label">What do you want out of the five weeks? (optional)</label><input class="pf-input" name="goal" maxlength="200" value="{{ form.goal }}" placeholder="e.g. get through a full class without stopping" /></div>
-      <div class="pf-field"><label class="pf-label">Any injury or condition we should know about? (optional)</label><input class="pf-input" name="notes" maxlength="300" value="{{ form.notes }}" placeholder="e.g. left knee, fine to train, no deep squats" /></div>
-      <p class="note">You'll go through this properly in your personal session. This just means your coach isn't starting from zero.</p>
-    </div>
+    {% include "funnel/_guided_start.html" %}
 
     <div class="pf-panel" id="waiver-panel">
       <h2>Waiver &amp; membership terms</h2>

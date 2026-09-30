@@ -6,6 +6,7 @@
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Contact</td><td>{{ guardian.phone or 'no phone' }} · {{ guardian.email }}</td></tr>
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Their goal</td><td>{{ goal or 'not given' }}</td></tr>
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Injury / condition</td><td>{{ notes or 'none given' }}</td></tr>
+      {% if guided_summary %}<tr><td style="padding:4px 18px 4px 0;color:#767C86">Guided Start</td><td>{{ guided_summary }}</td></tr>{% endif %}
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Challenge</td><td>{{ c.name }}, starts {{ c.start.strftime('%a %b %d') }}, {{ c.class_time }}</td></tr>
     </table>
     <p style="font-size:15px;line-height:1.6;margin:14px 0 0"><strong>To do:</strong> call or text them to book the personal session (goals, starting measures, weigh-in) before {{ c.start.strftime('%B %d') }}, and set aside gloves and wraps.</p>

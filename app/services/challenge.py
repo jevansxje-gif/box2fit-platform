@@ -42,6 +42,34 @@ CHALLENGE = {
     "class_days": "Monday to Friday",
     "reminder_hours": 72,             # notice before the renewal charge
 }
+# The She Hits intro is the same mechanism on a rolling start: two weeks paid
+# today, membership from day 15 unless cancelled. No cohort, no spot cap.
+SHEHITS_INTRO = {
+    "key": "shehits-intro",
+    "name": "She Hits: two-week intro",
+    "price_cents": 9450,
+    "days": 14,
+    "pass_segment": "shehits",
+    "cohort_label": "She Hits · 9 am",
+    "class_time": "9:00 am",
+    "reminder_hours": 72,
+    "description": "Two weeks of She Hits, any sessions, women only, coached.",
+}
+OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO}
+
+
+def offer_renew_at(offer: dict) -> datetime:
+    """When the membership starts charging: the cohort's fixed date, or day
+    15 for a rolling intro (10 am local, so the reminder lands in daytime)."""
+    from datetime import timedelta
+
+    from .tzutil import today_local
+
+    if offer.get("renew"):
+        return local_to_utc(offer["renew"], time(10, 0))
+    return local_to_utc(today_local() + timedelta(days=offer["days"]), time(10, 0))
+
+
 LIVE = (
     SubscriptionStatus.pending.value,
     SubscriptionStatus.active.value,
@@ -50,7 +78,7 @@ LIVE = (
 
 
 def renew_at_utc() -> datetime:
-    return local_to_utc(CHALLENGE["renew"], time(10, 0))
+    return offer_renew_at(CHALLENGE)
 
 
 def spots_taken(client_account_id: int) -> int:
@@ -80,8 +108,11 @@ def existing_sub(attendee: AttendeeProfile) -> Subscription | None:
     )
 
 
-def _local_sub(attendee: AttendeeProfile, stripe_subscription_id: str | None) -> Subscription:
+def _local_sub(attendee: AttendeeProfile, stripe_subscription_id: str | None, offer: dict | None = None,
+               renew_at: datetime | None = None) -> Subscription:
     from .billing import default_plan
+
+    offer = offer or CHALLENGE
 
     sub = None
     if stripe_subscription_id:
@@ -99,25 +130,33 @@ def _local_sub(attendee: AttendeeProfile, stripe_subscription_id: str | None) ->
             user_id=attendee.user_id,
             attendee_id=attendee.id,
             plan_id=plan.id,
-            cohort_label="Guided Boxing Challenge · 6 am",
+            cohort_label=offer.get("cohort_label", "Guided Boxing Challenge · 6 am"),
             status=SubscriptionStatus.pending.value,
             mrr_cents=plan.price_cents,
-            first_charge_at=renew_at_utc(),
-            challenge_key=CHALLENGE["key"],
+            first_charge_at=renew_at or offer_renew_at(offer),
+            challenge_key=offer["key"],
         )
         db.session.add(sub)
         db.session.flush()
+    if offer.get("pass_segment") and sub.first_charge_at:
+        # Book that program's classes through the trial flow until renewal.
+        from .tzutil import utc_to_local
+
+        attendee.pass_until = utc_to_local(sub.first_charge_at).date()
+        attendee.pass_segment = offer["pass_segment"]
     if stripe_subscription_id and not sub.stripe_subscription_id:
         sub.stripe_subscription_id = stripe_subscription_id
     return sub
 
 
-def start_checkout(guardian: User, attendee: AttendeeProfile) -> str | None:
-    """Stripe Checkout URL for the challenge, or None when Stripe isn't
-    configured (dev/test: the caller finalizes locally)."""
+def start_checkout(guardian: User, attendee: AttendeeProfile, offer: dict | None = None,
+                   success_endpoint: str = "funnel.challenge_done", cancel_endpoint: str = "funnel.challenge_join") -> str | None:
+    """Stripe Checkout URL for a paid intro (challenge or She Hits), or None
+    when Stripe isn't configured (dev/test: the caller finalizes locally)."""
     from .billing import default_plan, ensure_stripe_price
     from .tax import ensure_stripe_gst_rate
 
+    offer = offer or CHALLENGE
     if not stripe_service.is_configured():
         return None
     stripe = stripe_service.stripe_client()
@@ -130,10 +169,11 @@ def start_checkout(guardian: User, attendee: AttendeeProfile) -> str | None:
         else {"customer_email": guardian.email}
     )
     meta = {
-        "challenge_key": CHALLENGE["key"],
+        "challenge_key": offer["key"],
         "user_id": str(guardian.id),
         "attendee_id": str(attendee.id),
     }
+    renew_at = offer_renew_at(offer)
     session = stripe.checkout.Session.create(
         mode="subscription",
         payment_method_types=["card"],
@@ -144,21 +184,21 @@ def start_checkout(guardian: User, attendee: AttendeeProfile) -> str | None:
                 "tax_rates": [gst],
                 "price_data": {
                     "currency": "cad",
-                    "unit_amount": CHALLENGE["price_cents"],
+                    "unit_amount": offer["price_cents"],
                     "product_data": {
-                        "name": "Box2Fit " + CHALLENGE["name"],
-                        "description": "Five weeks of coached Guided Boxing at 6 am, gloves, wraps and one personal training session.",
+                        "name": "Box2Fit " + offer["name"],
+                        "description": offer.get("description", "Five weeks of coached Guided Boxing at 6 am, gloves, wraps and one personal training session."),
                     },
                 },
             },
         ],
         subscription_data={
-            "trial_end": int((renew_at_utc() - datetime(1970, 1, 1)).total_seconds()),
+            "trial_end": int((renew_at - datetime(1970, 1, 1)).total_seconds()),
             "metadata": meta,
         },
         metadata=meta,
-        success_url=absolute_url("funnel.challenge_done") + "?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url=absolute_url("funnel.challenge_join"),
+        success_url=absolute_url(success_endpoint) + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=absolute_url(cancel_endpoint),
         stripe_version="2023-10-16",
         **who,
     )
@@ -174,7 +214,8 @@ def finalize(session: dict) -> Subscription | None:
     from . import billing
 
     meta = session.get("metadata") or {}
-    if meta.get("challenge_key") != CHALLENGE["key"]:
+    offer = OFFERS.get(meta.get("challenge_key") or "")
+    if offer is None:
         return None
     if session.get("payment_status") not in (None, "paid", "no_payment_required"):
         return None
@@ -186,7 +227,15 @@ def finalize(session: dict) -> Subscription | None:
     stripe_sub_id = session.get("subscription")
     if isinstance(stripe_sub_id, dict):
         stripe_sub_id = stripe_sub_id.get("id")
-    sub = _local_sub(attendee, stripe_sub_id)
+    renew_at = None
+    if stripe_sub_id and stripe_service.is_configured():
+        try:
+            ss0 = json.loads(str(stripe_service.stripe_client().Subscription.retrieve(stripe_sub_id, stripe_version="2019-09-09")))
+            if ss0.get("trial_end"):
+                renew_at = datetime.utcfromtimestamp(int(ss0["trial_end"]))
+        except Exception:  # noqa: BLE001
+            log.exception("finalize: could not read trial_end for %s", stripe_sub_id)
+    sub = _local_sub(attendee, stripe_sub_id, offer, renew_at)
 
     customer = db.session.query(StripeCustomer).filter_by(user_id=guardian.id).one_or_none()
     if customer is None:
@@ -225,16 +274,44 @@ def send_welcome(sub: Subscription) -> None:
 
     attendee = db.session.get(AttendeeProfile, sub.attendee_id)
     guardian = attendee.guardian
+    offer = OFFERS.get(sub.challenge_key or "", CHALLENGE)
     invite_url = absolute_url("portal.set_password", token=make_token(guardian.id, SALT_SET_PASSWORD))
     from ..models import utcnow
 
     guardian.invited_at = guardian.invited_at or utcnow()
+    from . import guided
+
+    g = (attendee.health_json or {}).get("guided")
     ctx = dict(
-        guardian=guardian, attendee=attendee, sub=sub, c=CHALLENGE, invite_url=invite_url,
+        guardian=guardian, attendee=attendee, sub=sub, c=CHALLENGE, o=offer, invite_url=invite_url,
         renew_total=fmt_cents(total_with_gst_cents(sub.mrr_cents)),
-        goal=(attendee.health_json or {}).get("challenge_goal"),
-        notes=(attendee.health_json or {}).get("notes"),
+        renew_when=sub.first_charge_at,
+        goal=(attendee.health_json or {}).get("challenge_goal") or (g or {}).get("success"),
+        notes=(attendee.health_json or {}).get("notes") or (g or {}).get("notes"),
+        guided_summary=guided.summary(g),
     )
+    if offer is SHEHITS_INTRO:
+        from .tzutil import fmt_local
+
+        send_email(
+            guardian, guardian.email, "You're in: two weeks of She Hits",
+            render_template("emails/shehits_welcome.html", **ctx),
+            "shehits_welcome", sub.client_account_id, attendee_id=attendee.id,
+        )
+        if guardian.phone:
+            send_sms(
+                guardian, guardian.phone,
+                f"Box2Fit: you're in for two weeks of She Hits, weekdays 9 am. Book your first session: "
+                f"{absolute_url('funnel.step_class', segment='shehits')}",
+                "shehits_welcome", sub.client_account_id, attendee_id=attendee.id,
+            )
+        for to in admin_alert_recipients():
+            send_email(
+                None, to, f"She Hits two-week sign-up: {guardian.name}",
+                render_template("emails/shehits_admin.html", **ctx),
+                "shehits_admin", sub.client_account_id,
+            )
+        return
     send_email(
         guardian, guardian.email, "You're in: the 5-Week Guided Boxing Challenge",
         render_template("emails/challenge_welcome.html", **ctx),

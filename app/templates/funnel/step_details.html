@@ -58,6 +58,8 @@
       </div>
     </div>
 
+    {% if guided %}{% include "funnel/_guided_start.html" %}{% endif %}
+
     <div class="pf-panel">
       <h2>Quick health check</h2>
       <p class="note">Completed by you<span x-show="kind === 'child'"> on your child's behalf</span>. Tick anything that applies. A coach will chat with you before class if needed.</p>

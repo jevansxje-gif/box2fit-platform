@@ -1261,3 +1261,36 @@ def shehits_start_done():
         except Exception:  # noqa: BLE001
             log.exception("she hits done: could not verify session %s", sid)
     return render_template("funnel/shehits_done.html", paid=paid, already=False, guardian=guardian, **ctx)
+
+
+# ---------------------------------------------- Guided Start questionnaire ---
+@bp.route("/guided/<token>", methods=["GET", "POST"])
+def guided_start(token: str):
+    """Six questions, one per screen, from the signed link in the welcome
+    email. Answers land on the attendee; the coach sees the summary."""
+    from ..models import AttendeeProfile
+    from ..services import guided
+    from ..services.guided import GUIDED
+    from ..services.signed_links import SALT_GUIDED
+
+    aid = read_token(token, SALT_GUIDED)
+    attendee = db.session.get(AttendeeProfile, aid) if aid else None
+    if attendee is None:
+        abort(404)
+    seg = None
+    lead = db.session.query(Lead).filter_by(user_id=attendee.user_id).order_by(Lead.id.desc()).first()
+    if lead and lead.segment in ("shehits", "bootcamp", "technical"):
+        seg = lead.segment
+    elif attendee.pass_segment:
+        seg = attendee.pass_segment
+    done = False
+    if request.method == "POST":
+        g = guided.parse(request.form)
+        h = dict(attendee.health_json or {})
+        h["guided"] = g
+        if g and g.get("notes"):
+            h["notes"] = h.get("notes") or g["notes"]
+        attendee.health_json = h
+        db.session.commit()
+        done = True
+    return render_template("funnel/guided.html", attendee=attendee, guided=GUIDED, done=done, segment=seg)

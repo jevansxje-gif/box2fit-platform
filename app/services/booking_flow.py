@@ -310,8 +310,11 @@ def send_booking_confirmation(booking: Booking) -> None:
         "funnel.cancel_booking", token=make_token(booking.id, SALT_CANCEL_BOOKING)
     )
     is_child = attendee.kind == AttendeeKind.child.value
+    from .guided import url_for_attendee as _guided_url
+
     html = render_template(
         "emails/booking_confirmation.html",
+        guided_url=None if is_child else _guided_url(attendee.id),
         guardian=guardian,
         attendee=attendee,
         is_child=is_child,

@@ -13,6 +13,7 @@
       <b>Arrive:</b> 10 minutes early so a coach can get {{ attendee.first_name if is_child else 'you' }} set up.
       {% if is_child %}<br /><b>Parents:</b> you're welcome to stay and watch.{% endif %}
     </p>
+    {% if guided_url %}<p style="margin:0 0 14px"><a href="{{ guided_url }}" style="display:inline-block;background:#C8132B;color:#fff;font-weight:800;padding:12px 22px;border-radius:10px;text-decoration:none">Tell your coach where you're starting from (1 minute)</a><br /><span style="font-size:13px;color:#767C86">Six quick questions; your coach reads them before you arrive.</span></p>{% endif %}
     {% if gcal_url %}
     <p style="margin:6px 0 14px">
       <a href="{{ gcal_url }}" style="display:inline-block;background:#14161A;color:#fff;font-weight:700;padding:11px 18px;border-radius:9px;text-decoration:none;margin:0 10px 12px 0">Add to Google Calendar</a>

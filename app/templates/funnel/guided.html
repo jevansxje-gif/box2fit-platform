@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Guided Start — Box2Fit White Rock{% endblock %}
+{% block content %}
+<style>
+  .gsx{max-width:560px;margin:0 auto;padding:28px 16px 48px}
+  .gsx .bar{height:6px;background:#ECEAE4;border-radius:6px;overflow:hidden;margin:14px 0 26px}
+  .gsx .bar i{display:block;height:100%;background:var(--pf-red);width:0;transition:width .25s}
+  .gsx .step{display:none}.gsx .step.on{display:block}
+  .gsx h2{font-size:clamp(1.5rem,4.6vw,2rem);font-weight:900;letter-spacing:-.02em;line-height:1.1;margin:0 0 6px;color:var(--pf-ink)}
+  .gsx .h{color:var(--pf-text-3);margin:0 0 18px;font-size:15px}
+  .gsx .opts{display:grid;gap:10px}
+  .gsx .opts label{display:flex;align-items:center;gap:12px;border:1.5px solid var(--pf-line);border-radius:14px;padding:15px 16px;font-weight:700;font-size:16.5px;cursor:pointer;background:#fff}
+  .gsx .opts label:has(input:checked){border-color:var(--pf-ink);background:var(--pf-ink);color:#fff}
+  .gsx .opts input{width:18px;height:18px;margin:0;accent-color:var(--pf-red)}
+  .gsx .nav{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:22px}
+  .gsx .skip{color:var(--pf-text-3);font-size:14px;background:none;border:0;cursor:pointer;text-decoration:underline}
+  .gsx textarea,.gsx input[type=text]{width:100%}
+</style>
+<div class="gsx">
+  <div class="pf-kicker" style="color:var(--pf-red)">Guided Start · {{ attendee.first_name }}</div>
+  {% if done %}
+  <h2>Thank you, {{ attendee.first_name }}.</h2>
+  <p class="h" style="margin-top:8px">Your coach will read this before your first session and spend the first five minutes with you on it. See you in the gym.</p>
+  <p><a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.step_class', segment=segment) if segment else '/' }}">{{ "Book a session" if segment else "Back to the site" }}</a></p>
+  {% else %}
+  <p class="h" style="margin:6px 0 0">Six quick questions so your coach knows where you're starting from. It isn't a test; skip anything you like.</p>
+  <div class="bar"><i id="bar"></i></div>
+  <form method="post" id="gsf">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <section class="step on"><h2>What do you want out of this?</h2><p class="h">Pick up to two.</p>
+      <div class="opts">{% for v, l in guided.goals %}<label><input type="checkbox" name="g_goals" value="{{ v }}" />{{ l }}</label>{% endfor %}</div></section>
+    <section class="step"><h2>Where are you starting from?</h2><p class="h">Honestly. It only changes how we pitch your first round.</p>
+      <div class="opts">{% for v, l in guided.levels %}<label><input type="radio" name="g_level" value="{{ v }}" />{{ l }}</label>{% endfor %}</div></section>
+    <section class="step"><h2>What's put you off gyms before?</h2><p class="h">Tap all that apply. This is the useful one.</p>
+      <div class="opts">{% for v, l in guided.before %}<label><input type="checkbox" name="g_before" value="{{ v }}" />{{ l }}</label>{% endfor %}</div></section>
+    <section class="step"><h2>Anything your coach should know?</h2><p class="h">Tap all that apply, then add a line if it helps.</p>
+      <div class="opts">{% for v, l in guided.flags %}<label><input type="checkbox" name="g_flags" value="{{ v }}" />{{ l }}</label>{% endfor %}</div>
+      <input class="pf-input" type="text" name="g_notes" maxlength="300" placeholder="e.g. left knee, fine to train, no deep squats" style="margin-top:12px" /></section>
+    <section class="step"><h2>Which times can you actually make?</h2><p class="h">Tap all that work. We build your plan around them.</p>
+      <div class="opts">{% for v, l in guided.times %}<label><input type="checkbox" name="g_times" value="{{ v }}" />{{ l }}</label>{% endfor %}</div></section>
+    <section class="step"><h2>Six weeks from now, what would make you say “this worked”?</h2><p class="h">One line, in your words.</p>
+      <textarea class="pf-textarea" name="g_success" rows="3" maxlength="200" placeholder="e.g. get through a full class without stopping"></textarea></section>
+    <div class="nav">
+      <button type="button" class="pf-btn pf-btn--ghost" id="back" style="visibility:hidden">Back</button>
+      <div style="display:flex;gap:14px;align-items:center">
+        <button type="button" class="skip" id="skip">Skip</button>
+        <button type="button" class="pf-btn pf-btn--primary" id="next">Next</button>
+        <button type="submit" class="pf-btn pf-btn--primary" id="send" style="display:none">Send to my coach</button>
+      </div>
+    </div>
+  </form>
+  <script>
+    (function(){
+      var steps=[].slice.call(document.querySelectorAll('.step')),i=0,bar=document.getElementById('bar'),
+          back=document.getElementById('back'),next=document.getElementById('next'),send=document.getElementById('send'),skip=document.getElementById('skip');
+      function show(n){i=Math.max(0,Math.min(steps.length-1,n));steps.forEach(function(s,k){s.classList.toggle('on',k===i)});
+        bar.style.width=((i+1)/steps.length*100)+'%';back.style.visibility=i?'visible':'hidden';
+        var last=i===steps.length-1;next.style.display=last?'none':'';send.style.display=last?'':'none';skip.style.display=last?'none':'';window.scrollTo(0,0);}
+      next.onclick=function(){show(i+1)};skip.onclick=function(){show(i+1)};back.onclick=function(){show(i-1)};
+      document.querySelectorAll('.step input[type=radio]').forEach(function(r){r.addEventListener('change',function(){setTimeout(function(){show(i+1)},180)})});
+      show(0);
+    })();
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

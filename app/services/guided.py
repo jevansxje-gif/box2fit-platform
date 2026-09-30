@@ -66,3 +66,11 @@ def summary(g: dict | None) -> str:
     if g.get("success"):
         bits.append(f'"{g["success"]}"')
     return " · ".join(bits)
+
+
+def url_for_attendee(attendee_id: int) -> str:
+    """Signed link to the questionnaire page (no login; 90 days)."""
+    from .signed_links import SALT_GUIDED, make_token
+    from .urls import absolute_url
+
+    return absolute_url("funnel.guided_start", token=make_token(attendee_id, SALT_GUIDED))

@@ -4,7 +4,7 @@
 <div class="flow" style="max-width:640px;margin:0 auto;padding:24px 16px">
   <div class="pf-kicker" style="color:var(--pf-red)">She Hits · Women-only · Weekdays 9 AM</div>
   <h1 class="pf-h1" style="margin:6px 0 4px">Two weeks to find out.</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 16px">Any She Hits sessions you like for {{ days }} days, {{ price }} + GST, half the four-week price. Your coach reads your answers below before your first session and spends the first five minutes with you on them.</p>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">Any She Hits sessions you like for {{ days }} days, {{ price }} + GST, half the four-week price. After you sign up we'll send six quick questions so your coach knows where you're starting from.</p>
 
   {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
   <form method="post">
@@ -17,7 +17,6 @@
       <div class="pf-field"><label class="pf-label">Mobile</label><input class="pf-input" name="phone" type="tel" required value="{{ form.phone }}" autocomplete="tel" /></div>
       <label class="pf-check"><input type="checkbox" name="consent_sms" value="1" checked /> <span class="t">Text me reminders about my sessions</span></label>
     </div>
-    {% include "funnel/_guided_start.html" %}
     <div class="pf-panel" id="waiver-panel">
       <h2>Waiver &amp; membership terms</h2>
       <p class="note">Open and read each section below; the box unlocks once all three have been opened.</p>

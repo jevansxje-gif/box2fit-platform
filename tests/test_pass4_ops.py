@@ -2041,7 +2041,7 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     members are sent to the portal. /beast redirects to the challenge."""
     from datetime import timedelta
 
-    from app.models import AttendeeProfile, ClassInstance, User
+    from app.models import AttendeeProfile, ClassInstance, Message, User
     from app.services import booking_flow
 
     assert client.get("/beast").status_code == 302
@@ -2071,10 +2071,9 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
 
     # She Hits paid intro -> subscription that renews on day 15 + a 14-day pass
     r = client.get("/shehits/start")
-    assert r.status_code == 200 and b"94.50" in r.data and b"From day 15" in r.data and b"Guided Start" in r.data
+    assert r.status_code == 200 and b"94.50" in r.data and b"From day 15" in r.data and b"six quick questions" in r.data
     r = client.post("/shehits/start", data={"name": "Ana Intro", "email": "ana@example.com", "phone": "604-330-2671",
-                                            "waiver_agree": "1", "signature": "Ana Intro",
-                                            "g_goals": ["stress"], "g_level": "none", "g_before": ["watched"], "g_notes": "left knee"},
+                                            "waiver_agree": "1", "signature": "Ana Intro"},
                     follow_redirects=True)
     assert b"You're in" in r.data
     g = db.session.query(User).filter_by(email="ana@example.com").one()
@@ -2082,6 +2081,23 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     sub = db.session.query(Subscription).filter_by(user_id=g.id).one()
     assert sub.challenge_key == "shehits-intro" and sub.status == "pending" and sub.first_charge_at is not None
     assert a.pass_segment == "shehits" and a.pass_until is not None
+    # Stripe pays the first invoice ($94.50 + GST) -> welcome + staff alert, no membership welcome
+    import json as _json
+    sub.stripe_subscription_id = "sub_sh_1"
+    db.session.commit()
+    client.post("/api/v1/webhooks/stripe", content_type="application/json", data=_json.dumps({"type": "invoice.paid", "data": {"object": {
+        "id": "in_sh_1", "subscription": "sub_sh_1", "amount_paid": 9923, "tax": 473, "currency": "cad", "charge": "ch_sh_1"}}}))
+    db.session.refresh(sub)
+    assert sub.status == "active"
+    assert db.session.query(Message).filter_by(template="shehits_admin").count() == 1
+    assert db.session.query(Message).filter_by(template="membership_welcome").count() == 0
+    # the welcome email carries the Guided Start link; answering it lands on the attendee and the member page
+    welcome = db.session.query(Message).filter_by(template="shehits_welcome", channel="email").one()
+    tok = re.search(r"/guided/([\w\-\.]+)", welcome.body_preview).group(1)
+    assert b"What do you want out of this?" in client.get(f"/guided/{tok}").data
+    r = client.post(f"/guided/{tok}", data={"g_goals": ["stress"], "g_level": "none", "g_before": ["watched"], "g_notes": "left knee"})
+    assert b"Thank you, Ana" in r.data
+    db.session.refresh(a)
     assert a.health_json["guided"]["before"] == ["watched"] and "watched" in _admin(app).get(f"/ops/members/{g.id}").data.decode()
     sh = (
         db.session.query(ClassInstance).join(ClassInstance.class_type)

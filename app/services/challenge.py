@@ -284,6 +284,7 @@ def send_welcome(sub: Subscription) -> None:
     g = (attendee.health_json or {}).get("guided")
     ctx = dict(
         guardian=guardian, attendee=attendee, sub=sub, c=CHALLENGE, o=offer, invite_url=invite_url,
+        guided_url=guided.url_for_attendee(attendee.id),
         renew_total=fmt_cents(total_with_gst_cents(sub.mrr_cents)),
         renew_when=sub.first_charge_at,
         goal=(attendee.health_json or {}).get("challenge_goal") or (g or {}).get("success"),

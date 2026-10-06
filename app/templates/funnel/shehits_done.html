@@ -20,4 +20,9 @@
     {% endif %}
   </div>
 </div>
+{% if paid and not already and guardian %}
+<script>
+if (window.fbq) { fbq('track', 'Purchase', {value: {{ (price_total | replace('$','') | replace(',','')) }}, currency: 'CAD', content_name: 'shehits'}, {eventID: 'purchase-shehits-{{ guardian.id }}'}); }
+</script>
+{% endif %}
 {% endblock %}

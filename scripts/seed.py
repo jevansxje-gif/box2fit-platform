@@ -46,24 +46,21 @@ RETIRED_TYPE_KEYS = ["kids_7_10", "youth_11_14", "teen_15_17", "reset", "active"
 
 # ---- weekly schedule (weekday 0=Mon, local time, cohort) -------------------
 # THE REAL SCHEDULE (client, 2026-08-20):
-#   Kids: Group A Mon/Wed/Fri 4pm · Group B Tue/Thu 4pm + Sat 9am
-#   Mon-Fri daily: 6am Beast · 10am She Hits · 5pm Bootcamp · 6pm Technical
+#   Kids: Group A Mon/Wed/Fri 4pm (Group B Tue/Thu/Sat retired 2026-10-05)
+#   Mon-Fri daily: 6am Guided Boxing · 9am She Hits · 5pm Bootcamp · 6pm Technical
 #                  · 7pm Youth Confidence
 # Bump SCHEDULE_VERSION whenever this table changes — the reconcile runs
 # once per version so Builder edits made between versions are respected.
-SCHEDULE_VERSION = "2026-08-20.2"  # .2: Saturday kids moved 4pm -> 9am
+SCHEDULE_VERSION = "2026-10-05.2"  # .2: kids Group B (Tue/Thu/Sat) retired, nobody took it; She Hits 9am
 SCHEDULE = [
     ("kids", 0, time(16, 0), "Group A"),
     ("kids", 2, time(16, 0), "Group A"),
     ("kids", 4, time(16, 0), "Group A"),
-    ("kids", 1, time(16, 0), "Group B"),
-    ("kids", 3, time(16, 0), "Group B"),
-    ("kids", 5, time(9, 0), "Group B"),
 ]
 for _wd in range(5):  # Mon-Fri
     SCHEDULE += [
         ("beast", _wd, time(6, 0), None),
-        ("she_hits", _wd, time(10, 0), None),
+        ("she_hits", _wd, time(9, 0), None),
         ("bootcamp", _wd, time(17, 0), None),
         ("technical", _wd, time(18, 0), None),
         ("youth", _wd, time(19, 0), None),

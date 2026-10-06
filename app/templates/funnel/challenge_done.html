@@ -12,7 +12,7 @@
       <div class="big">You're in{% if guardian %}, {{ guardian.name.split(' ')[0] }}{% endif %}.</div>
       <p style="margin:18px 0 4px;color:var(--pf-text-2)">First class: <b>{{ c.start.strftime('%A, %B %d') }} at {{ c.class_time }}</b>, 1522 Finlay St, Unit 216, White Rock. Free underground parking.</p>
       <p style="margin:12px 0 4px;color:var(--pf-text-2)"><b>Next:</b> we'll call or text you in the next day or two to book your personal session before the challenge starts. Your gloves and wraps will be waiting.</p>
-      <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A confirmation is on its way by email. Your membership continues at {{ renew_total }} every 4 weeks from {{ c.renew.strftime('%B %d') }} unless you cancel before then; we'll remind you three days ahead.</p>
+      <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A confirmation is on its way by email. It carries on in five-week blocks at the same price: {{ renew_total }} {{ every }} from {{ c.renew.strftime('%B %d') }}, unless you cancel before then; we'll remind you three days ahead.</p>
     {% else %}
       <div class="pf-kicker">Almost there</div>
       <div class="big">We haven't seen the payment yet.</div>

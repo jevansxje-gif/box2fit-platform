@@ -1061,10 +1061,11 @@ def _challenge_ctx(client):
     from ..services.billing import default_plan
     from ..services.tax import fmt_cents, gst_cents, total_with_gst_cents
 
-    plan = default_plan(client.id)
+    plan = ch.offer_plan(ch.CHALLENGE, client.id)
     c = ch.CHALLENGE
     return dict(
         c=c,
+        every=__import__("app.services.billing", fromlist=["interval_label"]).interval_label(plan),
         spots_left=ch.spots_left(client.id),
         price=fmt_cents(c["price_cents"]),
         price_gst=fmt_cents(gst_cents(c["price_cents"])),

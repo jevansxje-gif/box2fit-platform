@@ -1,8 +1,8 @@
 """The 5-Week Guided Boxing Challenge (adult cohort offer).
 
 One up-front payment for five weeks (gloves, wraps and one personal session
-included), then the regular membership continues every 4 weeks unless the
-member cancels before the renewal date. Sold through one Stripe Checkout in
+included), then it continues in 5-week blocks at the same price unless the
+member cancels before the renewal date (owner, 2026-10-05). Sold through one Stripe Checkout in
 subscription mode: the challenge fee is a one-time line charged today and the
 membership price sits behind a trial that ends on the renewal date.
 
@@ -57,6 +57,20 @@ SHEHITS_INTRO = {
     "description": "Two weeks of She Hits, any sessions, women only, coached.",
 }
 OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO}
+CHALLENGE_PLAN_NAME = "Guided Boxing Challenge (5-week block)"
+
+
+def offer_plan(offer: dict, client_account_id: int):
+    """What the offer renews into: the challenge keeps billing in 5-week blocks
+    on its own plan; a rolling intro (She Hits) rolls into the membership."""
+    from ..models import Plan
+    from .billing import default_plan
+
+    if offer is CHALLENGE or offer.get("key") == CHALLENGE["key"]:
+        p = db.session.query(Plan).filter_by(client_account_id=client_account_id, name=CHALLENGE_PLAN_NAME, active=True).first()
+        if p is not None:
+            return p
+    return default_plan(client_account_id)
 
 
 def _start_label(offer: dict) -> str:
@@ -139,7 +153,7 @@ def _local_sub(attendee: AttendeeProfile, stripe_subscription_id: str | None, of
     if sub is None:
         sub = existing_sub(attendee)
     if sub is None:
-        plan = default_plan(attendee.client_account_id)
+        plan = offer_plan(offer, attendee.client_account_id)
         sub = Subscription(
             client_account_id=attendee.client_account_id,
             user_id=attendee.user_id,
@@ -175,7 +189,7 @@ def start_checkout(guardian: User, attendee: AttendeeProfile, offer: dict | None
     if not stripe_service.is_configured():
         return None
     stripe = stripe_service.stripe_client()
-    plan = default_plan(attendee.client_account_id)
+    plan = offer_plan(offer, attendee.client_account_id)
     gst = ensure_stripe_gst_rate(stripe)
     customer = db.session.query(StripeCustomer).filter_by(user_id=guardian.id).one_or_none()
     who = (

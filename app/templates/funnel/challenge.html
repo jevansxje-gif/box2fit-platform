@@ -100,8 +100,8 @@
       <p style="margin:0 0 14px;color:var(--pf-text-2)">Bought separately, a decent pair of gloves and wraps and one hour of personal training in South Surrey add up to more than the whole challenge. Here they are part of it.</p>
       <div class="pf-card pf-card--pad">
         <p style="margin:0 0 8px"><strong>Today:</strong> {{ price_total }} ({{ price }} + {{ price_gst }} GST). That covers all five weeks, your personal session, gloves and wraps.</p>
-        <p style="margin:0 0 8px"><strong>After the challenge:</strong> your membership continues at {{ renew_total }} ({{ renew_price }} + GST) every 4 weeks from {{ c.renew.strftime('%A, %B %d') }}, unless you cancel before then.</p>
-        <p style="margin:0;color:var(--pf-text-2)">We'll email and text you a reminder three days before, with a one-click cancel link. Cancel before {{ c.renew.strftime('%B %d') }} and you pay nothing more. After that, the membership is month to month with 30 days' notice.</p>
+        <p style="margin:0 0 8px"><strong>After the challenge:</strong> it carries on in five-week blocks at the same price, {{ renew_total }} ({{ renew_price }} + GST) {{ every }}, from {{ c.renew.strftime('%A, %B %d') }}, unless you cancel before then.</p>
+        <p style="margin:0;color:var(--pf-text-2)">We'll email and text you a reminder three days before, with a one-click cancel link. Cancel before {{ c.renew.strftime('%B %d') }} and you pay nothing more. After that, each block renews the same way, with the same reminder and the same one-click cancel.</p>
       </div>
       <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}" style="margin-top:18px">{{ cta }}</a>
     </div>
@@ -117,7 +117,7 @@
         <details open><summary>I haven't trained in years. Is this for me?</summary><p>Yes. That's who it's built for. Your coach sets your starting point in the personal session, and every round can be scaled up or down.</p></details>
         <details><summary>Will I get hit?</summary><p>No. There's no sparring and no head contact. You work on pads and bags with a coach.</p></details>
         <details><summary>What if I can't make every morning?</summary><p>Come to as many of the {{ c.class_time }} sessions as you can; three a week is plenty. If {{ c.class_time }} doesn't work at all, tell us which time would, just below.</p></details>
-        <details><summary>What happens after the five weeks?</summary><p>Your membership carries on at {{ renew_price }} + GST every 4 weeks from {{ c.renew.strftime('%B %d') }} unless you cancel before then. We remind you three days ahead with a one-click cancel link.</p></details>
+        <details><summary>What happens after the five weeks?</summary><p>You keep going in five-week blocks at the same price, {{ renew_price }} + GST {{ every }}, from {{ c.renew.strftime('%B %d') }}, unless you cancel before then. Same coach, same 6 am group. We email and text you three days before each renewal with a one-click cancel link.</p></details>
         <details><summary>How is "most improved" decided?</summary><p>By your coach, against the goals and starting measures you set together in your personal session.</p></details>
       </div>
     </div>

@@ -41,7 +41,7 @@
     <div class="pf-panel" style="border:2px solid var(--pf-ink)">
       <h2>What you pay</h2>
       <p style="margin:0 0 8px"><strong>Today: {{ price_total }}</strong> ({{ price }} + {{ price_gst }} GST) for the five weeks, your personal session, gloves and wraps.</p>
-      <p style="margin:0 0 8px"><strong>From {{ c.renew.strftime('%A, %B %d') }}: {{ renew_total }}</strong> ({{ renew_price }} + GST) every 4 weeks, unless you cancel before then.</p>
+      <p style="margin:0 0 8px"><strong>From {{ c.renew.strftime('%A, %B %d') }}: {{ renew_total }}</strong> ({{ renew_price }} + GST) {{ every }}, the next five-week block, unless you cancel before then.</p>
       <p class="note" style="margin:0">We'll email and text a reminder three days before, with a one-click cancel link. Cancel before {{ c.renew.strftime('%B %d') }} and you pay nothing more; after that, month to month with 30 days' notice.</p>
     </div>
 

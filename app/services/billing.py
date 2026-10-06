@@ -45,7 +45,13 @@ from .urls import absolute_url
 log = logging.getLogger(__name__)
 
 STRIPE_INTERVAL = {"4_weeks": {"interval": "week", "interval_count": 4},
+                   "5_weeks": {"interval": "week", "interval_count": 5},
                    "month": {"interval": "month", "interval_count": 1}}
+INTERVAL_LABEL = {"4_weeks": "every 4 weeks", "5_weeks": "every 5 weeks", "month": "every month"}
+
+
+def interval_label(plan) -> str:
+    return INTERVAL_LABEL.get(getattr(plan, "interval", None), "every 4 weeks")
 
 
 class ActivationError(Exception):
@@ -53,9 +59,12 @@ class ActivationError(Exception):
 
 
 def default_plan(client_account_id: int) -> Plan | None:
+    """The regular membership. Offer-specific plans (the 5-week challenge
+    block) are picked by name in challenge.offer_plan, never as a default."""
     return (
         db.session.query(Plan)
         .filter_by(client_account_id=client_account_id, active=True)
+        .filter(Plan.interval != "5_weeks")
         .order_by(Plan.class_type_id.desc())
         .first()
     )
@@ -280,11 +289,13 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
         when=when,
         cohort=sub.cohort_label,
         cancel_url=cancel_url,
+        every=interval_label(plan),
+        is_block=plan.interval == "5_weeks",
     )
     who = f"{attendee.first_name}'s" if is_child else "Your"
     send_email(
         guardian, guardian.email,
-        f"{who} Box2Fit membership starts {when}",
+        f"{who} next 5-week block starts {when}" if plan.interval == "5_weeks" else f"{who} Box2Fit membership starts {when}",
         html, "pre_charge_reminder", sub.client_account_id,
         attendee_id=attendee.id,
     )

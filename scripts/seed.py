@@ -183,6 +183,20 @@ def seed():
     plan.is_placeholder = False
     print("plans: Membership $189 / 4-week cycle (confirmed)")
 
+    # Guided Boxing Challenge: $249 + GST per 5-WEEK BLOCK, auto-renewing in
+    # 5-week blocks (owner, 2026-10-05). Never the default plan.
+    from app.services.challenge import CHALLENGE_PLAN_NAME
+
+    cplan = db.session.query(Plan).filter_by(client_account_id=client.id, name=CHALLENGE_PLAN_NAME).first()
+    if cplan is None:
+        cplan = Plan(client_account_id=client.id, class_type_id=None, name=CHALLENGE_PLAN_NAME, price_cents=24900)
+        db.session.add(cplan)
+    cplan.price_cents = 24900
+    cplan.interval = "5_weeks"
+    cplan.is_placeholder = False
+    cplan.active = True
+    print("plans: Guided Boxing Challenge $249 / 5-week block")
+
     # Retired catalog entries: delete only when nothing references them.
     from app.models import ClassInstance
 

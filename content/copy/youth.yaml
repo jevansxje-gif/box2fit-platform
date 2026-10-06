@@ -48,9 +48,9 @@ short_name: "Youth Confidence sessions"
 objections_headline: "Straight answers for parents."
 objections:
   - key: f5
-    q: "She won't go to a gym."
-    a: "This isn't a gym. It's a coach, a small group of the same faces each week, no sparring and nobody watching. The opposite of the room she's picturing."
-    proof: "Only 8% of teenage girls in Canada get enough activity, against 33% of boys."
+    q: "My teen won't go to a gym."
+    a: "This isn't a gym. It's a coach, a small group of the same faces each week, no sparring and nobody watching. The opposite of the room they're picturing."
+    proof: "Only a third of Canadian 12 to 17 year olds get enough activity, and the drop-off is steepest in the early teens."
   - key: y2
     q: "Is boxing safe for my teen?"
     a: "No sparring. No head contact. Pads, bags, footwork and conditioning, coached every round. It's boxing training, not fighting."

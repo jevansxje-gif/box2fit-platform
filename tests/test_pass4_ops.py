@@ -1940,17 +1940,17 @@ def test_suggest_another_time_is_recorded_and_reported(app, client, client_accou
     on the Marketing page, so we can see if the schedule is the blocker."""
     from app.models import TimeSuggestion
 
-    r = client.get("/bootcamp?v=g4&utm_source=meta&utm_campaign=guided&utm_content=guided-g4")
+    r = client.get("/guided-boxing?v=g4&utm_source=meta&utm_campaign=guided&utm_content=guided-g4")
     assert r.status_code == 200 and b"Tell us when you could train" in r.data
     r = client.post(
         "/suggest-time",
-        data={"program": "bootcamp", "times": ["morning", "evening"], "other": "7:30 after nights",
+        data={"program": "guided-boxing", "times": ["morning", "evening"], "other": "7:30 after nights",
               "name": "Nia", "contact": "nia@example.com"},
         follow_redirects=True,
     )
     assert b"Thank you, noted" in r.data
     s = db.session.query(TimeSuggestion).one()
-    assert s.program == "bootcamp" and s.times == "morning,evening" and s.other == "7:30 after nights"
+    assert s.program == "guided-boxing" and s.times == "morning,evening" and s.other == "7:30 after nights"
     assert s.utm_campaign == "guided" and s.utm_content == "guided-g4"
 
     # nothing picked: asked again, nothing stored; honeypot: silently dropped
@@ -2045,8 +2045,12 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     from app.services import booking_flow
 
     assert client.get("/beast").status_code == 302
-    r = client.get("/bootcamp")
-    assert b"Start your free week" in r.data and b"Free first week" in r.data
+    # Bootcamp and Technical live on as Guided Boxing (5 PM / 6 PM), one page
+    r = client.get("/bootcamp?v=g7")
+    assert r.status_code == 301 and r.headers["Location"].endswith("/guided-boxing?v=g7")
+    assert client.get("/book/technical").status_code == 301
+    r = client.get("/guided-boxing")
+    assert b"Start your free week" in r.data and b"Free first week" in r.data and b"See the challenge" in r.data
     r = client.get("/kids")
     assert b"Book their free week" in r.data
     r = client.get("/shehits")

@@ -49,15 +49,14 @@
           <span class="pf-program pf-program--youth" style="font-size:20px">YOUTH CONFIDENCE</span>
           <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Ages 11 to 18. Confidence, discipline and real boxing, every weekday at 7 PM.</p>
         </a>
-        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='technical') }}" style="text-decoration:none;color:inherit">
-          <span class="pf-program pf-program--beast" style="font-size:20px">TECHNICAL BOXING</span>
-          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Learn to actually box. Stance, footwork, defence and real pad work, weekdays at 6 PM.</p>
+        <a class="pf-card pf-card--pad" href="{{ url_for('funnel.landing', slug='guided-boxing') }}" style="text-decoration:none;color:inherit">
+          <span class="pf-program pf-program--beast" style="font-size:20px">GUIDED BOXING</span>
+          <p style="color:var(--pf-text-2);font-size:15px;margin:8px 0 0">Adults. A coach runs every round: 5 PM conditioning, 6 PM technique, and the 6 AM Challenge from October 26.</p>
         </a>
       </div>
       <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap">
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='bootcamp') }}">Boxing Bootcamp · 5 PM</a>
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='shehits') }}">She Hits · 10 AM</a>
-        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='beast') }}">Guided Boxing · 6 AM</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.challenge_landing') }}">5-Week Challenge · 6 AM</a>
+        <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.landing', slug='shehits') }}">She Hits · 9 AM</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_schedule') }}">Full schedule</a>
         <a class="pf-btn pf-btn--ghost pf-btn--sm" href="{{ url_for('funnel.public_pricing') }}">Memberships &amp; pricing</a>
       </div>

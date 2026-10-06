@@ -59,7 +59,8 @@ SESSION_KEY = "b2f_flow"
 # kids 6-10 (4pm groups), youth 11-18 (7pm confidence), technical (6pm),
 # bootcamp (5pm), shehits (10am), beast (6am). Retired landings /reset,
 # /focus, /strong 301 to their nearest successor.
-SEGMENTS = {"kids", "youth", "technical", "bootcamp", "shehits", "beast"}
+SEGMENTS = {"kids", "youth", "guided", "shehits", "beast"}
+RETIRED_SEGMENTS = {"technical": "guided", "bootcamp": "guided"}  # 2026-10-05: one adult banner
 CHILD_FIRST_SEGMENTS = {"kids", "youth"}  # a parent books; the child attends
 
 # Master Plan §6 wording, adjusted ONLY for the confirmed billing cadence:
@@ -106,8 +107,7 @@ def healthz():
 def sitemap():
     base = current_app.config["SITE_BASE_URL"].rstrip("/")
     paths = [
-        "/", "/kids", "/youth", "/technical", "/bootcamp", "/shehits",
-        "/beast", "/schedule", "/pricing", "/trainers", "/contact",
+        "/", "/kids", "/youth", "/guided-boxing", "/challenge", "/shehits", "/schedule", "/pricing", "/trainers", "/contact",
         "/privacy", "/terms",
     ]
     urls = "".join(f"<url><loc>{base}{p}</loc></url>" for p in paths)
@@ -470,6 +470,17 @@ def _member_price_label(client_account_id: int) -> str:
     return fmt_cents(plan.price_cents) if plan else "$189"
 
 
+def _intro_start_label(copy) -> str | None:
+    """'today' or the launch date, for pages selling a dated intro (She Hits)."""
+    if not copy.get("intro_offer"):
+        return None
+    from ..services.challenge import SHEHITS_INTRO, offer_start
+    from ..services.tzutil import today_local
+
+    d = offer_start(SHEHITS_INTRO)
+    return "today" if d <= today_local() else d.strftime("%A, %B %d")
+
+
 @bp.get("/<slug>")
 def landing(slug: str):
     """The copy-config landing pages (/kids keeps its custom page)."""
@@ -477,6 +488,8 @@ def landing(slug: str):
 
     if slug == "beast":  # Guided Boxing (6 am): its offer is the challenge while it's open
         return redirect(url_for("funnel.challenge_landing"), 302)
+    if slug in RETIRED_SEGMENTS:  # /bootcamp, /technical: the adult page is /guided-boxing now
+        return redirect(url_for("funnel.landing", slug="guided-boxing", **request.args), 301)
     copy = load_copy(slug)
     if copy is None:
         abort(404)
@@ -500,6 +513,7 @@ def landing(slug: str):
             slug=slug,
             variant=variant,
             member_price=_member_price_label(client.id),
+            intro_start=_intro_start_label(copy),
             time_slots=TIME_SLOTS,
             time_state=request.args.get("time"),
         )
@@ -511,6 +525,8 @@ def landing(slug: str):
 @bp.route("/book/<segment>", methods=["GET", "POST"])
 @limiter.limit("30/hour", methods=["POST"])
 def step_class(segment: str):
+    if segment in RETIRED_SEGMENTS:
+        return redirect(url_for("funnel.step_class", segment=RETIRED_SEGMENTS[segment], **request.args), 301)
     state = _flow(segment)
     client = get_client()
     form = SlotForm()
@@ -1174,8 +1190,11 @@ def _shehits_ctx():
     from ..services.guided import GUIDED
     from ..services.tax import fmt_cents, gst_cents, total_with_gst_cents
 
+    from ..services.challenge import _start_label
+
     o = SHEHITS_INTRO
     return dict(
+        start_label=_start_label(o),
         price=fmt_cents(o["price_cents"]), price_gst=fmt_cents(gst_cents(o["price_cents"])),
         price_total=fmt_cents(total_with_gst_cents(o["price_cents"])), days=o["days"],
         renew_price=_member_price_label(get_client().id),
@@ -1279,7 +1298,7 @@ def guided_start(token: str):
         abort(404)
     seg = None
     lead = db.session.query(Lead).filter_by(user_id=attendee.user_id).order_by(Lead.id.desc()).first()
-    if lead and lead.segment in ("shehits", "bootcamp", "technical"):
+    if lead and lead.segment in ("shehits", "bootcamp", "technical", "guided"):
         seg = lead.segment
     elif attendee.pass_segment:
         seg = attendee.pass_segment

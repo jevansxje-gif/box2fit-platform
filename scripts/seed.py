@@ -33,15 +33,19 @@ ROOT = Path(__file__).resolve().parent.parent
 CLASS_TYPES = [
     ("kids", "Kids Boxing", "kids", 6, 10, 45, 12),
     ("youth", "Youth Confidence", "youth", 11, 18, 45, 14),
-    ("technical", "Technical Boxing", "technical", None, None, 60, 16),
-    ("bootcamp", "Boxing Bootcamp", "bootcamp", None, None, 45, 16),
+    # Adults train under one banner: Guided Boxing (proposal 2026-09-23).
+    # 5 PM and 6 PM share the "guided" segment (one landing, one picker);
+    # 6 AM keeps its own because its offer is the Challenge.
+    ("technical", "Guided Boxing (6 PM)", "guided", None, None, 60, 16),
+    ("bootcamp", "Guided Boxing (5 PM)", "guided", None, None, 45, 16),
     ("she_hits", "She Hits", "shehits", None, None, 60, 16),
-    ("beast", "Guided Boxing", "beast", None, None, 50, 16),
+    ("beast", "Guided Boxing (6 AM)", "beast", None, None, 50, 16),
 ]
 
 # Retired catalog entries: deleted on reseed IF nothing references them.
 # (reset/active keep their rows where history exists — their templates are
 # deactivated by the schedule reconcile below.)
+OLD_NAMES = {"Beast Camp", "Guided Boxing", "Boxing Bootcamp", "Technical Boxing"}
 RETIRED_TYPE_KEYS = ["kids_7_10", "youth_11_14", "teen_15_17", "reset", "active"]
 
 # ---- weekly schedule (weekday 0=Mon, local time, cohort) -------------------
@@ -157,8 +161,8 @@ def seed():
             ct.age_min = amin
             ct.age_max = amax
             ct.active = True
-            if key == "beast" and ct.name == "Beast Camp":
-                ct.name = name  # 2026-09-30: the 6 am program is Guided Boxing
+            if ct.name in OLD_NAMES:
+                ct.name = name  # 2026-09-30 / 10-05: adult programs rebranded Guided Boxing
         types[key] = ct
     print(f"class types: {len(types)}")
 

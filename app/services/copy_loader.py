@@ -11,9 +11,8 @@ COPY_DIR = Path(__file__).resolve().parent.parent.parent / "content" / "copy"
 # custom page; retired slugs (reset/focus/strong) 301 in the funnel blueprint.
 SEGMENT_ROUTES = {
     "youth": "youth",          # 7pm confidence class, ages 11-18
-    "technical": "technical",  # 6pm learn-to-box
-    "bootcamp": "bootcamp",    # 5pm conditioning
-    "shehits": "shehits",      # 10am women-only
+    "guided-boxing": "guided",  # adults, 5pm + 6pm (6am = /challenge)
+    "shehits": "shehits",      # 9am women-only
     "beast": "beast",          # 6am strength & conditioning
 }
 

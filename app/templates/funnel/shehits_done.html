@@ -10,9 +10,9 @@
     {% elif paid %}
       <div class="pf-kicker">She Hits · two weeks</div>
       <div class="big">You're in{% if guardian %}, {{ guardian.name.split(' ')[0] }}{% endif %}.</div>
-      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Your {{ days }} days start today. Come to any She Hits session, weekdays at 9 AM, 1522 Finlay St, Unit 216, White Rock. Free underground parking; gloves and wraps provided.</p>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Your {{ days }} days start {{ start_label }}. Come to any She Hits session, weekdays at 9 AM, 1522 Finlay St, Unit 216, White Rock. Free underground parking; gloves and wraps provided.</p>
       <p style="margin:12px 0 4px"><a class="pf-btn pf-btn--primary" href="{{ url_for('funnel.step_class', segment='shehits') }}">Book your first session</a></p>
-      <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A confirmation is on its way by email. Your membership continues at {{ renew_total }} every 4 weeks from day 15 unless you cancel before then; we'll remind you three days ahead with a one-click cancel link.</p>
+      <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A confirmation is on its way by email. Your membership continues at {{ renew_total }} every 4 weeks from the day after your two weeks end, unless you cancel before then; we'll remind you three days ahead with a one-click cancel link.</p>
     {% else %}
       <div class="pf-kicker">Almost there</div>
       <div class="big">We haven't seen the payment yet.</div>

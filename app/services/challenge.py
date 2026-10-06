@@ -49,6 +49,7 @@ SHEHITS_INTRO = {
     "name": "She Hits: two-week intro",
     "price_cents": 9450,
     "days": 14,
+    "starts": date(2026, 10, 26),  # the class launches with the campaign; two weeks count from here
     "pass_segment": "shehits",
     "cohort_label": "She Hits · 9 am",
     "class_time": "9:00 am",
@@ -58,16 +59,30 @@ SHEHITS_INTRO = {
 OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO}
 
 
+def _start_label(offer: dict) -> str:
+    from .tzutil import today_local
+
+    d = offer_start(offer)
+    return "today" if d <= today_local() else d.strftime("%A, %B %d")
+
+
+def offer_start(offer: dict) -> date:
+    """First day of a rolling intro: today, or the program's launch date if later."""
+    from .tzutil import today_local
+
+    t = today_local()
+    s = offer.get("starts")
+    return s if s and s > t else t
+
+
 def offer_renew_at(offer: dict) -> datetime:
     """When the membership starts charging: the cohort's fixed date, or day
-    15 for a rolling intro (10 am local, so the reminder lands in daytime)."""
+    15 of a rolling intro (10 am local, so the reminder lands in daytime)."""
     from datetime import timedelta
-
-    from .tzutil import today_local
 
     if offer.get("renew"):
         return local_to_utc(offer["renew"], time(10, 0))
-    return local_to_utc(today_local() + timedelta(days=offer["days"]), time(10, 0))
+    return local_to_utc(offer_start(offer) + timedelta(days=offer["days"]), time(10, 0))
 
 
 LIVE = (
@@ -287,6 +302,7 @@ def send_welcome(sub: Subscription) -> None:
         guided_url=guided.url_for_attendee(attendee.id),
         renew_total=fmt_cents(total_with_gst_cents(sub.mrr_cents)),
         renew_when=sub.first_charge_at,
+        start_label=_start_label(offer),
         goal=(attendee.health_json or {}).get("challenge_goal") or (g or {}).get("success"),
         notes=(attendee.health_json or {}).get("notes") or (g or {}).get("notes"),
         guided_summary=guided.summary(g),

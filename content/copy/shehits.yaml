@@ -46,7 +46,7 @@ intro_offer:
   label: "Start your 2 weeks: $94.50"
   today: "$99.23 ($94.50 + GST)"
   endpoint: "funnel.shehits_start"
-  line: "Two weeks of She Hits, any sessions you like, for $94.50 + GST, half the four-week price. Your membership then continues at $189 + GST every 4 weeks unless you cancel before day 15; we remind you first."
+  line: "Two weeks of She Hits from Monday, October 26, any sessions you like, for $94.50 + GST, half the four-week price. Your membership then continues at $189 + GST every 4 weeks unless you cancel before your two weeks end; we remind you first."
   secondary: "Prefer to try one class first? It's free."
 review_tags: ["shehits"]
 time_line: "She Hits · Women only · Monday to Friday, 9 AM"
@@ -72,5 +72,5 @@ objections:
     proof: "Class times are set by what people ask for."
   - key: s5
     q: "What happens after the two weeks?"
-    a: "Your membership carries on at $189 + GST every 4 weeks from day 15, unless you cancel before then. We email and text you three days ahead with a one-click cancel link, so nothing is a surprise."
+    a: "Your membership carries on at $189 + GST every 4 weeks from the day after your two weeks end, unless you cancel before then. We email and text you three days ahead with a one-click cancel link, so nothing is a surprise."
     proof: "Half the four-week price to start; the same coached small group after."

@@ -1,0 +1,85 @@
+# Adults — /guided-boxing (weekdays 5 PM conditioning, 6 PM technique; the
+# 6 AM hour is sold as the 5-Week Challenge on /challenge). One banner for
+# every adult program (proposal 2026-09-23): Bootcamp and Technical retired
+# as names, their sessions live on here. Launches Monday 26 October 2026.
+page_title: "Guided Boxing — Box2Fit White Rock"
+register: beast
+eyebrow: "Guided Boxing · Adults · Weekdays 5 PM and 6 PM · from October 26"
+headline: "Boxing, with a coach"
+headline_accent: "in your corner."
+subhead: "Every round is called by a coach: what to hit, how hard, when to rest. Nobody is left to work it out alone. Pick the hour that fits your day: 5 PM for conditioning straight off work, 6 PM to learn the sport properly, or the 6 AM Challenge if you want a start date and a goal. No sparring, no head contact, no experience needed."
+hero_photo: adult-kettlebell.jpg
+hero_photo_alt: "Guided Boxing at Box2Fit White Rock"
+benefits_eyebrow: "Three hours, one way of coaching"
+benefits_headline: "Same coach-led round. Pick your hour."
+benefits:
+  - num: "5 PM"
+    title: "Conditioning"
+    body: "Straight off work. Bags, ropes, bodyweight and effort, scaled to you. The hard line between the workday and your evening, done by 5:45."
+    source: "Mon–Fri · 45 minutes"
+  - num: "6 PM"
+    title: "Technique"
+    body: "Learn to actually box. Stance, footwork, defence and real pad work, built up round by round so it sticks."
+    source: "Mon–Fri · 60 minutes"
+  - num: "6 AM"
+    title: "The 5-Week Challenge"
+    body: "A coach, a plan and a goal, with 12 people. Gloves, wraps and a one-to-one session included. Starts October 26."
+    source: "See the challenge · $249 + GST"
+coach_eyebrow: "Coached, every round"
+coach_headline: "You never have to guess."
+coach_body: "The thing that empties gyms is not laziness, it is not knowing what to do and nobody noticing when you stop coming. Here a coach runs the room, pitches each round to where you are, and knows your name by the second visit."
+coach_photo: hero-battle-ropes-logo.jpg
+faqs:
+  - q: "Which hour should I pick?"
+    a: "If you want to get fit and burn the day off, 5 PM. If you want to learn to box properly, 6 PM. If you want a start date, a goal and a small group that starts together, the 6 AM Challenge. Your free week works at 5 PM and 6 PM; come to both and decide."
+  - q: "I sit at a desk all day. Am I fit enough for this?"
+    a: "Yes. Everything scales. You work at your pace against your own numbers, and the coach adjusts every round to your level."
+  - q: "Do I need boxing experience?"
+    a: "None. Nobody spars and nobody gets hit in the head. Gloves, pads, bags and footwork."
+  - q: "What should I bring?"
+    a: "Comfortable athletic clothing, indoor training shoes and a water bottle. Gloves and wraps are provided for your free week."
+  - q: "Where are you located?"
+    a: "1522 Finlay Street, Unit 216, White Rock. Free underground parking. Start your free week below."
+final_kicker: "A coach in your corner"
+final_headline: "Your first week is on us."
+booking_lede: "Pick a Guided Boxing session, 5 PM or 6 PM. Your first week is free."
+review_tags: ["bootcamp", "technical", "beast"]
+time_line: "Guided Boxing · Monday to Friday · 5 PM conditioning · 6 PM technique · from October 26"
+hero_video: hero-adults
+short_name: "Guided Boxing sessions"
+objections_headline: "Straight answers, before you decide."
+feature:
+  kicker: "Want a start date and a goal?"
+  title: "The 5-Week Guided Boxing Challenge · 6 AM · starts Monday, October 26"
+  body: "Twelve people, one coach, five weeks. Your own gloves and wraps, a one-to-one session with your coach before day one, and the most improved wins the next month free. $249 + GST, all in."
+  cta: "See the challenge"
+  endpoint: "funnel.challenge_landing"
+objections:
+  - key: g1
+    q: "I wouldn't know what to do."
+    a: "You never have to guess. A coach runs every round: what to hit, how hard, when to rest. Nobody is left to work it out alone at a machine."
+    proof: "60% of gym-goers say not knowing what to do is their biggest worry."
+  - key: g2
+    q: "I'm not fit enough to start."
+    a: "Everything scales. Your first week is free, and the coach pitches every round to where you are, not where a class assumes you are."
+    proof: "37% of non-exercisers feel too unhealthy to begin. That is who this is built for."
+  - key: g3
+    q: "I've quit gyms before."
+    a: "Gym memberships fail because nobody notices when you stop coming. Here it's the same coach and the same crew every session, and they do notice."
+    proof: "Coached small groups keep 84% of sessions vs 69% for self-directed training."
+  - key: g4
+    q: "I don't have time."
+    a: "5 PM or 6 PM, 45 to 60 minutes, on the calendar rather than on your willpower. Three a week is plenty; come to more if you want. Can't make either? Tell us the time that works and we'll try to open it."
+    proof: "About half of inactive adults name time first. A fixed slot beats a promise of flexibility."
+  - key: g5
+    q: "Boxing is for fighters."
+    a: "No sparring. No head contact. Gloves, pads, bags and footwork. The best hour of cardio you'll do this week, and you learn a skill doing it."
+    proof: "Non-contact boxing: lower stress and higher confidence in 15 of 16 studies reviewed."
+  - key: g6
+    q: "Why not just do a HIIT class?"
+    a: "Same price as the studios down the road, except you leave knowing how to throw a proper 1-2. A skill you can see improve is the thing that keeps people coming back."
+    proof: "$189 every 4 weeks, the going rate for coached small groups in South Surrey."
+  - key: g7
+    q: "I'd rather start one to one."
+    a: "Foundations Private: a month of Guided Boxing plus ten private sessions with your coach, about $61 a session, then into the group when you're ready. Ask at your free week or book a free consult."
+    proof: "Personal training in South Surrey runs $83 to $140 an hour."

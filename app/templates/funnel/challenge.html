@@ -38,6 +38,11 @@
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">{% if full %}This one is full{% else %}{{ spots_left }} of {{ c.spots }} spots left{% endif %} · {{ price }} + GST</span>
         </div>
+        <ul class="included" aria-label="Included in the price">
+          <li><b>Your own gloves and wraps</b><span>fitted on day one, yours to keep</span></li>
+          <li><b>A one-to-one session with your coach</b><span>before the challenge starts: your goals, your starting point</span></li>
+          <li><b>Most improved wins a month free</b><span>judged against your own goals, not the room</span></li>
+        </ul>
       </div>
       <div class="hero-media">
         <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Guided Boxing at Box2Fit White Rock">
@@ -91,7 +96,8 @@
   <section class="section">
     <div class="wrap" style="max-width:820px">
       <div class="pf-kicker">The price, plainly</div>
-      <h2 style="margin:8px 0 12px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.4rem,2.8vw,1.9rem)">{{ price }} + GST for the five weeks.</h2>
+      <h2 style="margin:8px 0 12px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.4rem,2.8vw,1.9rem)">{{ price }} + GST for the five weeks, and that includes your gloves, your wraps and a one-to-one session.</h2>
+      <p style="margin:0 0 14px;color:var(--pf-text-2)">Bought separately, a decent pair of gloves and wraps and one hour of personal training in South Surrey add up to more than the whole challenge. Here they are part of it.</p>
       <div class="pf-card pf-card--pad">
         <p style="margin:0 0 8px"><strong>Today:</strong> {{ price_total }} ({{ price }} + {{ price_gst }} GST). That covers all five weeks, your personal session, gloves and wraps.</p>
         <p style="margin:0 0 8px"><strong>After the challenge:</strong> your membership continues at {{ renew_total }} ({{ renew_price }} + GST) every 4 weeks from {{ c.renew.strftime('%A, %B %d') }}, unless you cancel before then.</p>
@@ -124,7 +130,7 @@
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Starts {{ c.start.strftime('%A, %B %d') }} · {{ c.class_time }}</div>
       <h2>{{ c.spots }} spots. One of them is yours.</h2>
       <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
-      <div class="fine">{% if full %}This one is full{% else %}{{ spots_left }} spots left{% endif %} · {{ price }} + GST · 1522 Finlay St, White Rock · free underground parking</div>
+      <div class="fine">{% if full %}This one is full{% else %}{{ spots_left }} spots left{% endif %} · {{ price }} + GST with gloves, wraps and a personal session · 1522 Finlay St, White Rock</div>
     </div>
   </section>
 {% endblock %}

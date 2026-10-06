@@ -71,21 +71,22 @@ def _login(client, email, password="password123"):
 # ---------------------------------------------------- landing + public ------
 def test_public_and_landing_pages_render(client):
     for path in ("/", "/schedule", "/trainers", "/pricing", "/contact",
-                 "/privacy", "/terms", "/kids", "/youth", "/technical",
-                 "/bootcamp", "/shehits", "/challenge"):
+                 "/privacy", "/terms", "/kids", "/youth", "/guided-boxing",
+                 "/shehits", "/challenge"):
         r = client.get(path)
         assert r.status_code == 200, path
 
     # retired landings 301 to their successors
     for old, new in (("/reset", "/kids"), ("/focus", "/bootcamp"),
-                     ("/strong", "/technical")):
+                     ("/strong", "/technical"), ("/bootcamp", "/guided-boxing"),
+                     ("/technical", "/guided-boxing")):
         r = client.get(old, follow_redirects=False)
         assert r.status_code == 301 and new in r.headers["Location"], old
 
     # each landing books its own segment
     assert b"/book/kids" in client.get("/kids").data
     assert b"/book/youth" in client.get("/youth").data
-    assert b"/book/technical" in client.get("/technical").data
+    assert b"/book/guided" in client.get("/guided-boxing").data
     # /beast sends people to the challenge while it is open
     r = client.get("/beast")
     assert r.status_code == 302 and "/challenge" in r.headers["Location"]

@@ -285,10 +285,9 @@ def schedule_builder():
             ("", "None (portal/schedule only)"),
             ("kids", "Kids 6-10 (/kids)"),
             ("youth", "Youth 11-18 (/youth)"),
-            ("technical", "Technical Boxing (/technical)"),
-            ("bootcamp", "Boxing Bootcamp (/bootcamp)"),
+            ("guided", "Guided Boxing 5 PM / 6 PM (/guided-boxing)"),
             ("shehits", "She Hits (/shehits)"),
-            ("beast", "Guided Boxing (/beast)"),
+            ("beast", "Guided Boxing 6 AM (/challenge)"),
         ],
     )
 

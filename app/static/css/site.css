@@ -146,3 +146,10 @@ img{ display:block; max-width:100%; }
   .mobile-cta{ display:block; position:fixed; left:0; right:0; bottom:0; z-index:50; }
   body.has-mobile-cta{ padding-bottom:84px; }
 }
+
+/* Challenge hero: what the price includes, as a visible list not a footnote */
+.hero .included{ list-style:none; margin:24px 0 0; padding:0; display:grid; gap:10px; max-width:52ch; }
+.hero .included li{ display:grid; grid-template-columns:22px 1fr; column-gap:10px; align-items:baseline; font-size:15.5px; line-height:1.4; color:var(--pf-on-dark-2); }
+.hero .included li::before{ content:"✓"; font-weight:900; color:var(--pf-red-bright); font-size:17px; }
+.hero .included b{ color:var(--pf-on-dark); font-weight:800; display:block; }
+.hero .included span{ grid-column:2; }

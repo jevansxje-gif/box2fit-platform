@@ -32,7 +32,7 @@
         <p class="sub">{{ hero_obj.a }}</p>
         {% else %}
         <h1>Five weeks. A coach, a plan, <span class="accent">a goal to hit.</span></h1>
-        <p class="sub">Guided Boxing is the 6 am hour: boxing, strength and conditioning with a coach running every round, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
+        <p class="sub">Guided Boxing is how every adult class here runs: a coach calling every round, in a small group, no guessing. The 6 am hour is where the challenge happens. Boxing, strength and conditioning, done before the town wakes up. For five weeks it becomes a challenge: set your goals one to one with a coach, train with the same small group, and see how far you get by {{ c.end.strftime('%B %d') }}. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
         {% endif %}
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
@@ -53,7 +53,7 @@
   </section>
 
   <div class="time-strip">
-    <div class="wrap"><span>{{ c.class_days }}, {{ c.class_time }} · starts {{ c.start.strftime('%B %d') }}</span><a href="#other-time">Can't make 6 am? Tell us when you could train →</a></div>
+    <div class="wrap"><span>{{ c.class_days }}, {{ c.class_time }} · starts {{ c.start.strftime('%B %d') }}</span><a href="{{ url_for('funnel.landing', slug='guided-boxing') }}">Can't make 6 am? Guided Boxing also runs at 5 PM and 6 PM, free week →</a></div>
   </div>
 
   <section class="section">

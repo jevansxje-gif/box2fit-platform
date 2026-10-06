@@ -46,6 +46,10 @@ booking_lede: "Pick a Guided Boxing session, 5 PM or 6 PM. Your first week is fr
 review_tags: ["bootcamp", "technical", "beast"]
 time_line: "Guided Boxing · Monday to Friday · 5 PM conditioning · 6 PM technique · from October 26"
 hero_video: hero-adults
+hero_secondary:
+  label: "Join the 5-Week Challenge · 6 AM"
+  endpoint: "funnel.challenge_landing"
+  note: "$249 + GST · gloves, wraps and a 1:1 session included · starts Oct 26"
 short_name: "Guided Boxing sessions"
 objections_headline: "Straight answers, before you decide."
 feature:

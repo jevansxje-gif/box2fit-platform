@@ -37,6 +37,12 @@
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ "Two weeks, $94.50 + GST" if intro else "Free week · no card needed to book" }}</span>
           {% if intro %}<div style="flex-basis:100%;margin-top:10px;color:var(--pf-on-dark-2);font-size:14.5px;line-height:1.5">{{ intro.line }}<br /><a href="{{ trial_url }}" style="color:inherit;text-decoration:underline">{{ intro.secondary }}</a></div>{% endif %}
+          {% if copy.hero_secondary %}
+          <div class="hero-second" style="flex-basis:100%;margin-top:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ url_for(copy.hero_secondary.endpoint) }}">{{ copy.hero_secondary.label }}</a>
+            <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ copy.hero_secondary.note }}</span>
+          </div>
+          {% endif %}
         </div>
       </div>
       <div class="hero-media">

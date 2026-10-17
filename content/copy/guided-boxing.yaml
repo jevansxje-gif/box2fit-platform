@@ -55,7 +55,7 @@ objections_headline: "Straight answers, before you decide."
 feature:
   kicker: "Want a start date and a goal?"
   title: "The 5-Week Guided Boxing Challenge · 6 AM · starts Monday, October 26"
-  body: "Twelve people, one coach, five weeks. Your own gloves and wraps, a one-to-one session with your coach before day one, and the most improved wins the next month free. $249 + GST, all in."
+  body: "Twelve people, one coach, five weeks. Your own gloves and wraps, and a one-to-one session with your coach before day one. $249 + GST, all in."
   cta: "See the challenge"
   endpoint: "funnel.challenge_landing"
 objections:

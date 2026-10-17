@@ -71,7 +71,7 @@ def _login(client, email, password="password123"):
 # ---------------------------------------------------- landing + public ------
 def test_public_and_landing_pages_render(client):
     for path in ("/", "/schedule", "/trainers", "/pricing", "/contact",
-                 "/privacy", "/terms", "/kids", "/youth", "/guided-boxing",
+                 "/privacy", "/terms", "/kids", "/youth",
                  "/shehits", "/challenge"):
         r = client.get(path)
         assert r.status_code == 200, path
@@ -86,7 +86,9 @@ def test_public_and_landing_pages_render(client):
     # each landing books its own segment
     assert b"/book/kids" in client.get("/kids").data
     assert b"/book/youth" in client.get("/youth").data
-    assert b"/book/guided" in client.get("/guided-boxing").data
+    # /guided-boxing sends people to the challenge until 5 PM / 6 PM are advertised
+    r = client.get("/guided-boxing?v=g4", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["Location"].endswith("/challenge?v=g4")
     # /beast sends people to the challenge while it is open
     r = client.get("/beast")
     assert r.status_code == 302 and "/challenge" in r.headers["Location"]

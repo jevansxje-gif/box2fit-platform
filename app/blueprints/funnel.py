@@ -488,6 +488,10 @@ def landing(slug: str):
 
     if slug == "beast":  # Guided Boxing (6 am): its offer is the challenge while it's open
         return redirect(url_for("funnel.challenge_landing"), 302)
+    if slug == "guided-boxing":
+        # Owner 2026-10-17: the 5 PM / 6 PM free week isn't advertised, so the
+        # adult page is the challenge until those hours get their own route.
+        return redirect(url_for("funnel.challenge_landing", **request.args), 302)
     if slug in RETIRED_SEGMENTS:  # /bootcamp, /technical: the adult page is /guided-boxing now
         return redirect(url_for("funnel.landing", slug="guided-boxing", **request.args), 301)
     copy = load_copy(slug)

@@ -1940,7 +1940,7 @@ def test_suggest_another_time_is_recorded_and_reported(app, client, client_accou
     on the Marketing page, so we can see if the schedule is the blocker."""
     from app.models import TimeSuggestion
 
-    r = client.get("/guided-boxing?v=g4&utm_source=meta&utm_campaign=guided&utm_content=guided-g4")
+    r = client.get("/challenge?v=g4&utm_source=meta&utm_campaign=guided&utm_content=guided-g4")
     assert r.status_code == 200 and b"Tell us when you could train" in r.data
     r = client.post(
         "/suggest-time",
@@ -2050,7 +2050,9 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     assert r.status_code == 301 and r.headers["Location"].endswith("/guided-boxing?v=g7")
     assert client.get("/book/technical").status_code == 301
     r = client.get("/guided-boxing")
-    assert b"Start your free week" in r.data and b"Free first week" in r.data and b"See the challenge" in r.data
+    assert r.status_code == 302 and "/challenge" in r.headers["Location"]
+    r = client.get("/challenge")
+    assert b"5 PM" not in r.data and b"6 PM" not in r.data and b"free week" not in r.data
     r = client.get("/kids")
     assert b"Book their free week" in r.data
     r = client.get("/shehits")

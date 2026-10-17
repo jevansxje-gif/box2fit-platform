@@ -39,7 +39,7 @@ CLASS_TYPES = [
     ("technical", "Guided Boxing (6 PM)", "guided", None, None, 60, 16),
     ("bootcamp", "Guided Boxing (5 PM)", "guided", None, None, 45, 16),
     ("she_hits", "She Hits", "shehits", None, None, 60, 16),
-    ("beast", "Guided Boxing (6 AM)", "beast", None, None, 50, 16),
+    ("beast", "Guided Boxing (6 AM)", "beast", None, None, 60, 16),
 ]
 
 # Retired catalog entries: deleted on reseed IF nothing references them.

@@ -8,15 +8,15 @@
     <h1 class="pf-h1" style="margin:0">Marketing</h1>
     <span class="pf-chip pf-chip--ink">Meta</span>
     <div style="display:flex;gap:6px">
-      {% for c in campaigns %}
-      <a href="{{ url_for('ops_admin.marketing', c=c) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if c == campaign else 'pf-btn--ghost' }}">{{ c }}</a>
+      {% for c, c_cfg in campaigns.items() %}
+      <a href="{{ url_for('ops_admin.marketing', c=c) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if c == campaign else 'pf-btn--ghost' }}">{{ c_cfg.label }}</a>
       {% endfor %}
     </div>
   </div>
   <p style="color:var(--pf-text-2);font-size:14px;margin:6px 0 20px">Human visitors only — Meta's ad-review and preview bots are filtered out. Traffic comes from the server's own access log; leads and everything after come from the database.</p>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;align-items:stretch">
-    {% for label, value in [('Ad visitors', traffic.totals.visitors), ('Leads', funnel.totals.leads), ('Attended', funnel.totals.attended), ('Activated', funnel.totals.activated)] %}
+    {% for label, value in ([('Ad visitors', traffic.totals.visitors), ('Leads', funnel.totals.leads)] + ([('Paid', funnel.totals.paid)] if cfg.paid else [('Attended', funnel.totals.attended)]) + [('Activated', funnel.totals.activated)]) %}
     <div class="pf-card pf-card--pad" style="display:flex;flex-direction:column;justify-content:space-between;min-height:118px">
       <div class="pf-kicker" style="color:var(--pf-text-3)">{{ label }}</div>
       <div class="bnum" style="font-variant-numeric:tabular-nums;line-height:1">{{ value }}</div>
@@ -49,6 +49,7 @@
           <th style="padding:8px 10px;text-align:right">Details form</th>
           <th style="padding:8px 10px;text-align:right;border-left:1px solid var(--pf-line)">Leads</th>
           <th style="padding:8px 10px;text-align:right">Booked</th>
+          {% if cfg.paid %}<th style="padding:8px 10px;text-align:right">Paid</th>{% endif %}
           <th style="padding:8px 10px;text-align:right">Attended</th>
           <th style="padding:8px 10px;text-align:right">Activated</th>
         </tr>
@@ -63,6 +64,7 @@
           <td style="padding:9px 10px;text-align:right">{{ t.get('details', '—') }}</td>
           <td style="padding:9px 10px;text-align:right;border-left:1px solid var(--pf-line)">{{ f.get('leads', 0) }}</td>
           <td style="padding:9px 10px;text-align:right">{{ f.get('booked', 0) }}</td>
+          {% if cfg.paid %}<td style="padding:9px 10px;text-align:right;font-weight:700">{{ f.get('paid', 0) }}</td>{% endif %}
           <td style="padding:9px 10px;text-align:right">{{ f.get('attended', 0) }}</td>
           <td style="padding:9px 10px;text-align:right;font-weight:700">{{ f.get('activated', 0) }}</td>
         </tr>
@@ -74,6 +76,7 @@
           <td style="padding:9px 10px;text-align:right">{{ traffic.totals.details }}</td>
           <td style="padding:9px 10px;text-align:right;border-left:1px solid var(--pf-line)">{{ funnel.totals.leads }}</td>
           <td style="padding:9px 10px;text-align:right">{{ funnel.totals.booked }}</td>
+          {% if cfg.paid %}<td style="padding:9px 10px;text-align:right">{{ funnel.totals.paid }}</td>{% endif %}
           <td style="padding:9px 10px;text-align:right">{{ funnel.totals.attended }}</td>
           <td style="padding:9px 10px;text-align:right">{{ funnel.totals.activated }}</td>
         </tr>
@@ -85,12 +88,13 @@
   <div class="pf-panel">
     <h2>Recent ad leads</h2>
     {% if funnel.recent %}
-    {% for lead in funnel.recent %}
+    {% for row in funnel.recent %}{% set lead = row.lead %}
     <div style="display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--pf-line);font-size:14px;flex-wrap:wrap">
-      <b>{{ lead.name }}</b>
+      <b>{% if lead.user_id %}<a href="{{ url_for('ops_admin.member_detail', user_id=lead.user_id) }}">{{ lead.name }}</a>{% else %}{{ lead.name }}{% endif %}</b>
       <span style="color:var(--pf-text-2)">{{ lead.email }}</span>
-      <span class="pf-chip" style="font-size:11px">{{ lead.utm_content or '?' }}</span>
-      <span class="pf-chip {{ 'pf-chip--success' if lead.status == 'activated' else 'pf-chip--info' }}" style="font-size:11px">{{ lead.status }}</span>
+      <span class="pf-chip" style="font-size:11px">{{ row.ad }}</span>
+      {% if row.paid %}<span class="pf-chip pf-chip--success" style="font-size:11px">paid</span>{% else %}
+      <span class="pf-chip {{ 'pf-chip--success' if lead.status == 'activated' else 'pf-chip--info' }}" style="font-size:11px">{{ lead.status }}</span>{% endif %}
       <span style="margin-left:auto;color:var(--pf-text-3);font-size:12.5px">{{ lead.created_at.strftime('%b %d, %H:%M') }}</span>
     </div>
     {% endfor %}

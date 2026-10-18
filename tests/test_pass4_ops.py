@@ -2116,3 +2116,65 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     # the class picker carries the time suggestion
     r = client.get("/book/shehits")
     assert b"None of these times work?" in r.data
+
+
+def test_marketing_page_reads_october_campaigns(app, client, client_account, tmp_path, monkeypatch):
+    """October 2026 links (utm_campaign=families|guided|shehits,
+    utm_content=<campaign>-<ad>) show per ad as F1 / A4 / S1, leads are
+    credited to them, and a paid Challenge sign-up counts as Paid."""
+    from app.models import AttendeeProfile, Lead, User
+    from app.services import challenge as ch
+    from app.services.marketing_report import ad_label, db_funnel, traffic_funnel
+
+    assert ad_label("families-f1") == "F1"
+    assert ad_label("guided-g4") == "A4"
+    assert ad_label("shehits-s2") == "S2"
+    assert ad_label(None, "c1") == "c1"
+    assert ad_label("gym-referral") == "gym-referral"
+
+    ua = "Mozilla/5.0 (iPhone)"
+    log = tmp_path / "access.log"
+    log.write_text(
+        f'9.9.9.9 - - [17/Oct/2026:10:00:00 -0700] "GET /kids?v=f2&utm_source=meta&utm_campaign=families&utm_content=families-f2 HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'9.9.9.9 - - [17/Oct/2026:10:01:00 -0700] "GET /book/kids HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'9.9.9.9 - - [17/Oct/2026:10:02:00 -0700] "GET /book/kids/details HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'8.8.4.4 - - [17/Oct/2026:11:00:00 -0700] "GET /youth?v=f5&utm_source=meta&utm_campaign=families&utm_content=families-f5 HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'7.7.7.7 - - [17/Oct/2026:11:00:00 -0700] "GET /guided-boxing?v=g7&utm_source=meta&utm_campaign=guided&utm_content=guided-g7 HTTP/1.1" 302 1 "-" "{ua}"\n'
+        f'7.7.7.7 - - [17/Oct/2026:11:00:01 -0700] "GET /challenge?v=g7&utm_source=meta&utm_campaign=guided&utm_content=guided-g7 HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'7.7.7.7 - - [17/Oct/2026:11:01:00 -0700] "GET /challenge/join HTTP/1.1" 200 1 "-" "{ua}"\n'
+        f'7.7.7.7 - - [17/Oct/2026:11:02:00 -0700] "POST /challenge/join HTTP/1.1" 303 1 "-" "{ua}"\n'
+    )
+    monkeypatch.setenv("NGINX_ACCESS_LOG", str(log))
+
+    fam = traffic_funnel("families")
+    assert fam["totals"] == {"visitors": 2, "landings": 2, "picker": 1, "details": 1}
+    assert fam["per_ad"]["F2"]["details"] == 1 and fam["per_ad"]["F5"]["visitors"] == 1
+    gb = traffic_funnel("guided")
+    assert gb["totals"]["visitors"] == 1 and gb["per_ad"]["A7"]["details"] == 1
+
+    # a Families lead and a paid Challenge lead
+    cid = client_account.id
+    db.session.add(Lead(client_account_id=cid, name="Cat", email="cat@x.test", phone="", segment="kids",
+                        status="booked", utm_source="meta", utm_campaign="families", utm_content="families-f2"))
+    u = User(email="gb@x.test", name="Gee Bee", client_account_id=cid)
+    db.session.add(u)
+    db.session.flush()
+    att = AttendeeProfile(client_account_id=cid, user_id=u.id, kind="adult", first_name="Gee")
+    db.session.add(att)
+    db.session.add(Lead(client_account_id=cid, user_id=u.id, name="Gee Bee", email="gb@x.test", phone="",
+                        segment="guided", status="new", utm_source="meta", utm_campaign="guided",
+                        utm_content="guided-g4"))
+    db.session.flush()
+    ch._local_sub(att, None)
+    db.session.commit()
+
+    f = db_funnel(cid, "families")
+    assert f["per_ad"]["F2"]["booked"] == 1 and f["recent"][0]["ad"] == "F2"
+    g = db_funnel(cid, "guided")
+    assert g["totals"]["paid"] == 1 and g["per_ad"]["A4"]["paid"] == 1
+
+    staff = _admin(app)
+    r = staff.get("/ops/marketing")
+    assert r.status_code == 200 and b"Families" in r.data and b"F2" in r.data
+    r = staff.get("/ops/marketing?c=guided")
+    assert b"Paid" in r.data and b"A4" in r.data and b"Gee Bee" in r.data

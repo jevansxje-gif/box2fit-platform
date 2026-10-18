@@ -39,9 +39,64 @@ def _is_bot(ip: str, ua: str) -> bool:
     return ip.startswith(BOT_IP_PREFIXES) or any(m in ua_l for m in BOT_UA_MARKERS)
 
 
-def traffic_funnel(campaign: str = "kids") -> dict:
+# Campaign tabs on the Marketing page. The October 2026 launch tags every
+# link utm_campaign=families|guided|shehits and utm_content=<campaign>-<ad>
+# (families-f1, guided-g4, shehits-s1); the August test used ?v=c1..c3 with
+# utm_campaign = the landing slug. "picker"/"details" are the two steps
+# between landing and a lead for that offer (POST = form submitted).
+CAMPAIGNS = {
+    "families": {"label": "Families", "landings": ("/kids", "/youth"),
+                 "picker": ("GET", ("/book/kids", "/book/youth")),
+                 "details": ("GET", ("/book/kids/details", "/book/youth/details")),
+                 "paid": False},
+    "guided": {"label": "Guided Boxing", "landings": ("/challenge", "/guided-boxing"),
+               "picker": ("GET", ("/challenge/join",)),
+               "details": ("POST", ("/challenge/join",)),
+               "paid": True},
+    "shehits": {"label": "She Hits", "landings": ("/shehits",),
+                "picker": ("GET", ("/shehits/start", "/book/shehits")),
+                "details": ("POST", ("/shehits/start", "/book/shehits/details")),
+                "paid": True},
+    # August 2026 test, kept for the record
+    "kids": {"label": "Kids (Aug)", "landings": ("/kids",),
+             "picker": ("GET", ("/book/kids",)), "details": ("GET", ("/book/kids/details",)),
+             "paid": False},
+    "youth": {"label": "Youth (Aug)", "landings": ("/youth",),
+              "picker": ("GET", ("/book/youth",)), "details": ("GET", ("/book/youth/details",)),
+              "paid": False},
+    "beast": {"label": "Beast (Aug)", "landings": ("/beast",),
+              "picker": ("GET", ("/book/beast",)), "details": ("GET", ("/book/beast/details",)),
+              "paid": False},
+}
+DEFAULT_CAMPAIGN = "families"
+# Meta ad names use A1..A7 for the guided ads; their links say g1..g7.
+_AD_PREFIX = {"g": "A"}
+_NON_AD = ("gym-referral", "call-in")
+
+
+def ad_label(utm_content: str | None, v: str | None = None) -> str:
+    """families-f1 -> F1, guided-g4 -> A4, shehits-s1 -> S1; old ?v=c1 -> c1."""
+    if utm_content in _NON_AD:
+        return utm_content
+    if utm_content and "-" in utm_content:
+        code = utm_content.rsplit("-", 1)[1]
+        if code[:1].isalpha() and code[1:].isdigit():
+            return _AD_PREFIX.get(code[0], code[0].upper()) + code[1:]
+        return code
+    return v or utm_content or "unknown"
+
+
+def _matches(method: str, path: str, step: tuple) -> bool:
+    want, prefixes = step
+    base = path.split("?", 1)[0]
+    return method == want and any(base == p or base.startswith(p + "/") for p in prefixes)
+
+
+def traffic_funnel(campaign: str = DEFAULT_CAMPAIGN) -> dict:
     """Per-human-visitor journeys for one campaign's ad traffic."""
-    landing_path = f"/{campaign}"
+    from urllib.parse import parse_qs, urlsplit
+
+    cfg = CAMPAIGNS.get(campaign, CAMPAIGNS[DEFAULT_CAMPAIGN])
     visitors: dict[str, dict] = {}
     lines_read = 0
     error = None
@@ -54,26 +109,32 @@ def traffic_funnel(campaign: str = "kids") -> dict:
                     if not m:
                         continue
                     lines_read += 1
-                    ip, req_path, ua = m["ip"], m["path"], m["ua"]
+                    ip, req_path, ua, method = m["ip"], m["path"], m["ua"], m["method"]
                     if "fbclid=fbclid" in req_path:  # internal test links
                         continue
                     if _is_bot(ip, ua):
                         continue
+                    parts = urlsplit(req_path)
+                    q = parse_qs(parts.query)
+                    on_landing = parts.path in cfg["landings"]
+                    tagged = q.get("utm_source", [""])[0] == "meta" and (
+                        q.get("utm_campaign", [campaign])[0] == campaign
+                    )
                     # a meta-tagged landing starts/refreshes this visitor
-                    if req_path.startswith(landing_path) and "utm_source=meta" in req_path:
-                        ad = re.search(r"[?&]v=(c\d)", req_path)
+                    if method == "GET" and on_landing and tagged:
                         v = visitors.setdefault(
                             ip, {"ad": None, "landings": 0, "picker": False,
                                  "details": False}
                         )
                         v["landings"] += 1
-                        if ad:
-                            v["ad"] = ad.group(1)
+                        ad = ad_label(q.get("utm_content", [None])[0], q.get("v", [None])[0])
+                        if ad != "unknown":
+                            v["ad"] = ad
                     elif ip in visitors:
-                        if req_path.startswith(f"/book/{campaign}/details"):
+                        if _matches(method, req_path, cfg["details"]):
                             visitors[ip]["details"] = True
                             visitors[ip]["picker"] = True
-                        elif req_path.startswith(f"/book/{campaign}"):
+                        elif _matches(method, req_path, cfg["picker"]):
                             visitors[ip]["picker"] = True
         except FileNotFoundError:
             continue
@@ -103,10 +164,12 @@ def traffic_funnel(campaign: str = "kids") -> dict:
             "error": error}
 
 
-def db_funnel(client_account_id: int, campaign: str = "kids") -> dict:
-    """Database truth: leads with meta UTMs and how far each got."""
+def db_funnel(client_account_id: int, campaign: str = DEFAULT_CAMPAIGN) -> dict:
+    """Database truth: leads with meta UTMs and how far each got. "paid" is a
+    live Challenge / She Hits intro subscription on the lead's account."""
     from ..extensions import db
-    from ..models import Lead, LeadStatus
+    from ..models import Lead, LeadStatus, Subscription
+    from . import challenge as ch
 
     leads = (
         db.session.query(Lead)
@@ -115,24 +178,39 @@ def db_funnel(client_account_id: int, campaign: str = "kids") -> dict:
         .order_by(Lead.created_at.desc())
         .all()
     )
+    paid_users = set()
+    if CAMPAIGNS.get(campaign, {}).get("paid"):
+        paid_users = {
+            uid for (uid,) in db.session.query(Subscription.user_id).filter(
+                Subscription.client_account_id == client_account_id,
+                Subscription.challenge_key.in_(list(ch.OFFERS)),
+                Subscription.status.in_(ch.LIVE),
+            )
+        }
     per_ad: dict[str, dict] = defaultdict(
-        lambda: {"leads": 0, "booked": 0, "attended": 0, "activated": 0}
+        lambda: {"leads": 0, "booked": 0, "paid": 0, "attended": 0, "activated": 0}
     )
+    recent = []
     for lead in leads:
-        ad = lead.utm_content or "unknown"
+        ad = ad_label(lead.utm_content)
+        paid = lead.user_id in paid_users
+        if len(recent) < 12:
+            recent.append({"lead": lead, "ad": ad, "paid": paid})
         per_ad[ad]["leads"] += 1
         if lead.status in (
             LeadStatus.booked.value, LeadStatus.attended.value,
             LeadStatus.activated.value,
         ):
             per_ad[ad]["booked"] += 1
+        if paid:
+            per_ad[ad]["paid"] += 1
         if lead.status in (LeadStatus.attended.value, LeadStatus.activated.value):
             per_ad[ad]["attended"] += 1
         if lead.status == LeadStatus.activated.value:
             per_ad[ad]["activated"] += 1
     totals = {
         k: sum(a[k] for a in per_ad.values())
-        for k in ("leads", "booked", "attended", "activated")
+        for k in ("leads", "booked", "paid", "attended", "activated")
     }
     return {"per_ad": dict(sorted(per_ad.items())), "totals": totals,
-            "recent": leads[:12]}
+            "recent": recent}

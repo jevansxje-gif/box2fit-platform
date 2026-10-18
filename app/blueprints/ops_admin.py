@@ -1391,12 +1391,11 @@ def marketing():
     fleet filtered out) joined with lead/booking/activation truth from the
     database, per ad creative. Spend is entered manually from Ads Manager."""
     from ..models import SiteSetting
-    from ..services.marketing_report import db_funnel, traffic_funnel
+    from ..services.marketing_report import CAMPAIGNS, DEFAULT_CAMPAIGN, db_funnel, traffic_funnel
 
-    CAMPAIGNS = ("kids", "youth", "shehits", "beast")
-    campaign = request.args.get("c", "kids")
+    campaign = request.args.get("c", DEFAULT_CAMPAIGN)
     if campaign not in CAMPAIGNS:
-        campaign = "kids"
+        campaign = DEFAULT_CAMPAIGN
     if request.method == "POST" and request.form.get("action") == "spend":
         raw = (request.form.get("spend") or "").replace("$", "").strip()
         try:
@@ -1415,6 +1414,7 @@ def marketing():
         "ops/marketing.html",
         campaign=campaign,
         campaigns=CAMPAIGNS,
+        cfg=CAMPAIGNS[campaign],
         traffic=traffic,
         funnel=funnel,
         spend=spend,

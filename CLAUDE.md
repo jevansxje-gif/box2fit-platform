@@ -61,7 +61,8 @@ Kids and youth were the first journey; adults run under one banner, Guided Boxin
 
 ## Rules that came from the owner and from Joey
 - Prices are pre-tax and shown "+ GST"; the agency share is 25% of pre-tax.
-- Memberships: $189 + GST every 4 weeks, 30-day written cancellation notice. Never write
+- Memberships: $189 + GST a month, on the same day each month (every 4 weeks until
+  2026-10-19), 30-day written cancellation notice. Never write
   "cancel anytime" about a membership.
 - The 5-Week Guided Boxing Challenge: $249 + GST, then $249 + GST every 5 weeks on its own
   plan; gloves, wraps and a one-to-one coach session included; auto-renewal stays.

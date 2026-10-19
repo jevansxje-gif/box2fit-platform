@@ -5,7 +5,7 @@
     <table style="border-collapse:collapse;font-size:15px">
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Contact</td><td>{{ guardian.phone or 'no phone' }} · {{ guardian.email }}</td></tr>
       <tr><td style="padding:4px 18px 4px 0;color:#767C86">Guided Start</td><td>{{ guided_summary or 'not answered' }}</td></tr>
-      <tr><td style="padding:4px 18px 4px 0;color:#767C86">Renews</td><td>{{ fmt_local(renew_when, '%A, %B %d') if renew_when else 'day 15' }} at {{ renew_total }} every 4 weeks unless cancelled</td></tr>
+      <tr><td style="padding:4px 18px 4px 0;color:#767C86">Renews</td><td>{{ fmt_local(renew_when, '%A, %B %d') if renew_when else 'day 15' }} at {{ renew_total }} every month unless cancelled</td></tr>
     </table>
     <p style="font-size:15px;line-height:1.6;margin:14px 0 0"><strong>To do:</strong> the coach spends the first five minutes of her first session on the answers above.</p>
   </div>

@@ -14,7 +14,7 @@
   </div>
   {% else %}
   <h1>Set up your membership</h1>
-  <p class="lede">{% if price_label %}<b>{{ price_label }} every 4 weeks.</b> {% endif %}{% if charge_on %}Nothing is charged until <b>{{ charge_on.strftime('%B %d') }}</b> — we'll remind you first, and you can cancel before then in one click.{% else %}Nothing is charged for 48 hours — we'll remind you first, and you can cancel before then in one click.{% endif %}</p>
+  <p class="lede">{% if price_label %}<b>{{ price_label }} a month.</b> {% endif %}{% if charge_on %}Nothing is charged until <b>{{ charge_on.strftime('%B %d') }}</b> — we'll remind you first, and you can cancel before then in one click.{% else %}Nothing is charged for 48 hours — we'll remind you first, and you can cancel before then in one click.{% endif %}</p>
 
   {% if stripe_configured %}
     <form id="payment-form">

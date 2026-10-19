@@ -1,7 +1,8 @@
 """Money lifecycle (Pass 2).
 
 Activation creates the Stripe subscription on the guardian's vaulted card:
-- interval = week × 4 (client-confirmed 4-week billing cycle, $189)
+- interval = month, on the day of the first charge (owner 2026-10-19;
+  it was every 4 weeks until then). $189 + GST
 - trial_end = now + PRE_CHARGE_LEAD_HOURS (48h) so the first charge lands
   after the mandatory pre-charge reminder (card-network trial rule)
 - off_session on the stored default payment method; SCA falls back to
@@ -51,7 +52,7 @@ INTERVAL_LABEL = {"4_weeks": "every 4 weeks", "5_weeks": "every 5 weeks", "month
 
 
 def interval_label(plan) -> str:
-    return INTERVAL_LABEL.get(getattr(plan, "interval", None), "every 4 weeks")
+    return INTERVAL_LABEL.get(getattr(plan, "interval", None), "every month")
 
 
 class ActivationError(Exception):
@@ -75,7 +76,7 @@ def ensure_stripe_price(plan: Plan) -> str:
     if plan.stripe_price_id:
         return plan.stripe_price_id
     stripe = stripe_service.stripe_client()
-    recurring = STRIPE_INTERVAL.get(plan.interval, STRIPE_INTERVAL["4_weeks"])
+    recurring = STRIPE_INTERVAL.get(plan.interval, STRIPE_INTERVAL["month"])
     price = stripe.Price.create(
         unit_amount=plan.price_cents,
         currency=plan.currency.lower(),
@@ -87,7 +88,7 @@ def ensure_stripe_price(plan: Plan) -> str:
 
 
 # FAMILY PRICING (client deal, 2026-08-28): 1st member full price, then
-# $139 / $119 / $100 per 4-week cycle for the 2nd / 3rd / 4th+ member.
+# $139 / $119 / $100 per billing cycle (monthly) for the 2nd / 3rd / 4th+ member.
 # "Family" = subscriptions under the SAME guardian account, which by
 # construction all bill the same vaulted card — no promo codes needed and
 # nothing for the parent to redeem; the tier applies automatically at
@@ -111,11 +112,13 @@ def ensure_stripe_price_cents(plan: Plan, cents: int) -> str:
 
     stripe = stripe_service.stripe_client()
     mode = "live" if "live" in (stripe.api_key or "")[:8] else "test"
-    key = f"stripe_price_{cents}_{mode}"
+    # the interval is part of the key: a 4-week family price must never be
+    # reused for a monthly plan
+    key = f"stripe_price_{cents}_{plan.interval}_{mode}"
     price_id = SiteSetting.get(key, "")
     if price_id:
         return price_id
-    recurring = STRIPE_INTERVAL.get(plan.interval, STRIPE_INTERVAL["4_weeks"])
+    recurring = STRIPE_INTERVAL.get(plan.interval, STRIPE_INTERVAL["month"])
     price = stripe.Price.create(
         unit_amount=cents,
         currency=plan.currency.lower(),
@@ -268,7 +271,7 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
     price = price_with_gst_label(sub.mrr_cents)
     if sub.mrr_cents < plan.price_cents:
         # tuck inside the parens — the template continues "...billed every
-        # 4 weeks" right after this string
+        # month" right after this string
         price = price[:-1] + ", family rate)"
     lead_hours = current_app.config["PRE_CHARGE_LEAD_HOURS"]
     # A staff-agreed payday pushes the charge past the standard window —
@@ -301,7 +304,7 @@ def _send_pre_charge_reminder(sub: Subscription) -> None:
     )
     send_sms(
         guardian, guardian.phone,
-        f"Box2Fit: {who.lower()} membership ({price} every 4 weeks) starts "
+        f"Box2Fit: {who.lower()} membership ({price} {interval_label(plan)}) starts "
         f"{when}. Cancel before the charge in one click: {cancel_url}",
         "pre_charge_reminder", sub.client_account_id, attendee_id=attendee.id,
     )
@@ -572,6 +575,83 @@ def confirm_one_off_return(charge, session_id) -> bool:
         record_one_off_paid(charge, sd.get("payment_intent"))
         return True
     return False
+
+
+# ------------------------------------------- 4-week -> monthly move ---
+# Owner 2026-10-19: memberships bill on the same day each month. Existing
+# members keep the day of the month they first paid; Stripe bills a short
+# month on its last day. Run via scripts/move_to_monthly.py.
+def next_monthly_anchor(start_day: int, now_utc: datetime) -> datetime:
+    """Next 10 am local on `start_day` (clamped to the month's length) that is
+    at least an hour away, as naive UTC."""
+    import calendar
+    from datetime import time as dtime
+
+    from .tzutil import local_to_utc, utc_to_local
+
+    local = utc_to_local(now_utc).date()
+    y, m = local.year, local.month
+    for _ in range(3):
+        day = min(start_day, calendar.monthrange(y, m)[1])
+        when = local_to_utc(local.replace(year=y, month=m, day=day), dtime(10, 0))
+        if when > now_utc + timedelta(hours=1):
+            return when
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    raise ValueError("no anchor found")
+
+
+def move_subscription_to_monthly(sub: Subscription, apply: bool = False,
+                                 void_open: bool = False, now: datetime | None = None) -> dict:
+    """Switch one 4-week membership to the monthly price, next charge on its
+    start day. No proration, nothing charged in between. With void_open, an
+    unpaid (declined) invoice is voided so Stripe stops retrying it and the
+    member is no longer past due. Dry run unless apply=True."""
+    import json
+
+    from .tzutil import utc_to_local
+
+    now = now or utcnow()
+    plan = db.session.get(Plan, sub.plan_id)
+    start = sub.first_charge_at or sub.activated_at or now
+    start_day = utc_to_local(start).day
+    anchor = next_monthly_anchor(start_day, now)
+    out = {"sub_id": sub.id, "status": sub.status, "start_day": start_day,
+           "next_charge": anchor, "cents": sub.mrr_cents, "voided": [], "applied": False}
+    if plan is None or plan.interval != "month":
+        out["skip"] = "plan is not monthly yet (run the seed first)"
+        return out
+    if not sub.stripe_subscription_id or not stripe_service.is_configured():
+        out["skip"] = "no Stripe subscription"
+        return out
+    stripe = stripe_service.stripe_client()
+    ssub = json.loads(str(stripe.Subscription.retrieve(sub.stripe_subscription_id)))
+    item = ssub["items"]["data"][0]
+    old = item.get("price") or item.get("plan") or {}
+    out["stripe_status"] = ssub.get("status")
+    out["old_interval"] = f'{(old.get("recurring") or old).get("interval_count", "?")} {(old.get("recurring") or old).get("interval", "?")}'
+    if void_open:
+        for inv in json.loads(str(stripe.Invoice.list(subscription=sub.stripe_subscription_id, status="open")))["data"]:
+            out["voided"].append({"id": inv["id"], "amount": inv.get("amount_due")})
+    if not apply:
+        return out
+    for v in out["voided"]:
+        stripe.Invoice.void_invoice(v["id"])
+        pay = db.session.query(Payment).filter_by(stripe_invoice_id=v["id"]).one_or_none()
+        if pay is not None and pay.status != "paid":
+            pay.status = "void"
+            pay.note = "cancelled: membership moved to monthly billing"
+    price_id = ensure_stripe_price_cents(plan, sub.mrr_cents)
+    stripe.Subscription.modify(
+        sub.stripe_subscription_id,
+        items=[{"id": item["id"], "price": price_id}],
+        trial_end=int((anchor - datetime(1970, 1, 1)).total_seconds()),
+        proration_behavior="none",
+    )
+    sub.current_period_end = anchor
+    if out["voided"] and sub.status == SubscriptionStatus.past_due.value:
+        sub.status = SubscriptionStatus.active.value  # nothing owed any more
+    out["applied"] = True
+    return out
 
 
 def guardian_is_past_due(guardian_user_id: int) -> bool:

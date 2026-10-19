@@ -10,7 +10,7 @@
       {% if attendee.kind == 'child' %}Ready to keep {{ attendee.first_name }} training?{% else %}Ready to keep training?{% endif %}
     </div>
     <p style="margin:14px 0 6px;color:var(--pf-text-2);line-height:1.6">
-      {% if price_label %}<b>{{ price_label }} every 4 weeks</b>, three sessions a week in
+      {% if price_label %}<b>{{ price_label }} a month</b>, three sessions a week in
       {{ booking.class_instance.cohort_label or 'the group' }}.{% endif %}
       Month to month; a 30-day cancellation notice applies after the first month (per the membership terms you signed).
     </p>

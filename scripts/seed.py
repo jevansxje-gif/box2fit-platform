@@ -166,9 +166,11 @@ def seed():
         types[key] = ct
     print(f"class types: {len(types)}")
 
-    # Membership: $189 per 4-WEEK CYCLE, auto-renewing — CONFIRMED 2026-07-24.
+    # Membership: $189 a MONTH, billed on the same day each month, auto-
+    # renewing (owner 2026-10-19; every 4 weeks from 2026-07-24 until then).
     # Structure: 3 sessions/week within the member's group (no group swaps),
-    # RSVP per session. Stripe (Pass 2): interval=week, interval_count=4.
+    # RSVP per session. Stripe: interval=month. Existing members move with
+    # scripts/move_to_monthly.py.
     plan = db.session.query(Plan).filter_by(client_account_id=client.id).first()
     if plan is None:
         plan = Plan(
@@ -179,9 +181,11 @@ def seed():
         )
         db.session.add(plan)
     plan.price_cents = 18900
-    plan.interval = "4_weeks"
+    if plan.interval != "month":
+        plan.stripe_price_id = None  # the cached Stripe Price was for the old cycle
+    plan.interval = "month"
     plan.is_placeholder = False
-    print("plans: Membership $189 / 4-week cycle (confirmed)")
+    print("plans: Membership $189 / month (confirmed)")
 
     # Guided Boxing Challenge: $249 + GST per 5-WEEK BLOCK, auto-renewing in
     # 5-week blocks (owner, 2026-10-05). Never the default plan.

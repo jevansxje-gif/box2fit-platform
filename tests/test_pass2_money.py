@@ -162,7 +162,7 @@ def test_family_disclosure_and_touchpoints(app, client, client_account):
     )
     r = client.get("/book/youth/card")
     assert b"$139" in r.data                       # tier quoted, not $189
-    assert b"$145.95 billed every 4 weeks" in r.data
+    assert b"$145.95 billed monthly" in r.data
     assert b"Family pricing applied" in r.data
 
     # confirmation email template carries the (static) family-pricing block
@@ -362,7 +362,7 @@ def test_no_card_falls_back_to_activation_email(app, client, client_account):
     guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
     _vault_card(guardian)
     r = client.get(f"/activate/{token}")
-    assert b"$189" in r.data and b"every 4 weeks" in r.data
+    assert b"$189" in r.data and b"a month" in r.data
     assert b"Add a card to start" not in r.data
     r = client.post(f"/activate/{token}")
     assert b"crew" in r.data
@@ -384,3 +384,99 @@ def test_cancel_before_charge(app, client, client_account):
     assert sub.cancel_reason == "cancelled_before_charge"
     assert sub.activated_at is None  # no charge ever happened
 
+
+
+def test_move_four_weekly_membership_to_monthly(app, client, client_account, monkeypatch):
+    """Owner 2026-10-19: memberships bill on the same day each month. An
+    existing member keeps the day they first paid (Alex: the 21st); a
+    declined charge is voided so Stripe stops retrying and they're no longer
+    past due; short months fall back to their last day."""
+    import json as _json
+    from datetime import datetime as _dt
+
+    from app.services import billing as billing_mod
+    from app.services.tzutil import local_to_utc, utc_to_local
+    from datetime import date as _date, time as _time
+
+    # anchor maths: Sep 21 start, checked on Oct 20 -> Oct 21 10 am Pacific
+    now = local_to_utc(_date(2026, 10, 20), _time(12, 0))
+    a = billing_mod.next_monthly_anchor(21, now)
+    assert utc_to_local(a).date() == _date(2026, 10, 21) and utc_to_local(a).hour == 10
+    # same day but already past 10 am -> next month
+    a = billing_mod.next_monthly_anchor(20, now)
+    assert utc_to_local(a).date() == _date(2026, 11, 20)
+    # the 31st in February -> Feb 28
+    a = billing_mod.next_monthly_anchor(31, local_to_utc(_date(2027, 2, 2), _time(9, 0)))
+    assert utc_to_local(a).date() == _date(2027, 2, 28)
+
+    guardian = User(client_account_id=client_account.id, email="alex@example.com", name="Alex")
+    db.session.add(guardian)
+    db.session.flush()
+    from app.models import AttendeeProfile, Plan
+    kid = AttendeeProfile(client_account_id=client_account.id, user_id=guardian.id, first_name="Lucas")
+    db.session.add(kid)
+    db.session.flush()
+    plan = db.session.query(Plan).first()
+    plan.interval = "month"
+    sub = Subscription(
+        client_account_id=client_account.id, user_id=guardian.id, attendee_id=kid.id,
+        plan_id=plan.id, status=SubscriptionStatus.past_due.value, mrr_cents=18900,
+        stripe_subscription_id="sub_alex",
+        first_charge_at=local_to_utc(_date(2026, 9, 21), _time(10, 18)),
+    )
+    db.session.add(sub)
+    db.session.add(Payment(client_account_id=client_account.id, user_id=guardian.id,
+                           stripe_invoice_id="in_oct19", amount_cents=19845, status="failed"))
+    db.session.commit()
+
+    calls = {"void": [], "modify": []}
+
+    class _Sub:
+        @staticmethod
+        def retrieve(sid):
+            return _json.dumps({"id": sid, "status": "past_due", "items": {"data": [
+                {"id": "si_1", "plan": {"interval": "week", "interval_count": 4, "amount": 18900}}]}})
+
+        @staticmethod
+        def modify(sid, **kw):
+            calls["modify"].append((sid, kw))
+
+    class _Inv:
+        @staticmethod
+        def list(**kw):
+            assert kw == {"subscription": "sub_alex", "status": "open"}
+            return _json.dumps({"data": [{"id": "in_oct19", "amount_due": 19845}]})
+
+        @staticmethod
+        def void_invoice(iid):
+            calls["void"].append(iid)
+
+    class _Price:
+        @staticmethod
+        def create(**kw):
+            assert kw["recurring"] == {"interval": "month", "interval_count": 1}
+            return type("P", (), {"id": "price_month_189"})()
+
+    class _FakeStripe:
+        api_key = "sk_test_x"
+        Subscription, Invoice, Price = _Sub, _Inv, _Price
+
+    monkeypatch.setattr(billing_mod.stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(billing_mod.stripe_service, "stripe_client", lambda: _FakeStripe())
+
+    # dry run changes nothing
+    r = billing_mod.move_subscription_to_monthly(sub, apply=False, void_open=True, now=now)
+    assert r["start_day"] == 21 and r["voided"][0]["id"] == "in_oct19" and not r["applied"]
+    assert calls == {"void": [], "modify": []}
+
+    r = billing_mod.move_subscription_to_monthly(sub, apply=True, void_open=True, now=now)
+    db.session.commit()
+    assert r["applied"] and calls["void"] == ["in_oct19"]
+    sid, kw = calls["modify"][0]
+    assert sid == "sub_alex" and kw["items"] == [{"id": "si_1", "price": "price_month_189"}]
+    assert kw["proration_behavior"] == "none"
+    assert utc_to_local(_dt.utcfromtimestamp(kw["trial_end"])).date() == _date(2026, 10, 21)
+    db.session.refresh(sub)
+    assert sub.status == SubscriptionStatus.active.value  # no longer blocked from booking
+    pay = db.session.query(Payment).filter_by(stripe_invoice_id="in_oct19").one()
+    assert pay.status == "void" and "monthly" in pay.note

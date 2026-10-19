@@ -5,7 +5,7 @@
       {% if is_block %}Your next five weeks start {{ when }}{% elif is_child %}{{ attendee.first_name }}'s membership starts {{ when }}{% else %}Your membership starts {{ when }}{% endif %}
     </h1>
     <p style="font-size:15px;line-height:1.6;margin:0 0 16px">
-      A heads-up before anything is charged: <b>{{ price }} billed {{ every or 'every 4 weeks' }}</b>, {% if is_block %}another five weeks of coached 6 am sessions with {{ cohort or 'your group' }}{% else %}three sessions a week in {{ cohort or 'your group' }}{% endif %}. {% if is_block %}Each block renews the same way, with this reminder and a one-click cancel every time.{% else %}Auto-renews month to month (30-day cancellation notice applies after the first month).{% endif %}
+      A heads-up before anything is charged: <b>{{ price }} billed {{ every or 'every month' }}</b>, {% if is_block %}another five weeks of coached 6 am sessions with {{ cohort or 'your group' }}{% else %}three sessions a week in {{ cohort or 'your group' }}{% endif %}. {% if is_block %}Each block renews the same way, with this reminder and a one-click cancel every time.{% else %}Auto-renews month to month (30-day cancellation notice applies after the first month).{% endif %}
     </p>
     <p style="font-size:15px;line-height:1.6;margin:0 0 16px">
       All good? You don't need to do anything.

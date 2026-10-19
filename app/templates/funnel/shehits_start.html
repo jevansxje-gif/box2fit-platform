@@ -4,7 +4,7 @@
 <div class="flow" style="max-width:640px;margin:0 auto;padding:24px 16px">
   <div class="pf-kicker" style="color:var(--pf-red)">She Hits · Women-only · Weekdays 9 AM</div>
   <h1 class="pf-h1" style="margin:6px 0 4px">Two weeks to find out.</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 16px">Any She Hits sessions you like for {{ days }} days, {{ price }} + GST, half the four-week price. After you sign up we'll send six quick questions so your coach knows where you're starting from.</p>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">Any She Hits sessions you like for {{ days }} days, {{ price }} + GST, half the monthly price. After you sign up we'll send six quick questions so your coach knows where you're starting from.</p>
 
   {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
   <form method="post">
@@ -32,7 +32,7 @@
     <div class="pf-panel" style="border:2px solid var(--pf-ink)">
       <h2>What you pay</h2>
       <p style="margin:0 0 8px"><strong>Today: {{ price_total }}</strong> ({{ price }} + {{ price_gst }} GST) for {{ days }} days of She Hits, any sessions you like.</p>
-      <p style="margin:0 0 8px"><strong>From day 15: {{ renew_total }}</strong> ({{ renew_price }} + GST) every 4 weeks, unless you cancel before then.</p>
+      <p style="margin:0 0 8px"><strong>From day 15: {{ renew_total }}</strong> ({{ renew_price }} + GST) a month, unless you cancel before then.</p>
       <p class="note" style="margin:0">We'll email and text a reminder three days before, with a one-click cancel link. Cancel before day 15 and you pay nothing more; after that, month to month with 30 days' notice.</p>
     </div>
     <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" style="margin-top:6px">Continue to secure payment: {{ price_total }}</button>

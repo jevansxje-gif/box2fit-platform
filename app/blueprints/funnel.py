@@ -64,11 +64,11 @@ RETIRED_SEGMENTS = {"technical": "guided", "bootcamp": "guided"}  # 2026-10-05: 
 CHILD_FIRST_SEGMENTS = {"kids", "youth"}  # a parent books; the child attends
 
 # Master Plan §6 wording, adjusted ONLY for the confirmed billing cadence:
-# $189 per 4-week cycle (client 2026-07-24), so "/month" would be inaccurate
-# (13 charges/year) and disclosure accuracy is a card-network requirement.
+# $189 a month on the same day each month (owner 2026-10-19; it was every 4
+# weeks before). Disclosure accuracy is a card-network requirement.
 DISCLOSURE = (
     "No charge today. Your membership is {price} + 5% GST ({total} billed "
-    "every 4 weeks), starting after your free class on {date}, unless you "
+    "monthly), starting after your free class on {date}, unless you "
     "cancel. We'll remind you before any charge. Cancel before the first "
     "charge in one click."
 )

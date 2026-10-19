@@ -50,7 +50,9 @@ with app.app_context():
         who = db.session.get(User, sub.user_id)
         r = move_subscription_to_monthly(sub, apply=apply, void_open=void_open)
         line = (f"{who.name} | ${r['cents'] / 100:.2f} | {r['status']} | was {r.get('old_interval', '?')}"
-                f" | start day {r['start_day']} | next charge {fmt_local(r['next_charge'], '%a %b %d, %I:%M %p')}")
+                f" | start day {r['start_day']}"
+                f" | last paid {fmt_local(r['last_paid'], '%b %d') if r.get('last_paid') else '-'}"
+                f" | next charge {fmt_local(r['next_charge'], '%a %b %d, %I:%M %p')}")
         if r["voided"]:
             line += " | void " + ", ".join(f"{v['id']} (${(v['amount'] or 0) / 100:.2f})" for v in r["voided"])
         if r.get("skip"):

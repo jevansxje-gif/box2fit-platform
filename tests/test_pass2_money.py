@@ -444,6 +444,22 @@ def test_move_four_weekly_membership_to_monthly(app, client, client_account, mon
     r = billing_mod.move_subscription_to_monthly(carly, apply=False, now=now)
     assert r["start_day"] == 14 and utc_to_local(r["next_charge"]).date() == _date(2026, 11, 14)
 
+    # Robyn-style: first paid on the 23rd, last paid Oct 17 -> not Oct 23 (6 days later), Nov 23
+    robyn = Subscription(
+        client_account_id=client_account.id, user_id=guardian.id, attendee_id=kid.id,
+        plan_id=plan.id, status=SubscriptionStatus.active.value, mrr_cents=18900,
+        first_charge_at=local_to_utc(_date(2026, 9, 19), _time(10, 0)),
+    )
+    db.session.add(robyn)
+    db.session.flush()
+    for iid, d in (("in_r1", _date(2026, 9, 23)), ("in_r2", _date(2026, 10, 17))):
+        db.session.add(Payment(client_account_id=client_account.id, user_id=guardian.id, subscription_id=robyn.id,
+                               stripe_invoice_id=iid, amount_cents=19845, status="paid",
+                               paid_at=local_to_utc(d, _time(13, 0))))
+    db.session.commit()
+    r = billing_mod.move_subscription_to_monthly(robyn, apply=False, now=now)
+    assert r["start_day"] == 23 and utc_to_local(r["next_charge"]).date() == _date(2026, 11, 23)
+
     calls = {"void": [], "modify": []}
 
     class _Sub:

@@ -581,9 +581,10 @@ def confirm_one_off_return(charge, session_id) -> bool:
 # Owner 2026-10-19: memberships bill on the same day each month. Existing
 # members keep the day of the month they first paid; Stripe bills a short
 # month on its last day. Run via scripts/move_to_monthly.py.
-def next_monthly_anchor(start_day: int, now_utc: datetime) -> datetime:
+def next_monthly_anchor(start_day: int, now_utc: datetime,
+                        not_before: datetime | None = None) -> datetime:
     """Next 10 am local on `start_day` (clamped to the month's length) that is
-    at least an hour away, as naive UTC."""
+    at least an hour away and not before `not_before`, as naive UTC."""
     import calendar
     from datetime import time as dtime
 
@@ -591,10 +592,11 @@ def next_monthly_anchor(start_day: int, now_utc: datetime) -> datetime:
 
     local = utc_to_local(now_utc).date()
     y, m = local.year, local.month
-    for _ in range(3):
+    floor = max(now_utc + timedelta(hours=1), not_before or now_utc)
+    for _ in range(4):
         day = min(start_day, calendar.monthrange(y, m)[1])
         when = local_to_utc(local.replace(year=y, month=m, day=day), dtime(10, 0))
-        if when > now_utc + timedelta(hours=1):
+        if when > floor:
             return when
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     raise ValueError("no anchor found")
@@ -624,8 +626,18 @@ def move_subscription_to_monthly(sub: Subscription, apply: bool = False,
     start = ((first_paid.paid_at or first_paid.created_at) if first_paid else None) \
         or sub.first_charge_at or sub.activated_at or now
     start_day = utc_to_local(start).day
-    anchor = next_monthly_anchor(start_day, now)
-    out = {"sub_id": sub.id, "status": sub.status, "start_day": start_day,
+    # Never charge sooner than four weeks after their last successful payment
+    # (Robyn paid Oct 17; her start day, the 23rd, must not mean Oct 23).
+    last_paid = (
+        db.session.query(Payment)
+        .filter(Payment.subscription_id == sub.id, Payment.amount_cents > 0,
+                Payment.status.in_(["paid", "refunded"]))
+        .order_by(Payment.paid_at.desc().nulls_last(), Payment.created_at.desc())
+        .first()
+    )
+    last_at = (last_paid.paid_at or last_paid.created_at) if last_paid else None
+    anchor = next_monthly_anchor(start_day, now, not_before=(last_at + timedelta(days=28)) if last_at else None)
+    out = {"sub_id": sub.id, "status": sub.status, "start_day": start_day, "last_paid": last_at,
            "next_charge": anchor, "cents": sub.mrr_cents, "voided": [], "applied": False}
     if plan is None or plan.interval != "month":
         out["skip"] = "plan is not monthly yet (run the seed first)"

@@ -1979,7 +1979,8 @@ def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, cli
 
     r = client.get("/challenge?utm_source=meta&utm_campaign=guided&utm_content=guided-g1")
     assert r.status_code == 200
-    assert b"5-Week Guided Boxing Challenge" in r.data and b"12 of 12 spots left" in r.data
+    assert b"5-Week Guided Boxing Challenge" in r.data and b"12 spots" in r.data
+    assert b"spots left" not in r.data  # count hidden until 3 spots are taken
     assert b"Tell us when you could train" in r.data and b"261.45" in r.data
 
     base = {"name": "Sam Starter", "email": "sam@example.com", "phone": "604-330-2671",
@@ -2013,6 +2014,11 @@ def test_five_week_challenge_signup_payment_reminder_and_cancel(app, client, cli
     assert db.session.query(Message).filter_by(template="membership_welcome").count() == 0
     assert ch.spots_left(client_account.id) == 11
     assert b"1 <span" in _admin(app).get("/ops/marketing").data  # "1 of 12 spots taken"
+    assert b"spots left" not in client.get("/challenge").data  # 1 taken: still hidden
+    from unittest import mock
+    with mock.patch.object(ch, "spots_left", return_value=9):  # 3 taken: shown
+        assert b"9 of 12 spots left" in client.get("/challenge").data
+        assert b"9 of 12 spots left" in client.get("/challenge/join").data
 
     # renewal reminder: only inside the notice window, and only once
     sub.first_charge_at = utcnow() + timedelta(days=10)

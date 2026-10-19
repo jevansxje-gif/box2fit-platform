@@ -1060,6 +1060,9 @@ def one_off_done(token: str):
 
 
 # ------------------------------------------- 5-Week Guided Boxing Challenge ---
+SHOW_SPOTS_AFTER = 3  # spots taken before the page says "N of 12 spots left"
+
+
 def _challenge_ctx(client):
     from ..services import challenge as ch
     from ..services.billing import default_plan
@@ -1067,10 +1070,14 @@ def _challenge_ctx(client):
 
     plan = ch.offer_plan(ch.CHALLENGE, client.id)
     c = ch.CHALLENGE
+    spots_left = ch.spots_left(client.id)
     return dict(
         c=c,
         every=__import__("app.services.billing", fromlist=["interval_label"]).interval_label(plan),
-        spots_left=ch.spots_left(client.id),
+        spots_left=spots_left,
+        # "12 of 12 spots left" reads as "nobody has joined", so the count
+        # only shows once a few spots have gone (owner 2026-10-19).
+        show_spots_left=(c["spots"] - spots_left) >= SHOW_SPOTS_AFTER,
         price=fmt_cents(c["price_cents"]),
         price_gst=fmt_cents(gst_cents(c["price_cents"])),
         price_total=fmt_cents(total_with_gst_cents(c["price_cents"])),

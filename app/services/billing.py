@@ -612,7 +612,17 @@ def move_subscription_to_monthly(sub: Subscription, apply: bool = False,
 
     now = now or utcnow()
     plan = db.session.get(Plan, sub.plan_id)
-    start = sub.first_charge_at or sub.activated_at or now
+    # The day they first actually paid (the date on their first receipt);
+    # the scheduled first charge can be a day or two earlier.
+    first_paid = (
+        db.session.query(Payment)
+        .filter(Payment.subscription_id == sub.id, Payment.amount_cents > 0,
+                Payment.status.in_(["paid", "refunded"]))
+        .order_by(Payment.paid_at.is_(None), Payment.paid_at, Payment.created_at)
+        .first()
+    )
+    start = ((first_paid.paid_at or first_paid.created_at) if first_paid else None) \
+        or sub.first_charge_at or sub.activated_at or now
     start_day = utc_to_local(start).day
     anchor = next_monthly_anchor(start_day, now)
     out = {"sub_id": sub.id, "status": sub.status, "start_day": start_day,

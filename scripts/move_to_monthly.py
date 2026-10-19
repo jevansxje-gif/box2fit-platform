@@ -8,6 +8,7 @@ default; nothing changes in Stripe or the database without --apply.
 --void-open also cancels an unpaid (declined) charge so Stripe stops retrying
 it; the member is then billed fresh on their start day.
 """
+import logging
 import sys
 
 from app import create_app
@@ -23,6 +24,7 @@ with app.app_context():
     import stripe
 
     stripe.api_version = "2019-09-09"
+    logging.getLogger("stripe").setLevel(logging.WARNING)
     client_ids = {s.client_account_id for s in db.session.query(Subscription).all()}
     subs = []
     for cid in client_ids:

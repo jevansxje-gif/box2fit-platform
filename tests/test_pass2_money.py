@@ -429,6 +429,21 @@ def test_move_four_weekly_membership_to_monthly(app, client, client_account, mon
                            stripe_invoice_id="in_oct19", amount_cents=19845, status="failed"))
     db.session.commit()
 
+    # Carly-style: scheduled for the 12th, first actually paid on the 14th -> the 14th
+    carly = Subscription(
+        client_account_id=client_account.id, user_id=guardian.id, attendee_id=kid.id,
+        plan_id=plan.id, status=SubscriptionStatus.active.value, mrr_cents=18900,
+        first_charge_at=local_to_utc(_date(2026, 9, 12), _time(10, 0)),
+    )
+    db.session.add(carly)
+    db.session.flush()
+    db.session.add(Payment(client_account_id=client_account.id, user_id=guardian.id, subscription_id=carly.id,
+                           stripe_invoice_id="in_carly_1", amount_cents=19845, status="paid",
+                           paid_at=local_to_utc(_date(2026, 9, 14), _time(12, 31))))
+    db.session.commit()
+    r = billing_mod.move_subscription_to_monthly(carly, apply=False, now=now)
+    assert r["start_day"] == 14 and utc_to_local(r["next_charge"]).date() == _date(2026, 11, 14)
+
     calls = {"void": [], "modify": []}
 
     class _Sub:

@@ -45,18 +45,22 @@ def _is_bot(ip: str, ua: str) -> bool:
 # utm_campaign = the landing slug. "picker"/"details" are the two steps
 # between landing and a lead for that offer (POST = form submitted).
 CAMPAIGNS = {
+    # Since 2026-10-26 the adult pages (and kids ad F2) open the call-first
+    # short form at /start/<offer>: opening it counts as "picker", sending
+    # it as "details". `call_offer` ties the tab to its Call list rows.
     "families": {"label": "Families", "landings": ("/kids", "/youth"),
-                 "picker": ("GET", ("/book/kids", "/book/youth")),
-                 "details": ("GET", ("/book/kids/details", "/book/youth/details")),
-                 "paid": False},
+                 "picker": [("GET", ("/book/kids", "/book/youth", "/start/kids"))],
+                 "details": [("GET", ("/book/kids/details", "/book/youth/details")),
+                             ("POST", ("/start/kids",))],
+                 "paid": False, "call_offer": "kids"},
     "guided": {"label": "Guided Boxing", "landings": ("/challenge", "/guided-boxing"),
-               "picker": ("GET", ("/challenge/join",)),
-               "details": ("POST", ("/challenge/join",)),
-               "paid": True},
+               "picker": [("GET", ("/challenge/join", "/start/challenge"))],
+               "details": [("POST", ("/challenge/join", "/start/challenge"))],
+               "paid": True, "call_offer": "challenge"},
     "shehits": {"label": "She Hits", "landings": ("/shehits",),
-                "picker": ("GET", ("/shehits/start", "/book/shehits")),
-                "details": ("POST", ("/shehits/start", "/book/shehits/details")),
-                "paid": True},
+                "picker": [("GET", ("/shehits/start", "/book/shehits", "/start/shehits"))],
+                "details": [("POST", ("/shehits/start", "/book/shehits/details", "/start/shehits"))],
+                "paid": True, "call_offer": "shehits"},
     # August 2026 test, kept for the record
     "kids": {"label": "Kids (Aug)", "landings": ("/kids",),
              "picker": ("GET", ("/book/kids",)), "details": ("GET", ("/book/kids/details",)),
@@ -86,7 +90,9 @@ def ad_label(utm_content: str | None, v: str | None = None) -> str:
     return v or utm_content or "unknown"
 
 
-def _matches(method: str, path: str, step: tuple) -> bool:
+def _matches(method: str, path: str, step) -> bool:
+    if isinstance(step, list):  # several (method, prefixes) pairs
+        return any(_matches(method, path, s) for s in step)
     want, prefixes = step
     base = path.split("?", 1)[0]
     return method == want and any(base == p or base.startswith(p + "/") for p in prefixes)
@@ -214,3 +220,37 @@ def db_funnel(client_account_id: int, campaign: str = DEFAULT_CAMPAIGN) -> dict:
     }
     return {"per_ad": dict(sorted(per_ad.items())), "totals": totals,
             "recent": recent}
+
+
+def call_first_funnel(client_account_id: int, campaign: str = DEFAULT_CAMPAIGN) -> dict | None:
+    """The call-first short forms for this tab's offer, per ad: forms sent,
+    called (any status but new), agreed (link sent or signed up) and the
+    real outcome (paid / booked) read from the linked account."""
+    from ..extensions import db
+    from ..models import Enquiry
+    from . import enquiry as enq_svc
+
+    offer = CAMPAIGNS.get(campaign, {}).get("call_offer")
+    if not offer:
+        return None
+    rows = (
+        db.session.query(Enquiry)
+        .filter_by(client_account_id=client_account_id, offer=offer)
+        .order_by(Enquiry.created_at.desc())
+        .all()
+    )
+    per_ad: dict[str, dict] = defaultdict(lambda: {"forms": 0, "called": 0, "agreed": 0, "won": 0})
+    recent = []
+    for e in rows:
+        ad = ad_label(e.utm_content) if e.utm_content else "direct"
+        won = enq_svc.outcome(e)
+        a = per_ad[ad]
+        a["forms"] += 1
+        a["called"] += 1 if e.status != "new" or won else 0
+        a["agreed"] += 1 if (e.status == "agreed" or e.link_sent_at or e.user_id) else 0
+        a["won"] += 1 if won else 0
+        if len(recent) < 12:
+            recent.append({"e": e, "ad": ad, "won": won})
+    totals = {k: sum(a[k] for a in per_ad.values()) for k in ("forms", "called", "agreed", "won")}
+    return {"per_ad": dict(sorted(per_ad.items())), "totals": totals, "recent": recent,
+            "won_label": "Booked" if offer == "kids" else "Paid"}

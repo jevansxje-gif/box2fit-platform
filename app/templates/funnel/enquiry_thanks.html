@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Thanks — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow">
+  <div class="confirm-card">
+    <div class="pf-kicker">{{ offer.label }}</div>
+    <div class="big">Thanks, {{ e.first_name }}. The gym will call you.</div>
+    <p style="margin:18px 0 4px;color:var(--pf-text-2)">Expect a call within one business day{% if e.best_time %}, at the time you picked ({{ e.best_time | lower }}){% endif %}. They'll answer your questions{% if e.child_first_name %} about {{ e.child_first_name }}{% endif %} and get you set up.</p>
+    <p style="margin:12px 0 4px;color:var(--pf-text-2)">Want to talk sooner? Call <a href="tel:+17783846284">{{ gym_phone }}</a>.</p>
+    <p style="margin:22px 0 4px;color:var(--pf-text-3);font-size:14px">Already decided? <a href="{{ ready_url }}">{{ offer.pay_cta }}</a></p>
+  </div>
+</div>
+<script>
+if (window.fbq) { fbq('track', 'Lead', {content_name: '{{ e.offer }}'}, {eventID: 'enquiry-{{ e.id }}'}); }
+</script>
+{% endblock %}

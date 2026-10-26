@@ -722,6 +722,48 @@ class OneOffCharge(db.Model):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class Enquiry(db.Model):
+    """Call-first short form (owner 2026-10-26): name, mobile, date of birth
+    and the class from the page they came from. The gym calls every one;
+    when they agree, staff send a signed sign-up link into the normal pay
+    or booking page. "Paid" is not stored: it is read from the linked
+    user's subscription or booking."""
+
+    __tablename__ = "enquiries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_account_id: Mapped[int] = mapped_column(
+        ForeignKey("client_accounts.id"), index=True
+    )
+    offer: Mapped[str] = mapped_column(String(20), index=True)  # challenge | shehits | kids
+    first_name: Mapped[str] = mapped_column(String(60))
+    last_name: Mapped[str] = mapped_column(String(60))
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    email: Mapped[str | None] = mapped_column(String(255))
+    dob: Mapped[date | None] = mapped_column(Date)  # adult offers: theirs
+    child_first_name: Mapped[str | None] = mapped_column(String(60))
+    child_dob: Mapped[date | None] = mapped_column(Date)
+    best_time: Mapped[str | None] = mapped_column(String(200))
+    sms_ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    # new | no_answer | call_back | agreed | not_interested
+    status: Mapped[str] = mapped_column(String(20), default="new", index=True)
+    notes: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    link_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    utm_source: Mapped[str | None] = mapped_column(String(120))
+    utm_medium: Mapped[str | None] = mapped_column(String(120))
+    utm_campaign: Mapped[str | None] = mapped_column(String(255))
+    utm_content: Mapped[str | None] = mapped_column(String(255))
+    landing_variant: Mapped[str | None] = mapped_column(String(80))
+    submit_ip: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    @property
+    def name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+
 class TimeSuggestion(db.Model):
     """"The class time doesn't work for me — here's when I could train."
     Captured on landing pages so we can tell whether the schedule (not the

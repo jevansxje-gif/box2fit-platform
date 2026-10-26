@@ -241,6 +241,7 @@ def landing_kids():
         render_template(
             "funnel/landing_kids.html",
             variant=request.args.get("v", "a")[:20],
+            call_first=__import__("app.services.enquiry", fromlist=["kids_call_first"]).kids_call_first(variant, request.args.get("utm_content")),
             member_price=_member_price_label(client.id),
             google_rating=SiteSetting.get("google_rating", "5.0"),
             google_review_count=SiteSetting.get("google_review_count", "28"),
@@ -571,6 +572,14 @@ def step_details(segment: str):
     form = AttendeeForm()
     if request.method == "GET" and segment not in CHILD_FIRST_SEGMENTS:
         form.attendee_kind.data = "self"  # adults book themselves by default
+    if request.method == "GET":
+        from ..services import enquiry as enq_svc
+
+        pf = enq_svc.prefill()  # arrived from the gym's sign-up link
+        for field, key in (("guardian_name", "name"), ("email", "email"), ("phone", "phone"),
+                           ("child_first_name", "child_first_name"), ("child_birth_year", "child_birth_year")):
+            if pf.get(key) and hasattr(form, field):
+                getattr(form, field).data = pf[key]
 
     if form.validate_on_submit():
         err = validate_bookable(instance, for_trial=True)
@@ -586,6 +595,8 @@ def step_details(segment: str):
             consent_email=form.consent_email.data,
             consent_sms=form.consent_sms.data,
         )
+        db.session.flush()
+        __import__("app.services.enquiry", fromlist=["attach_user"]).attach_user(guardian.id)
         if form.attendee_kind.data == "child":
             # Hard guard: a blank child name slipped past form validation
             # once in production (2026-08-31) — never store one.
@@ -1117,6 +1128,11 @@ def challenge_join():
 
     ctx["guided"] = GUIDED
     form = {k: (request.form.get(k) or "").strip() for k in ("name", "email", "phone", "goal", "notes", "signature")}
+    if request.method == "GET":
+        from ..services import enquiry as enq_svc
+
+        pf = enq_svc.prefill()
+        form.update({k: pf[k] for k in ("name", "email", "phone") if pf.get(k)})
     error = None
     if request.method == "POST":
         email = form["email"].lower()
@@ -1136,6 +1152,7 @@ def challenge_join():
                 consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
             )
             db.session.flush()
+            __import__("app.services.enquiry", fromlist=["attach_user"]).attach_user(guardian.id)
             g = guided.parse(request.form)
             attendee = booking_flow.create_self_attendee(
                 guardian, {"notes": form["notes"] or (g or {}).get("notes") or "", "challenge_goal": form["goal"] or (g or {}).get("success") or "", "guided": g}
@@ -1228,6 +1245,11 @@ def shehits_start():
     client = get_client()
     ctx = _shehits_ctx()
     form = {k: (request.form.get(k) or "").strip() for k in ("name", "email", "phone", "signature")}
+    if request.method == "GET":
+        from ..services import enquiry as enq_svc
+
+        pf = enq_svc.prefill()
+        form.update({k: pf[k] for k in ("name", "email", "phone") if pf.get(k)})
     error = None
     if request.method == "POST":
         email = form["email"].lower()
@@ -1245,6 +1267,7 @@ def shehits_start():
                 consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
             )
             db.session.flush()
+            __import__("app.services.enquiry", fromlist=["attach_user"]).attach_user(guardian.id)
             g = guided.parse(request.form)
             attendee = booking_flow.create_self_attendee(guardian, {"notes": (g or {}).get("notes") or "", "guided": g})
             if ch.existing_sub(attendee):
@@ -1292,6 +1315,118 @@ def shehits_start_done():
         except Exception:  # noqa: BLE001
             log.exception("she hits done: could not verify session %s", sid)
     return render_template("funnel/shehits_done.html", paid=paid, already=False, guardian=guardian, **ctx)
+
+
+# ------------------------------------- Call-first short form (2026-10-26) ---
+@bp.route("/start/<offer>", methods=["GET", "POST"])
+@limiter.limit("10/hour", methods=["POST"])
+def enquiry_start(offer: str):
+    """Short form instead of the big join form: name, mobile, date of birth
+    and the class from the page they came from. The gym calls them."""
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+
+    o = enq_svc.OFFERS.get(offer) or abort(404)
+    client = get_client()
+    keys = ("first_name", "last_name", "phone", "email", "dob", "child_first_name", "child_dob")
+    form = {k: (request.form.get(k) or "").strip() for k in keys}
+    times = request.form.getlist("times")
+    error = None
+    if request.method == "POST":
+        if request.form.get("website"):  # honeypot
+            return redirect(url_for(o["back"][0], **o["back"][1]))
+        email = form["email"].lower()
+        dob = enq_svc.parse_dob(form["dob"]) if not o["kids"] else None
+        child_dob = enq_svc.parse_dob(form["child_dob"]) if o["kids"] else None
+        if not form["first_name"] or not form["last_name"]:
+            error = "Please enter your first and last name."
+        elif len(enq_svc.digits(form["phone"])) < 10:
+            error = "Please enter a mobile number so the gym can call you."
+        elif email and ("@" not in email or "." not in email.split("@")[-1]):
+            error = "That email doesn't look right. You can leave it blank."
+        elif not o["kids"] and dob is None:
+            error = "Please enter your date of birth."
+        elif o["kids"] and (not form["child_first_name"] or child_dob is None):
+            error = "Please enter your child's first name and date of birth."
+        if error is None:
+            touch = read_first_touch(request) or {}
+            labels = dict(TIME_SLOTS)
+            e = Enquiry(
+                client_account_id=client.id, offer=offer,
+                first_name=form["first_name"][:60], last_name=form["last_name"][:60],
+                phone=form["phone"][:20], email=email or None, dob=dob,
+                child_first_name=form["child_first_name"][:60] or None, child_dob=child_dob,
+                best_time=", ".join(labels[t] for t in times if t in labels)[:200] or None,
+                sms_ok=bool(request.form.get("sms_ok")),
+                utm_source=touch.get("utm_source"), utm_medium=touch.get("utm_medium"),
+                utm_campaign=touch.get("utm_campaign"), utm_content=touch.get("utm_content"),
+                landing_variant=touch.get("landing_variant") or offer,
+                submit_ip=(request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip())[:64],
+            )
+            db.session.add(e)
+            db.session.flush()
+            try:
+                enq_svc.send_admin_alert(e)
+            except Exception:  # noqa: BLE001 - the form must not fail on a mail hiccup
+                log.exception("enquiry alert failed for %s", e.id)
+            db.session.commit()
+            session["enquiry_done"] = e.id
+            return redirect(url_for("funnel.enquiry_thanks", offer=offer))
+    resp = make_response(render_template(
+        "funnel/enquiry_start.html", offer=o, offer_key=offer, form=form, times=times,
+        time_slots=TIME_SLOTS, error=error,
+    ))
+    capture_first_touch(request, resp, landing_variant=f"{offer}:start")
+    return resp
+
+
+@bp.get("/start/<offer>/thanks")
+def enquiry_thanks(offer: str):
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+    from ..services.signed_links import SALT_ENQUIRY, make_token
+
+    o = enq_svc.OFFERS.get(offer) or abort(404)
+    eid = session.get("enquiry_done")
+    e = db.session.get(Enquiry, eid) if eid else None
+    if e is None or e.offer != offer:
+        return redirect(url_for("funnel.enquiry_start", offer=offer))
+    return render_template(
+        "funnel/enquiry_thanks.html", offer=o, e=e,
+        ready_url=url_for("funnel.enquiry_link", token=make_token(e.id, SALT_ENQUIRY)),
+        gym_phone="(778) 384-6284",
+    )
+
+
+@bp.get("/s/<token>")
+def enquiry_link(token: str):
+    """Personal sign-up link (texted/emailed by the gym after the call, or
+    the 'Ready now?' link): fills in the pay/booking page and ties the
+    sign-up back to the enquiry and the ad it came from."""
+    import json
+
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+    from ..services.signed_links import SALT_ENQUIRY
+
+    eid = read_token(token, SALT_ENQUIRY)
+    e = db.session.get(Enquiry, eid) if eid else None
+    if e is None:
+        abort(404)
+    enq_svc.remember(e)
+    ep, args = enq_svc.OFFERS[e.offer]["pay"]
+    resp = make_response(redirect(url_for(ep, **args)))
+    # Opened on another phone (the text) there's no ad cookie: carry the
+    # enquiry's attribution so the sign-up still counts for its ad.
+    if not request.cookies.get(current_app.config["UTM_COOKIE_NAME"]):
+        data = {k: getattr(e, k) for k in ("utm_source", "utm_medium", "utm_campaign", "utm_content", "landing_variant") if getattr(e, k)}
+        data["first_touch_at"] = e.created_at.isoformat()
+        resp.set_cookie(
+            current_app.config["UTM_COOKIE_NAME"], json.dumps(data),
+            max_age=current_app.config["UTM_COOKIE_MAX_AGE"], httponly=True,
+            samesite="Lax", secure=request.is_secure,
+        )
+    return resp
 
 
 # ---------------------------------------------- Guided Start questionnaire ---

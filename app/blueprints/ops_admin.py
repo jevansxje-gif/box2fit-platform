@@ -767,6 +767,77 @@ def trainers():
     return render_template("ops/trainers.html", trainers=rows)
 
 
+# ------------------------------------------------------------- call list ---
+@bp.get("/calls")
+@staff_required
+def calls():
+    """Call-first short forms (2026-10-26): everyone the gym needs to ring,
+    newest first. Paid/Booked is read from the real records."""
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+    from ..services.marketing_report import ad_label
+    from ..services.tzutil import fmt_local
+
+    show = request.args.get("show", "open")
+    q = db.session.query(Enquiry).filter_by(client_account_id=_cid())
+    if show == "open":
+        q = q.filter(Enquiry.status.in_(enq_svc.OPEN_STATUSES))
+    rows = []
+    for e in q.order_by(Enquiry.created_at.desc()).limit(300):
+        rows.append({
+            "e": e,
+            "offer": enq_svc.OFFERS.get(e.offer, {}).get("label", e.offer),
+            "age": enq_svc.age_on(e.dob),
+            "child_age": enq_svc.age_on(e.child_dob),
+            "outcome": enq_svc.outcome(e),
+            "link": enq_svc.signup_link(e),
+            "ad": ad_label(e.utm_content) if e.utm_content else "direct",
+            "asked": fmt_local(e.created_at, "%a %b %d, %I:%M %p"),
+        })
+    return render_template("ops/calls.html", rows=rows, show=show, statuses=enq_svc.STATUSES)
+
+
+@bp.post("/calls/<int:enquiry_id>")
+@staff_required
+def call_update(enquiry_id: int):
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+
+    e = db.session.get(Enquiry, enquiry_id)
+    if e is None or e.client_account_id != _cid():
+        abort(404)
+    status = request.form.get("status")
+    if status in dict(enq_svc.STATUSES):
+        e.status = status
+    e.notes = (request.form.get("notes") or "").strip()[:2000] or None
+    db.session.commit()
+    flash(f"Saved {e.name}.", "success")
+    return redirect(url_for("ops_admin.calls", show=request.form.get("show", "open")))
+
+
+@bp.post("/calls/<int:enquiry_id>/send-link")
+@staff_required
+def call_send_link(enquiry_id: int):
+    from ..models import Enquiry
+    from ..services import enquiry as enq_svc
+
+    e = db.session.get(Enquiry, enquiry_id)
+    if e is None or e.client_account_id != _cid():
+        abort(404)
+    email = (request.form.get("email") or "").strip().lower()
+    if email and "@" in email:
+        e.email = email
+    if request.form.get("sms_ok"):
+        e.sms_ok = True  # they agreed on the call to get it by text
+    used = enq_svc.send_signup_link(e)
+    db.session.commit()
+    if used:
+        flash(f"Sign-up link sent to {e.name} by {' and '.join(used)}.", "success")
+    else:
+        flash(f"No mobile OK'd for texts and no email for {e.name}: copy the link and send it yourself.", "error")
+    return redirect(url_for("ops_admin.calls", show=request.form.get("show", "open")))
+
+
 # ------------------------------------------------------- member directory ---
 NOSHOW_FLAG_THRESHOLD = 3  # no-shows in the last 60 days → "high no-show"
 
@@ -1391,7 +1462,13 @@ def marketing():
     fleet filtered out) joined with lead/booking/activation truth from the
     database, per ad creative. Spend is entered manually from Ads Manager."""
     from ..models import SiteSetting
-    from ..services.marketing_report import CAMPAIGNS, DEFAULT_CAMPAIGN, db_funnel, traffic_funnel
+    from ..services.marketing_report import (
+        CAMPAIGNS,
+        DEFAULT_CAMPAIGN,
+        call_first_funnel,
+        db_funnel,
+        traffic_funnel,
+    )
 
     campaign = request.args.get("c", DEFAULT_CAMPAIGN)
     if campaign not in CAMPAIGNS:
@@ -1417,6 +1494,7 @@ def marketing():
         cfg=CAMPAIGNS[campaign],
         traffic=traffic,
         funnel=funnel,
+        calls=call_first_funnel(_cid(), campaign),
         spend=spend,
         cpl=(spend / leads_n) if leads_n else None,
         **_time_suggestion_summary(),

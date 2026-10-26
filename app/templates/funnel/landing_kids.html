@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% set book_url = url_for('funnel.step_class', segment='kids') %}
+{# Call-first test on the ads in KIDS_CALL_FIRST_VARIANTS (F2); the others book the free week directly. #}
+{% set book_url = url_for('funnel.enquiry_start', offer='kids') if call_first else url_for('funnel.step_class', segment='kids') %}
+{% set book_cta = "Save their free week" if call_first else "Book their free week" %}
 {% set objections = [
   {"key": "f1", "q": "Is boxing safe for my kid?", "a": "No sparring. No head contact. A coach runs every round: pads, bags, footwork and games. Ages 6 to 10 and 11 to 18 train separately. Confidence, not combat.", "proof": "Only 65% of parents allow contact sports. This isn't one."},
   {"key": "f2", "q": "They spend all day on a screen.", "a": "Three afternoons a week, Mon/Wed/Fri at 4 pm, they'll be too busy hitting pads to look at one.", "proof": "54% of Canadian kids blow through the daily screen limit. Kids who stay under it are twice as likely to be active."},
@@ -35,7 +37,7 @@
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
         </div>
         <div class="hero-cta">
-          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">Book their free week</a>
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ book_cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>
         </div>
       </div>
@@ -66,7 +68,7 @@
         <div class="pf-kicker">What it costs</div>
         <p style="margin:8px 0 6px;font-size:17px"><strong>Their first week is free.</strong> Any kids classes within 7 days of the first one. Nothing is charged to book.</p>
         <p style="margin:0;color:var(--pf-text-2)">To keep going after that: {{ member_price }} + GST a month, three sessions a week in their group, month to month with 30 days' notice. Family pricing from the second child. You'll be reminded before any charge, with a one-click cancel link.</p>
-        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:16px">Book their free week</a>
+        <a class="pf-btn pf-btn--primary" href="{{ book_url }}" style="margin-top:16px">{{ book_cta }}</a>
       </div>
     </div>
   </section>
@@ -153,7 +155,7 @@
     <div class="wrap">
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Train Smarter. Get Results.</div>
       <h2>Their first class is on us.</h2>
-      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">Book their free week</a>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ book_url }}">{{ book_cta }}</a>
       <div class="fine">Limited spots per class · Free first week · White Rock</div>
     </div>
   </section>
@@ -161,6 +163,6 @@
 
 {% block after_body %}
 <div class="mobile-cta pf-sticky">
-  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">Book their free week</a>
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ book_url }}">{{ book_cta }}</a>
 </div>
 {% endblock %}

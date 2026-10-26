@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ offer.label }} — Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow" style="max-width:560px;margin:0 auto;padding:24px 16px">
+  <div class="pf-kicker" style="color:var(--pf-red)">{{ offer.label }}</div>
+  <h1 class="pf-h1" style="margin:6px 0 4px">Save your spot. We'll call you.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">{{ offer.class_line }}. Leave your details and the gym will call you to answer your questions and get you started. No payment here.</p>
+
+  {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
+  <form method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+
+    <div class="pf-panel">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="pf-field" style="flex:1;min-width:140px"><label class="pf-label">{{ "Your first name" if offer.kids else "First name" }}</label><input class="pf-input" name="first_name" required value="{{ form.first_name }}" autocomplete="given-name" /></div>
+        <div class="pf-field" style="flex:1;min-width:140px"><label class="pf-label">{{ "Your last name" if offer.kids else "Last name" }}</label><input class="pf-input" name="last_name" required value="{{ form.last_name }}" autocomplete="family-name" /></div>
+      </div>
+      <div class="pf-field"><label class="pf-label">Mobile</label><input class="pf-input" name="phone" type="tel" required value="{{ form.phone }}" autocomplete="tel" placeholder="(604) 555-0123" /></div>
+      {% if offer.kids %}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="pf-field" style="flex:1;min-width:140px"><label class="pf-label">Child's first name</label><input class="pf-input" name="child_first_name" required value="{{ form.child_first_name }}" autocomplete="off" /></div>
+        <div class="pf-field" style="flex:1;min-width:140px"><label class="pf-label">Child's date of birth</label><input class="pf-input" name="child_dob" type="date" required value="{{ form.child_dob }}" /></div>
+      </div>
+      {% else %}
+      <div class="pf-field"><label class="pf-label">Date of birth</label><input class="pf-input" name="dob" type="date" required value="{{ form.dob }}" autocomplete="bday" /></div>
+      {% endif %}
+      <div class="pf-field"><label class="pf-label">Email <span style="color:var(--pf-text-3);font-weight:400">(optional)</span></label><input class="pf-input" name="email" type="email" value="{{ form.email }}" autocomplete="email" /></div>
+      <div class="pf-field" style="margin-bottom:6px"><label class="pf-label">Class</label><div style="padding:11px 14px;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);background:var(--pf-paper-2);font-weight:700">{{ offer.label }}<br /><span style="font-weight:400;color:var(--pf-text-2);font-size:14px">{{ offer.class_line }}</span></div></div>
+    </div>
+
+    <div class="pf-panel">
+      <h2 style="margin:0 0 4px">Best time to call <span style="color:var(--pf-text-3);font-weight:400;font-size:15px">(optional)</span></h2>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px">
+        {% for value, label in time_slots %}
+        <label style="border:1.5px solid var(--pf-ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13.5px;cursor:pointer;background:#fff"><input type="checkbox" name="times" value="{{ value }}" style="margin-right:6px" {% if value in times %}checked{% endif %} />{{ label }}</label>
+        {% endfor %}
+      </div>
+      <label class="pf-check" style="margin-top:12px"><input type="checkbox" name="sms_ok" value="1" /> <span class="t">OK to text me (for example, your sign-up link after the call)</span></label>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Call me back</button>
+    <p class="note" style="text-align:center;margin-top:10px;color:var(--pf-text-3)">Takes 30 seconds. Rather call now? <a href="tel:+17783846284">(778) 384-6284</a></p>
+  </form>
+</div>
+{% endblock %}

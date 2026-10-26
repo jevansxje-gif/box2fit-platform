@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Call list — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1000px">
+  {{ ops_nav() }}
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:6px">
+    <h1 class="pf-h1" style="margin:0">Call list</h1>
+    <div style="display:flex;gap:8px">
+      <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == 'open' else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show='open') }}">To call</a>
+      <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == 'all' else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show='all') }}">Everyone</a>
+    </div>
+  </div>
+  <p class="note" style="color:var(--pf-text-2);margin:0 0 16px">People who asked for a call from the ads. Call them, note what happened, and when they agree to sign up press <b>Send sign-up link</b>: it texts or emails a link that takes them to payment with their details filled in.</p>
+
+  {% if not rows %}
+  <div class="pf-panel"><p style="margin:0">{{ "Nobody waiting for a call." if show == 'open' else "No call-back requests yet." }}</p></div>
+  {% endif %}
+
+  {% for r in rows %}{% set e = r.e %}
+  <div class="pf-panel" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start">
+      <div>
+        <div style="font-weight:800;font-size:17px">{{ e.name }}{% if r.age is not none %} <span style="font-weight:400;color:var(--pf-text-2)">({{ r.age }})</span>{% endif %}</div>
+        {% if e.child_first_name %}<div style="color:var(--pf-text-2)">For {{ e.child_first_name }}{% if r.child_age is not none %}, age {{ r.child_age }}{% endif %}</div>{% endif %}
+        <div style="margin-top:4px"><a href="tel:{{ e.phone }}" style="font-weight:800;color:var(--pf-red)">{{ e.phone }}</a>{% if e.email %} · {{ e.email }}{% endif %}</div>
+        <div style="color:var(--pf-text-2);font-size:14px;margin-top:4px">{{ r.offer }} · best time: {{ e.best_time or "any" }} · {{ "OK to text" if e.sms_ok else "no texts" }}</div>
+        <div style="color:var(--pf-text-3);font-size:13px">Asked {{ r.asked }} · from {{ r.ad }}{% if e.link_sent_at %} · link sent {{ e.link_sent_at.strftime('%b %d') }}{% endif %}</div>
+      </div>
+      <div>
+        {% if r.outcome == 'paid' %}<span class="pf-badge" style="background:#1F7A3D;color:#fff;padding:5px 10px;border-radius:999px;font-weight:800">Paid</span>
+        {% elif r.outcome == 'booked' %}<span class="pf-badge" style="background:#1F7A3D;color:#fff;padding:5px 10px;border-radius:999px;font-weight:800">Booked</span>
+        {% else %}<span style="padding:5px 10px;border-radius:999px;font-weight:700;border:1px solid var(--pf-line)">{{ dict(statuses)[e.status] }}</span>{% endif %}
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('ops_admin.call_update', enquiry_id=e.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="show" value="{{ show }}" />
+      <select class="pf-input" name="status" style="min-width:200px">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if e.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <input class="pf-input" name="notes" value="{{ e.notes or '' }}" placeholder="Notes from the call" style="flex:1;min-width:220px" />
+      <button class="pf-btn pf-btn--dark pf-btn--sm">Save</button>
+    </form>
+
+    {% if not r.outcome %}
+    <form method="post" action="{{ url_for('ops_admin.call_send_link', enquiry_id=e.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="show" value="{{ show }}" />
+      {% if not e.email %}<input class="pf-input" name="email" type="email" placeholder="Their email (optional)" style="min-width:200px" />{% endif %}
+      {% if not e.sms_ok %}<label class="pf-check" style="margin:0"><input type="checkbox" name="sms_ok" value="1" /> <span class="t">They said OK to text it</span></label>{% endif %}
+      <button class="pf-btn pf-btn--primary pf-btn--sm">Send sign-up link</button>
+      <input class="pf-input" value="{{ r.link }}" readonly onclick="this.select()" title="Or copy and send it yourself" style="flex:1;min-width:200px;font-size:12px;color:var(--pf-text-3)" />
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -16,6 +16,7 @@ SALT_AD_INVITE = "ad-invite"
 SALT_MEMBERSHIP_SETUP = "membership-setup"
 SALT_ONE_OFF = "one-off-charge"
 SALT_GUIDED = "guided-start"
+SALT_ENQUIRY = "enquiry-signup"
 
 MAX_AGE = 60 * 60 * 24 * 90  # 90 days default
 

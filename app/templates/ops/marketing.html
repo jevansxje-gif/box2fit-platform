@@ -85,6 +85,52 @@
     <p class="note" style="color:var(--pf-text-3);font-size:12.5px;margin-top:10px">Visitors/picker/details = unique humans from the access log (this server, log-rotation window ≈ last 2 weeks). Leads onward = database, all time. A visitor on a phone may appear under a different IP than their later booking — treat the join as directional.</p>
   </div>
 
+  {% if calls %}
+  <div class="pf-panel">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">Call-first short form</h2>
+      <a href="{{ url_for('ops_admin.calls', show='all') }}" style="font-size:14px">Open the Call list →</a>
+    </div>
+    <p class="note" style="color:var(--pf-text-3);font-size:12.5px;margin:4px 0 10px">Since Oct 26: the button opens a short form, the gym calls, then sends the sign-up link. These are not in the Leads column above until they sign up.</p>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums">
+        <tr style="color:var(--pf-text-3);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">
+          <th style="padding:8px 10px;text-align:left;width:64px">Ad</th>
+          <th style="padding:8px 10px;text-align:right">Forms</th>
+          <th style="padding:8px 10px;text-align:right">Called</th>
+          <th style="padding:8px 10px;text-align:right">Agreed</th>
+          <th style="padding:8px 10px;text-align:right">{{ calls.won_label }}</th>
+        </tr>
+        {% for ad, a in calls.per_ad.items() %}
+        <tr style="border-top:1px solid var(--pf-line)">
+          <td style="padding:9px 10px;font-weight:700">{{ ad }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ a.forms }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ a.called }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ a.agreed }}</td>
+          <td style="padding:9px 10px;text-align:right;font-weight:700">{{ a.won }}</td>
+        </tr>
+        {% endfor %}
+        <tr style="border-top:2px solid var(--pf-line);font-weight:800">
+          <td style="padding:9px 10px">All</td>
+          <td style="padding:9px 10px;text-align:right">{{ calls.totals.forms }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ calls.totals.called }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ calls.totals.agreed }}</td>
+          <td style="padding:9px 10px;text-align:right">{{ calls.totals.won }}</td>
+        </tr>
+      </table>
+    </div>
+    {% for row in calls.recent %}{% set e = row.e %}
+    <div style="display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--pf-line);font-size:14px;flex-wrap:wrap">
+      <b>{{ e.name }}</b>{% if e.child_first_name %}<span style="color:var(--pf-text-2)">for {{ e.child_first_name }}</span>{% endif %}
+      <span style="color:var(--pf-text-2)">{{ e.phone }}</span>
+      <span class="pf-chip" style="font-size:11px">{{ row.ad }}</span>
+      <span class="pf-chip {{ 'pf-chip--success' if row.won else 'pf-chip--info' }}" style="font-size:11px">{{ row.won or e.status.replace('_', ' ') }}</span>
+      <span style="margin-left:auto;color:var(--pf-text-3);font-size:12.5px">{{ e.created_at.strftime('%b %d, %H:%M') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="pf-panel">
     <h2>Recent ad leads</h2>
     {% if funnel.recent %}

@@ -2062,7 +2062,8 @@ def test_free_week_and_she_hits_intro_pass(app, client, client_account):
     r = client.get("/kids")
     assert b"Book their free week" in r.data
     r = client.get("/shehits")
-    assert b"9 AM" in r.data and b"Start your 2 weeks: $94.50" in r.data and b"try one class first" in r.data
+    # call-first since 2026-10-26: the button opens the short form
+    assert b"9 AM" in r.data and b'href="/start/shehits">Save my spot' in r.data and b"try one class first" in r.data
 
     # free week rule
     instance = _first_instance(client_account)

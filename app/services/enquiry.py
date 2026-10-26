@@ -164,25 +164,36 @@ def stage(enq: Enquiry, won: str | None = None) -> str:
 
 
 def card_link(enq: Enquiry) -> str | None:
-    """The 'add your card' link for waiver-first offers."""
-    if enq.offer == "bootcamp":
+    """The 'add your card' link for waiver-first offers: the terms page,
+    then the card (boot camp checkout or the kids membership form)."""
+    if enq.offer in ("bootcamp", "kids") and enq.attendee_id:
         return absolute_url("funnel.enquiry_pay", token=make_token(enq.id, SALT_ENQUIRY_PAY))
-    if enq.offer == "kids" and enq.attendee_id:
-        from .billing import default_plan
+    return None
 
-        plan = default_plan(enq.client_account_id)
-        charge_on = None
-        if enq.booked_for:
-            first_bill = enq.booked_for + timedelta(days=OFFERS["kids"]["free_days"])
-            charge_on = max(first_bill, today_local() + timedelta(days=1)).isoformat()
-        return absolute_url(
+
+def first_bill_date(enq: Enquiry) -> date | None:
+    """Kids: the membership starts billing after the free week."""
+    if enq.offer != "kids":
+        return None
+    start = enq.booked_for or today_local()
+    return max(start + timedelta(days=OFFERS["kids"]["free_days"]), today_local() + timedelta(days=1))
+
+
+def membership_link(enq: Enquiry) -> str:
+    """Kids: the existing membership card form, billing from the end of
+    the free week."""
+    from .billing import default_plan
+
+    plan = default_plan(enq.client_account_id)
+    charge_on = first_bill_date(enq)
+    return absolute_url(
             "funnel.membership_pay",
             token=make_payload_token(
-                {"aid": enq.attendee_id, "plan": plan.id if plan else None, "charge_on": charge_on},
+                {"aid": enq.attendee_id, "plan": plan.id if plan else None,
+                 "charge_on": charge_on.isoformat() if charge_on else None},
                 SALT_MEMBERSHIP_SETUP,
             ),
         )
-    return None
 
 
 def send_card_email(enq: Enquiry) -> list[str]:
@@ -196,7 +207,7 @@ def send_card_email(enq: Enquiry) -> list[str]:
         html = render_template(
             "emails/enquiry_card_link.html", e=enq, offer=o, link=link,
             bootcamp=__import__("app.services.challenge", fromlist=["BOOTCAMP"]).BOOTCAMP,
-            first_bill=(enq.booked_for + timedelta(days=o.get("free_days", 0))) if enq.booked_for else None,
+            first_bill=first_bill_date(enq),
         )
         send_email(None, enq.email, "Box2Fit: add your card to keep your spot", html,
                    "enquiry_card_link", enq.client_account_id)

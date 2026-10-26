@@ -133,8 +133,31 @@ def create_self_attendee(guardian: User, health_answers: dict) -> AttendeeProfil
     return attendee
 
 
-def sign_waiver(attendee: AttendeeProfile, guardian: User, signature_name: str) -> WaiverSignature:
+def sign_waiver(attendee: AttendeeProfile, guardian: User, signature_name: str,
+                release_only: bool = False) -> WaiverSignature:
+    """release_only: the call-first short form signs the release without the
+    membership terms (its own document, kind adult_rel/minor_rel); the terms
+    are signed with the full document on the payment link page."""
     kind = "minor" if attendee.kind == AttendeeKind.child.value else "adult"
+    if release_only:
+        from ..legal import RELEASE_FULL_TEXT, WAIVER_VERSION
+
+        kind += "_rel"
+        doc = (
+            db.session.query(WaiverDocument)
+            .filter_by(client_account_id=guardian.client_account_id, kind=kind,
+                       version=WAIVER_VERSION, active=True)
+            .first()
+        )
+        if doc is None:
+            doc = WaiverDocument(client_account_id=guardian.client_account_id, kind=kind,
+                                 version=WAIVER_VERSION, body_md=RELEASE_FULL_TEXT)
+            db.session.add(doc)
+            db.session.flush()
+        sig = WaiverSignature(attendee_id=attendee.id, document_id=doc.id,
+                              signed_by_user_id=guardian.id, signature_name=signature_name)
+        db.session.add(sig)
+        return sig
     doc = (
         db.session.query(WaiverDocument)
         .filter_by(

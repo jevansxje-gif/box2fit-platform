@@ -43,14 +43,14 @@
     {% if offer.waiver %}
     <div class="pf-panel" id="waiver-panel">
       <h2>Waiver</h2>
-      <p class="note">So {{ "they're" if offer.kids else "you're" }} ready for {{ "their" if offer.kids else "your" }} first class. Open and read each section; the box unlocks once all three have been opened.</p>
+      <p class="note">So {{ "they're" if offer.kids else "you're" }} ready for {{ "their" if offer.kids else "your" }} first class. Open and read each section; the box unlocks once both have been opened. No payment or membership terms here: those come later, only if {{ "they" if offer.kids else "you" }} decide to join.</p>
       {% for title, body in waiver_sections %}
       <details class="waiver-sec" style="border:1px solid var(--pf-line);border-radius:var(--pf-r-md);margin-bottom:8px;background:var(--pf-paper-2)">
         <summary style="cursor:pointer;padding:13px 16px;font-weight:700;font-size:15px;color:var(--pf-ink)">{{ title }}</summary>
         <div style="padding:0 16px 14px;font-size:13.5px;line-height:1.65;color:var(--pf-text-2);white-space:pre-line">{{ body }}</div>
       </details>
       {% endfor %}
-      <label class="pf-check" style="margin-top:14px"><input type="checkbox" name="waiver_agree" value="1" id="waiver-agree" disabled /> <span class="t">I have read and agree to the waiver{% if offer.kids %} for my child{% endif %} <em id="waiver-hint" style="color:var(--pf-text-3);font-style:normal;font-size:13px">(open all three sections above first)</em></span></label>
+      <label class="pf-check" style="margin-top:14px"><input type="checkbox" name="waiver_agree" value="1" id="waiver-agree" disabled /> <span class="t">I have read and agree to the waiver{% if offer.kids %} for my child{% endif %} <em id="waiver-hint" style="color:var(--pf-text-3);font-style:normal;font-size:13px">(open both sections above first)</em></span></label>
       <div class="pf-field" style="margin:14px 0 0"><label class="pf-label">Type your full legal name to sign</label><input class="pf-input" name="signature" required value="{{ form.signature }}" autocomplete="off" /></div>
     </div>
     {% endif %}

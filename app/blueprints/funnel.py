@@ -1351,7 +1351,7 @@ def enquiry_start(offer: str):
         elif o["kids"] and (not form["child_first_name"] or child_dob is None):
             error = "Please enter your child's first name and date of birth."
         elif o["waiver"] and (not request.form.get("waiver_agree") or not form["signature"]):
-            error = "Please open and read the three sections, tick the box and type your full name to sign."
+            error = "Please open and read each section, tick the box and type your full name to sign."
         if error is None:
             touch = read_first_touch(request) or {}
             labels = dict(TIME_SLOTS)
@@ -1386,7 +1386,7 @@ def enquiry_start(offer: str):
                 else:
                     attendee = booking_flow.create_self_attendee(guardian, {})
                 db.session.flush()
-                booking_flow.sign_waiver(attendee, guardian, form["signature"])
+                booking_flow.sign_waiver(attendee, guardian, form["signature"], release_only=True)
                 e.user_id, e.attendee_id = guardian.id, attendee.id
             try:
                 enq_svc.send_admin_alert(e)
@@ -1395,11 +1395,11 @@ def enquiry_start(offer: str):
             db.session.commit()
             session["enquiry_done"] = e.id
             return redirect(url_for("funnel.enquiry_thanks", offer=offer))
-    from ..legal import WAIVER_SECTIONS
+    from ..legal import RELEASE_SECTIONS
 
     resp = make_response(render_template(
         "funnel/enquiry_start.html", offer=o, offer_key=offer, form=form, times=times,
-        time_slots=TIME_SLOTS, error=error, waiver_sections=WAIVER_SECTIONS,
+        time_slots=TIME_SLOTS, error=error, waiver_sections=RELEASE_SECTIONS,
     ))
     capture_first_touch(request, resp, landing_variant=f"{offer}:start")
     return resp
@@ -1481,22 +1481,52 @@ def bootcamp_landing():
     return resp
 
 
-@bp.get("/p/<token>")
+@bp.route("/p/<token>", methods=["GET", "POST"])
+@limiter.limit("20/hour", methods=["POST"])
 def enquiry_pay(token: str):
-    """The card link the gym emails after the first boot camp class: Stripe
-    Checkout for the five weeks, then the normal finalize/welcome."""
+    """The card link the gym sends after the first class. The membership
+    terms, cancellation policy and payment authorization are agreed here
+    (not on the short form), then: boot camp -> Stripe Checkout for the five
+    weeks; kids -> the membership card form, billing after the free week."""
+    from ..legal import TERMS_SECTIONS
     from ..models import AttendeeProfile, Enquiry, User
     from ..services import challenge as ch
+    from ..services import enquiry as enq_svc
     from ..services.signed_links import SALT_ENQUIRY_PAY
+    from ..services.tax import fmt_cents, total_with_gst_cents
 
     eid = read_token(token, SALT_ENQUIRY_PAY)
     e = db.session.get(Enquiry, eid) if eid else None
-    if e is None or e.offer != "bootcamp" or not e.attendee_id:
+    if e is None or e.offer not in ("bootcamp", "kids") or not e.attendee_id:
         abort(404)
     guardian = db.session.get(User, e.user_id)
     attendee = db.session.get(AttendeeProfile, e.attendee_id)
-    if ch.existing_sub(attendee):
+    if e.offer == "bootcamp" and ch.existing_sub(attendee):
         return render_template("funnel/bootcamp_done.html", paid=True, guardian=guardian, **_bootcamp_ctx())
+    error = None
+    signature = (request.form.get("signature") or "").strip()
+    if request.method == "POST":
+        if not request.form.get("terms_agree") or len(signature) < 2:
+            error = "Please open and read the terms, tick the box and type your full name to sign."
+        else:
+            booking_flow.sign_waiver(attendee, guardian, signature)  # the full document: release + terms
+            db.session.commit()
+            if e.offer == "kids":
+                return redirect(enq_svc.membership_link(e))
+            return _bootcamp_checkout(guardian, attendee)
+    plan = __import__("app.services.billing", fromlist=["default_plan"]).default_plan(e.client_account_id)
+    return render_template(
+        "funnel/enquiry_pay.html", e=e, guardian=guardian, error=error, signature=signature,
+        terms_sections=TERMS_SECTIONS, first_bill=enq_svc.first_bill_date(e),
+        member_price=fmt_cents(plan.price_cents) if plan else "",
+        member_total=fmt_cents(total_with_gst_cents(plan.price_cents)) if plan else "",
+        **_bootcamp_ctx(),
+    )
+
+
+def _bootcamp_checkout(guardian, attendee):
+    from ..services import challenge as ch
+
     url = ch.start_checkout(guardian, attendee, ch.BOOTCAMP, "funnel.bootcamp_done", "funnel.bootcamp_landing")
     if url:
         return redirect(url)

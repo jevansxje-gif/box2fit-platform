@@ -42,6 +42,15 @@ WAIVER_FULL_TEXT = "\n\n---\n\n".join(
     f"## {title}\n\n{body}" for title, body in WAIVER_SECTIONS
 )
 
+# Call-first forms (owner 2026-10-26): the short form signs the release only;
+# the membership terms and payment authorization are agreed on the payment
+# link page, which then signs the full document above.
+RELEASE_SECTIONS = WAIVER_SECTIONS[:2]
+TERMS_SECTIONS = WAIVER_SECTIONS[2:]
+RELEASE_FULL_TEXT = "\n\n---\n\n".join(
+    f"## {title}\n\n{body}" for title, body in RELEASE_SECTIONS
+)
+
 # The one-line summary of the cancellation policy used wherever marketing
 # copy needs to reference it (replaces the old "no contracts" claims).
 CANCELLATION_SUMMARY = (

@@ -101,6 +101,7 @@ def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account)
 
     r = client.get("/start/kids")
     assert b"No card details needed." in r.data and b"waiver-agree" in r.data
+    assert b"Waiver &amp; Release" in r.data and b"Membership Terms" not in r.data  # terms come with the card link
     base = {"first_name": "Pat", "last_name": "Singh", "phone": "604 555 0100", "email": "pat@example.com",
             "child_first_name": "Ravi", "child_dob": "2018-05-01"}
     r = client.post("/start/kids", data=base)
@@ -111,7 +112,10 @@ def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account)
     assert e.offer == "kids" and e.child_first_name == "Ravi" and e.utm_content == "families-f2"
     child = db.session.get(AttendeeProfile, e.attendee_id)
     assert child.first_name == "Ravi" and child.kind == "child" and child.user_id == e.user_id
-    assert db.session.query(WaiverSignature).filter_by(attendee_id=child.id).count() == 1
+    sig = db.session.query(WaiverSignature).filter_by(attendee_id=child.id).one()
+    from app.models import WaiverDocument
+
+    assert db.session.get(WaiverDocument, sig.document_id).kind == "minor_rel"  # release only
     r = client.get("/start/kids/thanks")
     assert b"waiver is signed" in r.data and b"Already decided" not in r.data
     assert enq_svc.stage(e) == "to_call"
@@ -134,7 +138,16 @@ def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account)
     msg = db.session.query(Message).filter_by(template="enquiry_card_link").one()
     assert msg.recipient == "pat@example.com"
     link = enq_svc.card_link(e)
-    assert "/membership/start/" in link  # the membership card form, billing after the free week
+    path = link.split("health.box2fit.com")[-1].split("localhost")[-1]
+    path = path[path.index("/p/"):]
+    r = client.get(path)  # terms first, then the card
+    assert b"Membership Terms" in r.data and b"Keep Ravi" in r.data and b"Today: nothing." in r.data
+    r = client.post(path, data={"signature": "Pat Singh"})
+    assert b"tick the box" in r.data
+    r = client.post(path, data={"signature": "Pat Singh", "terms_agree": "1"})
+    assert r.status_code == 302 and "/membership/start/" in r.headers["Location"]
+    full = db.session.query(WaiverSignature).filter_by(attendee_id=child.id).order_by(WaiverSignature.id.desc()).first()
+    assert db.session.get(WaiverDocument, full.document_id).kind == "minor"  # release + terms
 
     # card added -> membership pending -> Paid
     from app.models import Subscription as Sub
@@ -181,8 +194,10 @@ def test_bootcamp_page_form_book_card_paid(app, client, client_account):
     db.session.refresh(e)
     assert e.card_sent_at and "/p/" in enq_svc.card_link(e)
 
-    # the card link (no Stripe in tests: the spot is held locally)
+    # the card link: terms first (no Stripe in tests: the spot is held locally)
     r = client.get(f"/p/{make_token(e.id, SALT_ENQUIRY_PAY)}")
+    assert b"Membership Terms" in r.data and b"What you pay" in r.data and b"Keep your spot, Jo." in r.data
+    r = client.post(f"/p/{make_token(e.id, SALT_ENQUIRY_PAY)}", data={"signature": "Jo Park", "terms_agree": "1"})
     assert r.status_code == 200 and b"You're in" in r.data
     sub = db.session.query(Subscription).filter_by(user_id=e.user_id).one()
     assert sub.challenge_key == ch.BOOTCAMP["key"]

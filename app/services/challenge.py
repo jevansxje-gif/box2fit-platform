@@ -56,7 +56,26 @@ SHEHITS_INTRO = {
     "reminder_hours": 72,
     "description": "Two weeks of She Hits, any sessions, women only, coached.",
 }
-OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO}
+# 7 pm boot camp test (owner 2026-10-26). Call-first: contact details and
+# waiver on the short form, the gym books the first class by phone, and the
+# card link is emailed after that class. PRICE, DAYS, START AND SPOTS ARE
+# PLACEHOLDERS copied from the 6 am challenge until the gym confirms them.
+BOOTCAMP = {
+    "key": "bootcamp7-2026-11-02",
+    "name": "5-Week Boot Camp, 7 pm",
+    "start": date(2026, 11, 2),       # first class (Monday)
+    "end": date(2026, 12, 4),         # last class (Friday)
+    "renew": date(2026, 12, 7),       # next 5-week block from here
+    "price_cents": 24900,             # pre-tax, charged when they add the card
+    "spots": 12,
+    "class_time": "7:00 pm",
+    "class_days": "Monday to Friday",
+    "reminder_hours": 72,
+    "cohort_label": "Boot Camp · 7 pm",
+    "description": "Five weeks of coached boot camp at 7 pm, gloves and wraps provided.",
+}
+OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO, BOOTCAMP["key"]: BOOTCAMP}
+BLOCK_OFFERS = (CHALLENGE["key"], BOOTCAMP["key"])  # renew in 5-week blocks, not into the membership
 CHALLENGE_PLAN_NAME = "Guided Boxing Challenge (5-week block)"
 
 
@@ -66,7 +85,7 @@ def offer_plan(offer: dict, client_account_id: int):
     from ..models import Plan
     from .billing import default_plan
 
-    if offer is CHALLENGE or offer.get("key") == CHALLENGE["key"]:
+    if offer.get("key") in BLOCK_OFFERS:
         p = db.session.query(Plan).filter_by(client_account_id=client_account_id, name=CHALLENGE_PLAN_NAME, active=True).first()
         if p is not None:
             return p
@@ -341,6 +360,19 @@ def send_welcome(sub: Subscription) -> None:
                 None, to, f"She Hits two-week sign-up: {guardian.name}",
                 render_template("emails/shehits_admin.html", **ctx),
                 "shehits_admin", sub.client_account_id,
+            )
+        return
+    if offer is BOOTCAMP:
+        send_email(
+            guardian, guardian.email, f"You're in: the {BOOTCAMP['name']}",
+            render_template("emails/bootcamp_welcome.html", **ctx),
+            "bootcamp_welcome", sub.client_account_id, attendee_id=attendee.id,
+        )
+        for to in admin_alert_recipients():
+            send_email(
+                None, to, f"Boot camp paid: {guardian.name}",
+                render_template("emails/bootcamp_admin.html", **ctx),
+                "bootcamp_admin", sub.client_account_id,
             )
         return
     send_email(

@@ -61,6 +61,10 @@ CAMPAIGNS = {
                 "picker": [("GET", ("/shehits/start", "/book/shehits", "/start/shehits"))],
                 "details": [("POST", ("/shehits/start", "/book/shehits/details", "/start/shehits"))],
                 "paid": True, "call_offer": "shehits"},
+    "bootcamp": {"label": "Boot camp 7 pm", "landings": ("/bootcamp-7pm",),
+                 "picker": [("GET", ("/start/bootcamp",))],
+                 "details": [("POST", ("/start/bootcamp",))],
+                 "paid": True, "call_offer": "bootcamp"},
     # August 2026 test, kept for the record
     "kids": {"label": "Kids (Aug)", "landings": ("/kids",),
              "picker": ("GET", ("/book/kids",)), "details": ("GET", ("/book/kids/details",)),
@@ -247,7 +251,7 @@ def call_first_funnel(client_account_id: int, campaign: str = DEFAULT_CAMPAIGN) 
         a = per_ad[ad]
         a["forms"] += 1
         a["called"] += 1 if e.status != "new" or won else 0
-        a["agreed"] += 1 if (e.status == "agreed" or e.link_sent_at or e.user_id) else 0
+        a["agreed"] += 1 if (e.status == "agreed" or e.link_sent_at or e.booked_for) else 0
         a["won"] += 1 if won else 0
         if len(recent) < 12:
             recent.append({"e": e, "ad": ad, "won": won})

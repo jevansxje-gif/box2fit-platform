@@ -771,59 +771,108 @@ def trainers():
 @bp.get("/calls")
 @staff_required
 def calls():
-    """Call-first short forms (2026-10-26): everyone the gym needs to ring,
-    newest first. Paid/Booked is read from the real records."""
+    """Call-first short forms (2026-10-26), by stage: to call, booked (first
+    class still to come), to pay (class done or sign-up link sent), paid.
+    Paid is read from the real records."""
     from ..models import Enquiry
     from ..services import enquiry as enq_svc
     from ..services.marketing_report import ad_label
     from ..services.tzutil import fmt_local
 
-    show = request.args.get("show", "open")
-    q = db.session.query(Enquiry).filter_by(client_account_id=_cid())
-    if show == "open":
-        q = q.filter(Enquiry.status.in_(enq_svc.OPEN_STATUSES))
-    rows = []
-    for e in q.order_by(Enquiry.created_at.desc()).limit(300):
+    tab = request.args.get("show", "to_call")
+    rows, counts = [], {k: 0 for k, _ in enq_svc.STAGES}
+    for e in (
+        db.session.query(Enquiry).filter_by(client_account_id=_cid())
+        .order_by(Enquiry.created_at.desc()).limit(500)
+    ):
+        won = enq_svc.outcome(e)
+        st = enq_svc.stage(e, won)
+        counts[st] += 1
+        if tab != "all" and st != tab:
+            continue
+        o = enq_svc.OFFERS.get(e.offer, {})
         rows.append({
-            "e": e,
-            "offer": enq_svc.OFFERS.get(e.offer, {}).get("label", e.offer),
+            "e": e, "stage": st, "waiver": bool(o.get("waiver")),
+            "offer": o.get("label", e.offer),
             "age": enq_svc.age_on(e.dob),
             "child_age": enq_svc.age_on(e.child_dob),
-            "outcome": enq_svc.outcome(e),
-            "link": enq_svc.signup_link(e),
+            "link": None if o.get("waiver") else enq_svc.signup_link(e),
             "ad": ad_label(e.utm_content) if e.utm_content else "direct",
             "asked": fmt_local(e.created_at, "%a %b %d, %I:%M %p"),
         })
-    return render_template("ops/calls.html", rows=rows, show=show, statuses=enq_svc.STATUSES)
+    return render_template(
+        "ops/calls.html", rows=rows, show=tab, counts=counts,
+        stages=enq_svc.STAGES, statuses=enq_svc.STATUSES,
+    )
+
+
+def _enquiry_or_404(enquiry_id: int):
+    from ..models import Enquiry
+
+    e = db.session.get(Enquiry, enquiry_id)
+    if e is None or e.client_account_id != _cid():
+        abort(404)
+    return e
+
+
+def _back_to_calls():
+    return redirect(url_for("ops_admin.calls", show=request.form.get("show", "to_call")))
 
 
 @bp.post("/calls/<int:enquiry_id>")
 @staff_required
 def call_update(enquiry_id: int):
-    from ..models import Enquiry
     from ..services import enquiry as enq_svc
 
-    e = db.session.get(Enquiry, enquiry_id)
-    if e is None or e.client_account_id != _cid():
-        abort(404)
+    e = _enquiry_or_404(enquiry_id)
     status = request.form.get("status")
     if status in dict(enq_svc.STATUSES):
         e.status = status
     e.notes = (request.form.get("notes") or "").strip()[:2000] or None
     db.session.commit()
     flash(f"Saved {e.name}.", "success")
-    return redirect(url_for("ops_admin.calls", show=request.form.get("show", "open")))
+    return _back_to_calls()
+
+
+@bp.post("/calls/<int:enquiry_id>/book")
+@staff_required
+def call_book(enquiry_id: int):
+    """The gym booked their first class on the phone."""
+    e = _enquiry_or_404(enquiry_id)
+    try:
+        e.booked_for = date.fromisoformat((request.form.get("booked_for") or "").strip())
+    except ValueError:
+        flash("Pick the date of their first class.", "error")
+        return _back_to_calls()
+    if e.status != "not_interested":
+        e.status = "agreed"
+    db.session.commit()
+    flash(f"{e.name} booked for {e.booked_for.strftime('%a %b %d')}. They move to To pay after that class.", "success")
+    return _back_to_calls()
+
+
+@bp.post("/calls/<int:enquiry_id>/send-card")
+@staff_required
+def call_send_card(enquiry_id: int):
+    """After their first class: email (and text, if OK'd) the card link."""
+    from ..services import enquiry as enq_svc
+
+    e = _enquiry_or_404(enquiry_id)
+    used = enq_svc.send_card_email(e)
+    db.session.commit()
+    if used:
+        flash(f"Card link sent to {e.name} by {' and '.join(used)}.", "success")
+    else:
+        flash(f"Couldn't send the card link to {e.name}: no email on file.", "error")
+    return _back_to_calls()
 
 
 @bp.post("/calls/<int:enquiry_id>/send-link")
 @staff_required
 def call_send_link(enquiry_id: int):
-    from ..models import Enquiry
     from ..services import enquiry as enq_svc
 
-    e = db.session.get(Enquiry, enquiry_id)
-    if e is None or e.client_account_id != _cid():
-        abort(404)
+    e = _enquiry_or_404(enquiry_id)
     email = (request.form.get("email") or "").strip().lower()
     if email and "@" in email:
         e.email = email
@@ -835,7 +884,7 @@ def call_send_link(enquiry_id: int):
         flash(f"Sign-up link sent to {e.name} by {' and '.join(used)}.", "success")
     else:
         flash(f"No mobile OK'd for texts and no email for {e.name}: copy the link and send it yourself.", "error")
-    return redirect(url_for("ops_admin.calls", show=request.form.get("show", "open")))
+    return _back_to_calls()
 
 
 # ------------------------------------------------------- member directory ---

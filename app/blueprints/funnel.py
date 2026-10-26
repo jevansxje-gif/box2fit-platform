@@ -1328,7 +1328,7 @@ def enquiry_start(offer: str):
 
     o = enq_svc.OFFERS.get(offer) or abort(404)
     client = get_client()
-    keys = ("first_name", "last_name", "phone", "email", "dob", "child_first_name", "child_dob")
+    keys = ("first_name", "last_name", "phone", "email", "dob", "child_first_name", "child_dob", "signature")
     form = {k: (request.form.get(k) or "").strip() for k in keys}
     times = request.form.getlist("times")
     error = None
@@ -1342,12 +1342,16 @@ def enquiry_start(offer: str):
             error = "Please enter your first and last name."
         elif len(enq_svc.digits(form["phone"])) < 10:
             error = "Please enter a mobile number so the gym can call you."
+        elif o["waiver"] and not email:
+            error = "Please enter your email so the gym can send your details."
         elif email and ("@" not in email or "." not in email.split("@")[-1]):
-            error = "That email doesn't look right. You can leave it blank."
+            error = "That email doesn't look right." + ("" if o["waiver"] else " You can leave it blank.")
         elif not o["kids"] and dob is None:
             error = "Please enter your date of birth."
         elif o["kids"] and (not form["child_first_name"] or child_dob is None):
             error = "Please enter your child's first name and date of birth."
+        elif o["waiver"] and (not request.form.get("waiver_agree") or not form["signature"]):
+            error = "Please open and read the three sections, tick the box and type your full name to sign."
         if error is None:
             touch = read_first_touch(request) or {}
             labels = dict(TIME_SLOTS)
@@ -1365,6 +1369,25 @@ def enquiry_start(offer: str):
             )
             db.session.add(e)
             db.session.flush()
+            if o["waiver"]:
+                # The account and the signed waiver exist from the first form,
+                # so the gym can book them straight in.
+                guardian = booking_flow.get_or_create_guardian(
+                    client.id, name=e.name, email=email, phone=e.phone,
+                    consent_email=True, consent_sms=e.sms_ok,
+                )
+                db.session.flush()
+                if o["kids"]:
+                    attendee = booking_flow.create_child_attendee(
+                        guardian, first_name=e.child_first_name, birth_year=child_dob.year,
+                        emergency_contact_name=e.name, emergency_contact_phone=e.phone,
+                        health_answers={},
+                    )
+                else:
+                    attendee = booking_flow.create_self_attendee(guardian, {})
+                db.session.flush()
+                booking_flow.sign_waiver(attendee, guardian, form["signature"])
+                e.user_id, e.attendee_id = guardian.id, attendee.id
             try:
                 enq_svc.send_admin_alert(e)
             except Exception:  # noqa: BLE001 - the form must not fail on a mail hiccup
@@ -1372,9 +1395,11 @@ def enquiry_start(offer: str):
             db.session.commit()
             session["enquiry_done"] = e.id
             return redirect(url_for("funnel.enquiry_thanks", offer=offer))
+    from ..legal import WAIVER_SECTIONS
+
     resp = make_response(render_template(
         "funnel/enquiry_start.html", offer=o, offer_key=offer, form=form, times=times,
-        time_slots=TIME_SLOTS, error=error,
+        time_slots=TIME_SLOTS, error=error, waiver_sections=WAIVER_SECTIONS,
     ))
     capture_first_touch(request, resp, landing_variant=f"{offer}:start")
     return resp
@@ -1393,7 +1418,7 @@ def enquiry_thanks(offer: str):
         return redirect(url_for("funnel.enquiry_start", offer=offer))
     return render_template(
         "funnel/enquiry_thanks.html", offer=o, e=e,
-        ready_url=url_for("funnel.enquiry_link", token=make_token(e.id, SALT_ENQUIRY)),
+        ready_url=url_for("funnel.enquiry_link", token=make_token(e.id, SALT_ENQUIRY)) if o["pay"] else None,
         gym_phone="(778) 384-6284",
     )
 
@@ -1413,6 +1438,8 @@ def enquiry_link(token: str):
     e = db.session.get(Enquiry, eid) if eid else None
     if e is None:
         abort(404)
+    if not enq_svc.OFFERS[e.offer]["pay"]:  # waiver-first offers pay from the card email
+        abort(404)
     enq_svc.remember(e)
     ep, args = enq_svc.OFFERS[e.offer]["pay"]
     resp = make_response(redirect(url_for(ep, **args)))
@@ -1427,6 +1454,78 @@ def enquiry_link(token: str):
             samesite="Lax", secure=request.is_secure,
         )
     return resp
+
+
+# ------------------------------------------------ 7 pm boot camp test ---
+def _bootcamp_ctx():
+    from ..services.challenge import BOOTCAMP, offer_plan
+    from ..services.tax import fmt_cents, total_with_gst_cents
+
+    b = BOOTCAMP
+    plan = offer_plan(b, get_client().id)
+    return dict(
+        b=b, price=fmt_cents(b["price_cents"]), price_total=fmt_cents(total_with_gst_cents(b["price_cents"])),
+        renew_price=fmt_cents(plan.price_cents) if plan else "",
+        renew_total=fmt_cents(total_with_gst_cents(plan.price_cents)) if plan else "",
+    )
+
+
+@bp.get("/bootcamp-7pm")
+def bootcamp_landing():
+    resp = make_response(render_template(
+        "funnel/bootcamp.html", cta_url=url_for("funnel.enquiry_start", offer="bootcamp"),
+        slug="bootcamp-7pm", time_slots=TIME_SLOTS, time_state=request.args.get("time"),
+        **_bootcamp_ctx(),
+    ))
+    capture_first_touch(request, resp, landing_variant=f"bootcamp:{request.args.get('v', 'a')[:20]}")
+    return resp
+
+
+@bp.get("/p/<token>")
+def enquiry_pay(token: str):
+    """The card link the gym emails after the first boot camp class: Stripe
+    Checkout for the five weeks, then the normal finalize/welcome."""
+    from ..models import AttendeeProfile, Enquiry, User
+    from ..services import challenge as ch
+    from ..services.signed_links import SALT_ENQUIRY_PAY
+
+    eid = read_token(token, SALT_ENQUIRY_PAY)
+    e = db.session.get(Enquiry, eid) if eid else None
+    if e is None or e.offer != "bootcamp" or not e.attendee_id:
+        abort(404)
+    guardian = db.session.get(User, e.user_id)
+    attendee = db.session.get(AttendeeProfile, e.attendee_id)
+    if ch.existing_sub(attendee):
+        return render_template("funnel/bootcamp_done.html", paid=True, guardian=guardian, **_bootcamp_ctx())
+    url = ch.start_checkout(guardian, attendee, ch.BOOTCAMP, "funnel.bootcamp_done", "funnel.bootcamp_landing")
+    if url:
+        return redirect(url)
+    ch._local_sub(attendee, None, ch.BOOTCAMP)  # Stripe not configured (dev/test)
+    db.session.commit()
+    return render_template("funnel/bootcamp_done.html", paid=True, guardian=guardian, **_bootcamp_ctx())
+
+
+@bp.get("/bootcamp-7pm/done")
+def bootcamp_done():
+    import json as _json
+
+    from ..models import User
+    from ..services import challenge as ch
+    from ..services import stripe_service as _ss
+
+    sid = request.args.get("session_id")
+    guardian, paid = None, False
+    if sid and _ss.is_configured():
+        try:
+            sd = _json.loads(str(_ss.stripe_client().checkout.Session.retrieve(sid, stripe_version="2023-10-16")))
+            sub = ch.finalize(sd)
+            db.session.commit()
+            if sub is not None:
+                guardian = db.session.get(User, sub.user_id)
+                paid = sub.activated_at is not None
+        except Exception:  # noqa: BLE001
+            log.exception("boot camp done: could not verify session %s", sid)
+    return render_template("funnel/bootcamp_done.html", paid=paid, guardian=guardian, **_bootcamp_ctx())
 
 
 # ---------------------------------------------- Guided Start questionnaire ---

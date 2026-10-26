@@ -749,6 +749,12 @@ class Enquiry(db.Model):
     status: Mapped[str] = mapped_column(String(20), default="new", index=True)
     notes: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # Waiver-first offers (boot camp, kids test) make the account and sign
+    # the waiver on the short form; the gym books the first class by phone
+    # (booked_for) and emails the card link after it (card_sent_at).
+    attendee_id: Mapped[int | None] = mapped_column(ForeignKey("attendee_profiles.id"))
+    booked_for: Mapped[date | None] = mapped_column(Date)
+    card_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     link_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     utm_source: Mapped[str | None] = mapped_column(String(120))
     utm_medium: Mapped[str | None] = mapped_column(String(120))

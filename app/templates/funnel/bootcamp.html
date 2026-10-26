@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{# 7 pm boot camp test (owner 2026-10-26). Call-first: short form + waiver,
+   the gym calls and books the first class, card link emailed after it.
+   Price, days, start and spots come from challenge.BOOTCAMP (placeholders
+   until the gym confirms). #}
+{% set cta = "Save my spot" %}
+
+{% block title %}{{ b.name }} — Box2Fit White Rock{% endblock %}
+{% block meta_description %}Five weeks of coached boot camp at 7 pm, {{ b.class_days }}, in a small group of {{ b.spots }}. Box2Fit White Rock. No card details needed to save your spot.{% endblock %}
+{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='video/hero-beast.jpg') }}{% endblock %}
+{% block body_class %}has-mobile-cta{% endblock %}
+
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ cta_url }}">{{ cta }}</a>{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">Boot camp · 7 pm · Starts {{ b.start.strftime('%A, %B') }} {{ b.start.day }} · White Rock</div>
+        <h1>Five weeks. Seven o'clock. <span class="accent">Done before bed.</span></h1>
+        <p class="sub">A coached evening boot camp: boxing, strength and conditioning in a small group of {{ b.spots }}, {{ b.class_days }} at {{ b.class_time.replace(':00', '') }}. A coach runs every round, so you never have to guess what to do next. No sparring, no head contact, and nobody expects you to be fit on day one.</p>
+        <div style="background:#fff;color:var(--pf-ink);border-radius:var(--pf-r-md);padding:14px 18px;margin:18px 0 6px;font-weight:800;font-size:clamp(1.35rem,4vw,1.9rem);line-height:1.15;display:inline-block">No card details needed.</div>
+        <p style="color:var(--pf-on-dark-2);margin:6px 0 16px;font-size:15.5px">Leave your name and number. The gym calls you and books your first class.</p>
+        <div class="hero-cta">
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ b.spots }} spots · {{ price }} + GST for five weeks</span>
+        </div>
+      </div>
+      <div class="hero-media">
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Boot camp at Box2Fit White Rock">
+          <source src="{{ url_for('static', filename='video/hero-beast.mp4') }}" type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <div class="time-strip">
+    <div class="wrap"><span>{{ b.class_days }}, {{ b.class_time }} · starts {{ b.start.strftime('%B') }} {{ b.start.day }}</span><a href="#other-time">Can't make 7 pm? Tell us when you could train →</a></div>
+  </div>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">How it works</div>
+        <h2>Three steps. Nothing to pay until you've tried it.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">1</div><h3 style="margin:8px 0 6px">Save your spot</h3><p style="color:var(--pf-text-2);margin:0">Your name, number, email and date of birth, and sign the waiver. About a minute. No card details.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">2</div><h3 style="margin:8px 0 6px">The gym calls you</h3><p style="color:var(--pf-text-2);margin:0">They answer your questions and book your first class at {{ b.class_time.replace(':00', '') }}.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">3</div><h3 style="margin:8px 0 6px">Come to class</h3><p style="color:var(--pf-text-2);margin:0">Train with the group. Afterwards we email you a link to keep your spot for the five weeks.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:#fff;border-top:1px solid var(--pf-line);border-bottom:1px solid var(--pf-line)">
+    <div class="wrap" style="max-width:820px">
+      <div class="pf-kicker">The price, plainly</div>
+      <h2 style="margin:8px 0 12px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.4rem,2.8vw,1.9rem)">{{ price }} + GST for the five weeks.</h2>
+      <div class="pf-card pf-card--pad">
+        <p style="margin:0 0 8px"><strong>Today:</strong> nothing. No card details needed to save your spot.</p>
+        <p style="margin:0 0 8px"><strong>After your first class:</strong> {{ price_total }} ({{ price }} + GST) for the five weeks, if you want to keep going. You add your card from the link we email you.</p>
+        <p style="margin:0;color:var(--pf-text-2)">After the five weeks it carries on in five-week blocks at {{ renew_total }} including GST, unless you cancel before then. We email and text you three days before, with a one-click cancel link.</p>
+      </div>
+      <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}" style="margin-top:18px">{{ cta }}</a>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--pf-paper-2)">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Before you sign up</div>
+        <h2>Questions, answered.</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>I haven't trained in years. Is this for me?</summary><p>Yes. Your coach scales every round up or down, so you start where you are.</p></details>
+        <details><summary>Will I get hit?</summary><p>No. There's no sparring and no head contact. You work on pads and bags with a coach.</p></details>
+        <details><summary>What do I need to bring?</summary><p>Water and runners. Gloves and wraps are provided.</p></details>
+        <details><summary>Why do you need my details now?</summary><p>So the gym can call you and book your first class, and so your waiver is done before you arrive. No card details are taken until after your first class, and only if you want to keep going.</p></details>
+      </div>
+    </div>
+  </section>
+
+  {% include "funnel/_other_time.html" %}
+
+  <section class="final">
+    <div class="wrap">
+      <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Starts {{ b.start.strftime('%A, %B') }} {{ b.start.day }} · {{ b.class_time }}</div>
+      <h2>{{ b.spots }} spots. No card details needed.</h2>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
+      <div class="fine">{{ price }} + GST for five weeks, paid after your first class · 1522 Finlay St, White Rock</div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block after_body %}
+<div class="mobile-cta pf-sticky">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ cta_url }}">{{ cta }}</a>
+</div>
+{% endblock %}

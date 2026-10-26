@@ -2,17 +2,22 @@
 
 The landing page stays as it is; its button opens a short form (name,
 mobile, date of birth, the class from the page). The gym calls everyone.
-When they agree, staff press "Send sign-up link" on the Call list and the
-person lands on the normal pay or booking page with their details filled
-in. Nothing here takes money: the existing pages still do that.
+
+Two shapes:
+- Sign-up link (6 am challenge, She Hits): when they agree, staff send a
+  link to the normal pay page, filled in.
+- Waiver first (7 pm boot camp, kids test): the short form also takes the
+  email and the signed waiver, so the account exists from the start. The
+  gym books the first class by phone, then after that class emails the
+  card link (boot camp: Stripe Checkout for the 5 weeks; kids: the
+  membership card form, billing from the end of the free week).
 """
-from datetime import date
+from datetime import date, timedelta
 
 from flask import render_template, session
 
 from ..extensions import db
 from ..models import (
-    Booking,
     Enquiry,
     Subscription,
     SubscriptionStatus,
@@ -20,7 +25,7 @@ from ..models import (
 )
 from .booking_flow import admin_alert_recipients
 from .messaging import send_email, send_sms
-from .signed_links import SALT_ENQUIRY, make_token
+from .signed_links import SALT_ENQUIRY, SALT_ENQUIRY_PAY, SALT_MEMBERSHIP_SETUP, make_payload_token, make_token
 from .tzutil import today_local
 from .urls import absolute_url
 
@@ -33,6 +38,7 @@ OFFERS = {
         "pay": ("funnel.challenge_join", {}),
         "back": ("funnel.challenge_landing", {}),
         "kids": False,
+        "waiver": False,
         "pay_cta": "Claim my spot and pay",
     },
     "shehits": {
@@ -41,15 +47,25 @@ OFFERS = {
         "pay": ("funnel.shehits_start", {}),
         "back": ("funnel.landing", {"slug": "shehits"}),
         "kids": False,
+        "waiver": False,
         "pay_cta": "Start my two weeks",
     },
     "kids": {
         "label": "Kids Boxing (ages 6 to 10): free first week",
         "class_line": "Monday, Wednesday and Friday at 4 pm",
-        "pay": ("funnel.step_class", {"segment": "kids"}),
+        "pay": None,  # card email after the first class (membership form)
         "back": ("funnel.landing_kids", {}),
         "kids": True,
-        "pay_cta": "Book the free week now",
+        "waiver": True,
+        "free_days": 7,  # membership billing starts after the free week
+    },
+    "bootcamp": {
+        "label": "5-Week Boot Camp, 7 pm",
+        "class_line": "Monday to Friday at 7 pm · coached, small group",
+        "pay": None,  # card email after the first class (Stripe Checkout)
+        "back": ("funnel.bootcamp_landing", {}),
+        "kids": False,
+        "waiver": True,
     },
 }
 
@@ -68,10 +84,19 @@ STATUSES = [
     ("new", "New, not called yet"),
     ("no_answer", "No answer"),
     ("call_back", "Call back"),
-    ("agreed", "Agreed, link sent"),
+    ("agreed", "Agreed / booked"),
     ("not_interested", "Not interested"),
 ]
 OPEN_STATUSES = {"new", "no_answer", "call_back"}
+
+# Where each person is, for the Call list tabs.
+STAGES = [
+    ("to_call", "To call"),
+    ("booked", "Booked, class coming up"),
+    ("to_pay", "To pay"),
+    ("paid", "Paid"),
+    ("closed", "Not interested"),
+]
 
 SESSION_KEY = "enquiry_id"
 
@@ -98,17 +123,20 @@ def digits(phone: str) -> str:
 
 
 def outcome(enq: Enquiry) -> str | None:
-    """What happened after the call, read from the real records: 'paid'
-    (adult subscription started), 'booked' (kids free week booked)."""
+    """'paid' once it's real: an adult intro/boot camp subscription paid, or
+    (kids) a membership set up with a card, billing after the free week."""
     if not enq.user_id:
         return None
     if enq.offer == "kids":
-        from ..models import AttendeeProfile
-
-        ids = [a.id for a in db.session.query(AttendeeProfile).filter_by(user_id=enq.user_id)]
-        if ids and db.session.query(Booking).filter(Booking.attendee_id.in_(ids)).first():
-            return "booked"
-        return None
+        sub = (
+            db.session.query(Subscription)
+            .filter(
+                Subscription.user_id == enq.user_id,
+                Subscription.status.in_([SubscriptionStatus.active.value, SubscriptionStatus.pending.value]),
+            )
+            .first()
+        )
+        return "paid" if sub else None
     sub = (
         db.session.query(Subscription)
         .filter(
@@ -119,6 +147,66 @@ def outcome(enq: Enquiry) -> str | None:
         .first()
     )
     return "paid" if sub else None
+
+
+def stage(enq: Enquiry, won: str | None = None) -> str:
+    """To call -> Booked (first class booked, still to come) -> To pay (class
+    done, or sign-up link sent) -> Paid."""
+    if won or outcome(enq):
+        return "paid"
+    if enq.status == "not_interested":
+        return "closed"
+    if OFFERS.get(enq.offer, {}).get("waiver"):
+        if enq.booked_for:
+            return "to_pay" if enq.booked_for <= today_local() else "booked"
+        return "to_call"
+    return "to_pay" if (enq.link_sent_at or enq.status == "agreed") else "to_call"
+
+
+def card_link(enq: Enquiry) -> str | None:
+    """The 'add your card' link for waiver-first offers."""
+    if enq.offer == "bootcamp":
+        return absolute_url("funnel.enquiry_pay", token=make_token(enq.id, SALT_ENQUIRY_PAY))
+    if enq.offer == "kids" and enq.attendee_id:
+        from .billing import default_plan
+
+        plan = default_plan(enq.client_account_id)
+        charge_on = None
+        if enq.booked_for:
+            first_bill = enq.booked_for + timedelta(days=OFFERS["kids"]["free_days"])
+            charge_on = max(first_bill, today_local() + timedelta(days=1)).isoformat()
+        return absolute_url(
+            "funnel.membership_pay",
+            token=make_payload_token(
+                {"aid": enq.attendee_id, "plan": plan.id if plan else None, "charge_on": charge_on},
+                SALT_MEMBERSHIP_SETUP,
+            ),
+        )
+    return None
+
+
+def send_card_email(enq: Enquiry) -> list[str]:
+    """After their first class: email (and text, if OK'd) the card link."""
+    link = card_link(enq)
+    if not link:
+        return []
+    o = OFFERS[enq.offer]
+    used = []
+    if enq.email:
+        html = render_template(
+            "emails/enquiry_card_link.html", e=enq, offer=o, link=link,
+            bootcamp=__import__("app.services.challenge", fromlist=["BOOTCAMP"]).BOOTCAMP,
+            first_bill=(enq.booked_for + timedelta(days=o.get("free_days", 0))) if enq.booked_for else None,
+        )
+        send_email(None, enq.email, "Box2Fit: add your card to keep your spot", html,
+                   "enquiry_card_link", enq.client_account_id)
+        used.append("email")
+    if enq.sms_ok and len(digits(enq.phone)) >= 10:
+        send_sms(None, enq.phone, f"Box2Fit: thanks for coming in! Add your card to keep your spot: {link}",
+                 "payment_link", enq.client_account_id, transactional=True)
+        used.append("text")
+    enq.card_sent_at = utcnow()
+    return used
 
 
 def signup_link(enq: Enquiry) -> str:

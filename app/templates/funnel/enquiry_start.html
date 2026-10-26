@@ -3,8 +3,9 @@
 {% block content %}
 <div class="flow" style="max-width:560px;margin:0 auto;padding:24px 16px">
   <div class="pf-kicker" style="color:var(--pf-red)">{{ offer.label }}</div>
-  <h1 class="pf-h1" style="margin:6px 0 4px">Save your spot. We'll call you.</h1>
-  <p style="color:var(--pf-text-2);margin:0 0 16px">{{ offer.class_line }}. Leave your details and the gym will call you to answer your questions and get you started. No payment here.</p>
+  <h1 class="pf-h1" style="margin:6px 0 4px">Save {{ "their" if offer.kids else "your" }} spot. We'll call you.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 14px">{{ offer.class_line }}. Leave your details and the gym will call you to answer your questions and {{ "book their first class" if offer.waiver and offer.kids else ("book your first class" if offer.waiver else "get you started") }}.</p>
+  <div style="background:var(--pf-ink);color:#fff;border-radius:var(--pf-r-md);padding:14px 16px;margin:0 0 16px;font-weight:800;font-size:clamp(1.25rem,5vw,1.6rem);line-height:1.2;text-align:center">No card details needed.</div>
 
   {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
   <form method="post" novalidate>
@@ -25,7 +26,7 @@
       {% else %}
       <div class="pf-field"><label class="pf-label">Date of birth</label><input class="pf-input" name="dob" type="date" required value="{{ form.dob }}" autocomplete="bday" /></div>
       {% endif %}
-      <div class="pf-field"><label class="pf-label">Email <span style="color:var(--pf-text-3);font-weight:400">(optional)</span></label><input class="pf-input" name="email" type="email" value="{{ form.email }}" autocomplete="email" /></div>
+      <div class="pf-field"><label class="pf-label">Email{% if not offer.waiver %} <span style="color:var(--pf-text-3);font-weight:400">(optional)</span>{% endif %}</label><input class="pf-input" name="email" type="email" {% if offer.waiver %}required{% endif %} value="{{ form.email }}" autocomplete="email" /></div>
       <div class="pf-field" style="margin-bottom:6px"><label class="pf-label">Class</label><div style="padding:11px 14px;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);background:var(--pf-paper-2);font-weight:700">{{ offer.label }}<br /><span style="font-weight:400;color:var(--pf-text-2);font-size:14px">{{ offer.class_line }}</span></div></div>
     </div>
 
@@ -36,11 +37,40 @@
         <label style="border:1.5px solid var(--pf-ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13.5px;cursor:pointer;background:#fff"><input type="checkbox" name="times" value="{{ value }}" style="margin-right:6px" {% if value in times %}checked{% endif %} />{{ label }}</label>
         {% endfor %}
       </div>
-      <label class="pf-check" style="margin-top:12px"><input type="checkbox" name="sms_ok" value="1" /> <span class="t">OK to text me (for example, your sign-up link after the call)</span></label>
+      <label class="pf-check" style="margin-top:12px"><input type="checkbox" name="sms_ok" value="1" /> <span class="t">OK to text me</span></label>
     </div>
 
+    {% if offer.waiver %}
+    <div class="pf-panel" id="waiver-panel">
+      <h2>Waiver</h2>
+      <p class="note">So {{ "they're" if offer.kids else "you're" }} ready for {{ "their" if offer.kids else "your" }} first class. Open and read each section; the box unlocks once all three have been opened.</p>
+      {% for title, body in waiver_sections %}
+      <details class="waiver-sec" style="border:1px solid var(--pf-line);border-radius:var(--pf-r-md);margin-bottom:8px;background:var(--pf-paper-2)">
+        <summary style="cursor:pointer;padding:13px 16px;font-weight:700;font-size:15px;color:var(--pf-ink)">{{ title }}</summary>
+        <div style="padding:0 16px 14px;font-size:13.5px;line-height:1.65;color:var(--pf-text-2);white-space:pre-line">{{ body }}</div>
+      </details>
+      {% endfor %}
+      <label class="pf-check" style="margin-top:14px"><input type="checkbox" name="waiver_agree" value="1" id="waiver-agree" disabled /> <span class="t">I have read and agree to the waiver{% if offer.kids %} for my child{% endif %} <em id="waiver-hint" style="color:var(--pf-text-3);font-style:normal;font-size:13px">(open all three sections above first)</em></span></label>
+      <div class="pf-field" style="margin:14px 0 0"><label class="pf-label">Type your full legal name to sign</label><input class="pf-input" name="signature" required value="{{ form.signature }}" autocomplete="off" /></div>
+    </div>
+    {% endif %}
+
     <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Call me back</button>
-    <p class="note" style="text-align:center;margin-top:10px;color:var(--pf-text-3)">Takes 30 seconds. Rather call now? <a href="tel:+17783846284">(778) 384-6284</a></p>
+    <p class="note" style="text-align:center;margin-top:10px;color:var(--pf-text-3)">Rather call now? <a href="tel:+17783846284">(778) 384-6284</a></p>
   </form>
 </div>
+{% if offer.waiver %}
+<script>
+  (function () {
+    var secs = document.querySelectorAll('.waiver-sec'), box = document.getElementById('waiver-agree'), hint = document.getElementById('waiver-hint');
+    var opened = new Set();
+    secs.forEach(function (d, i) {
+      d.addEventListener('toggle', function () {
+        if (d.open) opened.add(i);
+        if (opened.size === secs.length) { box.disabled = false; if (hint) hint.style.display = 'none'; }
+      });
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

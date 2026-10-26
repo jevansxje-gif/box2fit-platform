@@ -36,6 +36,10 @@
           <span class="stars">★★★★★</span>
           <span><b>{{ google_rating }}</b> · {{ google_review_count }} Google reviews</span>
         </div>
+        {% if call_first %}
+        <div style="background:#fff;color:var(--pf-ink);border-radius:var(--pf-r-md);padding:14px 18px;margin:16px 0 6px;font-weight:800;font-size:clamp(1.35rem,4vw,1.9rem);line-height:1.15;display:inline-block">No card details needed.</div>
+        <p style="color:var(--pf-on-dark-2);margin:6px 0 4px;font-size:15.5px">Leave your name and number. The gym calls you and books their first class.</p>
+        {% endif %}
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ book_url }}">{{ book_cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">Limited spots per class</span>

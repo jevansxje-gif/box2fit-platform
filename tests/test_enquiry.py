@@ -20,7 +20,7 @@ def test_adult_short_form_to_paid(app, client, client_account):
 
     r = client.get("/start/challenge")
     assert r.status_code == 200 and b"Date of birth" in r.data and b"5-Week Guided Boxing Challenge" in r.data
-    assert b"No payment here" in r.data
+    assert b"No card details needed." in r.data
 
     base = {"first_name": "Dana", "last_name": "Lee", "phone": "604-555-0199"}
     r = client.post("/start/challenge", data=base)
@@ -85,27 +85,113 @@ def test_adult_short_form_to_paid(app, client, client_account):
     assert b"Call-first short form" in r.data and b"Dana Lee" in r.data
 
 
-def test_kids_f2_gets_short_form_f5_keeps_booking(app, client, client_account):
+def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account):
+    from datetime import timedelta
+
+    from app.models import AttendeeProfile, WaiverSignature
+    from app.services import enquiry as enq_svc
+    from app.services.tzutil import today_local
+
+    _staff_alerts_on()
     r = client.get("/kids?v=f5&utm_source=meta&utm_campaign=families&utm_content=families-f5")
     assert b"Book their free week" in r.data and b"/start/kids" not in r.data
     client = app.test_client()  # a different parent, who clicked F2
     r = client.get("/kids?utm_source=meta&utm_campaign=families&utm_content=families-f2")
-    assert b'href="/start/kids">Save their free week' in r.data
+    assert b'href="/start/kids">Save their free week' in r.data and b"No card details needed." in r.data
 
     r = client.get("/start/kids")
-    assert b"Child&#39;s date of birth" in r.data or b"Child's date of birth" in r.data
-    r = client.post("/start/kids", data={"first_name": "Pat", "last_name": "Singh", "phone": "604 555 0100",
-                                         "child_first_name": "Ravi", "child_dob": "2018-05-01"})
+    assert b"No card details needed." in r.data and b"waiver-agree" in r.data
+    base = {"first_name": "Pat", "last_name": "Singh", "phone": "604 555 0100", "email": "pat@example.com",
+            "child_first_name": "Ravi", "child_dob": "2018-05-01"}
+    r = client.post("/start/kids", data=base)
+    assert b"tick the box" in r.data and db.session.query(Enquiry).count() == 0
+    r = client.post("/start/kids", data={**base, "waiver_agree": "1", "signature": "Pat Singh"})
     assert r.status_code == 302
     e = db.session.query(Enquiry).one()
-    assert e.offer == "kids" and e.child_first_name == "Ravi" and e.dob is None
-    assert e.utm_content == "families-f2"
+    assert e.offer == "kids" and e.child_first_name == "Ravi" and e.utm_content == "families-f2"
+    child = db.session.get(AttendeeProfile, e.attendee_id)
+    assert child.first_name == "Ravi" and child.kind == "child" and child.user_id == e.user_id
+    assert db.session.query(WaiverSignature).filter_by(attendee_id=child.id).count() == 1
+    r = client.get("/start/kids/thanks")
+    assert b"waiver is signed" in r.data and b"Already decided" not in r.data
+    assert enq_svc.stage(e) == "to_call"
 
-    # fast path from the thank-you page goes to the kids booking, filled in
-    from app.services.signed_links import SALT_ENQUIRY, make_token
+    staff = _admin(app)
+    assert b"Pat Singh" in staff.get("/ops/calls").data
+    # booked on the phone for a class still to come
+    future = today_local() + timedelta(days=2)
+    staff.post(f"/ops/calls/{e.id}/book", data={"booked_for": future.isoformat()})
+    db.session.refresh(e)
+    assert enq_svc.stage(e) == "booked" and b"Pat Singh" in staff.get("/ops/calls?show=booked").data
+    # after the class it moves to To pay
+    e.booked_for = today_local() - timedelta(days=1)
+    db.session.commit()
+    assert enq_svc.stage(e) == "to_pay" and b"Pat Singh" in staff.get("/ops/calls?show=to_pay").data
 
-    r = client.get(f"/s/{make_token(e.id, SALT_ENQUIRY)}")
-    assert r.headers["Location"].endswith("/book/kids")
+    staff.post(f"/ops/calls/{e.id}/send-card", data={"show": "to_pay"})
+    db.session.refresh(e)
+    assert e.card_sent_at is not None
+    msg = db.session.query(Message).filter_by(template="enquiry_card_link").one()
+    assert msg.recipient == "pat@example.com"
+    link = enq_svc.card_link(e)
+    assert "/membership/start/" in link  # the membership card form, billing after the free week
+
+    # card added -> membership pending -> Paid
+    from app.models import Subscription as Sub
+    from app.services.billing import default_plan
+
+    plan = default_plan(client_account.id)
+    db.session.add(Sub(client_account_id=client_account.id, user_id=e.user_id, attendee_id=child.id,
+                       plan_id=plan.id, status="pending", mrr_cents=plan.price_cents))
+    db.session.commit()
+    assert enq_svc.stage(e) == "paid"
+    assert b"Pat Singh" in staff.get("/ops/calls?show=paid").data
+
+
+def test_bootcamp_page_form_book_card_paid(app, client, client_account):
+    from datetime import timedelta
+
+    from app.models import WaiverSignature
+    from app.services import challenge as ch
+    from app.services import enquiry as enq_svc
+    from app.services.signed_links import SALT_ENQUIRY_PAY, make_token
+    from app.services.tzutil import today_local
+
+    _staff_alerts_on()
+    r = client.get("/bootcamp-7pm?utm_source=meta&utm_campaign=bootcamp&utm_content=bootcamp-b1")
+    assert r.status_code == 200 and b"No card details needed." in r.data and b'href="/start/bootcamp"' in r.data
+    assert b"7 pm" in r.data and b"$249 + GST for the five weeks" in r.data and b"November 2" in r.data
+
+    data = {"first_name": "Jo", "last_name": "Park", "phone": "604-555-0111", "email": "jo@example.com",
+            "dob": "1990-02-02", "waiver_agree": "1", "signature": "Jo Park"}
+    r = client.post("/start/bootcamp", data={**data, "email": ""})
+    assert b"enter your email" in r.data
+    r = client.post("/start/bootcamp", data=data)
+    assert r.status_code == 302
+    e = db.session.query(Enquiry).one()
+    assert e.offer == "bootcamp" and e.user_id and e.attendee_id and e.utm_content == "bootcamp-b1"
+    assert db.session.query(WaiverSignature).filter_by(attendee_id=e.attendee_id).count() == 1
+    assert db.session.query(Message).filter_by(template="admin_new_enquiry").count() == 1
+
+    staff = _admin(app)
+    staff.post(f"/ops/calls/{e.id}/book", data={"booked_for": today_local().isoformat()})
+    db.session.refresh(e)
+    assert enq_svc.stage(e) == "to_pay"  # class is today: card link can go out after it
+    staff.post(f"/ops/calls/{e.id}/send-card")
+    db.session.refresh(e)
+    assert e.card_sent_at and "/p/" in enq_svc.card_link(e)
+
+    # the card link (no Stripe in tests: the spot is held locally)
+    r = client.get(f"/p/{make_token(e.id, SALT_ENQUIRY_PAY)}")
+    assert r.status_code == 200 and b"You're in" in r.data
+    sub = db.session.query(Subscription).filter_by(user_id=e.user_id).one()
+    assert sub.challenge_key == ch.BOOTCAMP["key"]
+    sub.activated_at = utcnow()
+    db.session.commit()
+    assert enq_svc.stage(e) == "paid"
+    r = staff.get("/ops/marketing?c=bootcamp")
+    assert b"Boot camp 7 pm" in r.data and b"Jo Park" in r.data
+    assert client.get(f"/p/{make_token(999, SALT_ENQUIRY_PAY)}").status_code == 404
 
 
 def test_short_form_rejects_bad_input(app, client, client_account):

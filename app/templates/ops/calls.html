@@ -4,17 +4,18 @@
 {% block content %}
 <div class="ops-shell" style="max-width:1000px">
   {{ ops_nav() }}
-  <div style="display:flex;justify-content:space-between;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:6px">
-    <h1 class="pf-h1" style="margin:0">Call list</h1>
-    <div style="display:flex;gap:8px">
-      <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == 'open' else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show='open') }}">To call</a>
-      <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == 'all' else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show='all') }}">Everyone</a>
-    </div>
+  <h1 class="pf-h1" style="margin:0 0 6px">Call list</h1>
+  <p class="note" style="color:var(--pf-text-2);margin:0 0 14px">Everyone who asked for a call from the ads, by step. <b>To call</b>: ring them and book their first class. <b>Booked</b>: first class still to come. <b>To pay</b>: class done, send the card link. <b>Paid</b>: card added and paid (kids: card on file for after the free week).</p>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    {% for key, label in stages %}
+    <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == key else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show=key) }}">{{ label }} <span style="opacity:.7">({{ counts[key] }})</span></a>
+    {% endfor %}
+    <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == 'all' else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.calls', show='all') }}">Everyone</a>
   </div>
-  <p class="note" style="color:var(--pf-text-2);margin:0 0 16px">People who asked for a call from the ads. Call them, note what happened, and when they agree to sign up press <b>Send sign-up link</b>: it texts or emails a link that takes them to payment with their details filled in.</p>
 
   {% if not rows %}
-  <div class="pf-panel"><p style="margin:0">{{ "Nobody waiting for a call." if show == 'open' else "No call-back requests yet." }}</p></div>
+  <div class="pf-panel"><p style="margin:0">Nobody here right now.</p></div>
   {% endif %}
 
   {% for r in rows %}{% set e = r.e %}
@@ -24,27 +25,44 @@
         <div style="font-weight:800;font-size:17px">{{ e.name }}{% if r.age is not none %} <span style="font-weight:400;color:var(--pf-text-2)">({{ r.age }})</span>{% endif %}</div>
         {% if e.child_first_name %}<div style="color:var(--pf-text-2)">For {{ e.child_first_name }}{% if r.child_age is not none %}, age {{ r.child_age }}{% endif %}</div>{% endif %}
         <div style="margin-top:4px"><a href="tel:{{ e.phone }}" style="font-weight:800;color:var(--pf-red)">{{ e.phone }}</a>{% if e.email %} · {{ e.email }}{% endif %}</div>
-        <div style="color:var(--pf-text-2);font-size:14px;margin-top:4px">{{ r.offer }} · best time: {{ e.best_time or "any" }} · {{ "OK to text" if e.sms_ok else "no texts" }}</div>
-        <div style="color:var(--pf-text-3);font-size:13px">Asked {{ r.asked }} · from {{ r.ad }}{% if e.link_sent_at %} · link sent {{ e.link_sent_at.strftime('%b %d') }}{% endif %}</div>
+        <div style="color:var(--pf-text-2);font-size:14px;margin-top:4px">{{ r.offer }} · best time: {{ e.best_time or "any" }} · {{ "OK to text" if e.sms_ok else "no texts" }}{% if r.waiver %} · <b style="color:#1F7A3D">waiver signed</b>{% endif %}</div>
+        <div style="color:var(--pf-text-3);font-size:13px">Asked {{ r.asked }} · from {{ r.ad }}{% if e.booked_for %} · first class {{ e.booked_for.strftime('%a %b %d') }}{% endif %}{% if e.card_sent_at %} · card link sent {{ e.card_sent_at.strftime('%b %d') }}{% endif %}{% if e.link_sent_at %} · sign-up link sent {{ e.link_sent_at.strftime('%b %d') }}{% endif %}</div>
       </div>
       <div>
-        {% if r.outcome == 'paid' %}<span class="pf-badge" style="background:#1F7A3D;color:#fff;padding:5px 10px;border-radius:999px;font-weight:800">Paid</span>
-        {% elif r.outcome == 'booked' %}<span class="pf-badge" style="background:#1F7A3D;color:#fff;padding:5px 10px;border-radius:999px;font-weight:800">Booked</span>
-        {% else %}<span style="padding:5px 10px;border-radius:999px;font-weight:700;border:1px solid var(--pf-line)">{{ dict(statuses)[e.status] }}</span>{% endif %}
+        {% set badge = dict(stages)[r.stage] %}
+        <span style="padding:5px 10px;border-radius:999px;font-weight:800;{% if r.stage == 'paid' %}background:#1F7A3D;color:#fff{% elif r.stage == 'to_pay' %}background:var(--pf-red);color:#fff{% else %}border:1px solid var(--pf-line){% endif %}">{{ badge }}</span>
       </div>
     </div>
 
+    {% if r.stage != 'paid' %}
     <form method="post" action="{{ url_for('ops_admin.call_update', enquiry_id=e.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="show" value="{{ show }}" />
-      <select class="pf-input" name="status" style="min-width:200px">
+      <select class="pf-input" name="status" style="min-width:180px">
         {% for value, label in statuses %}<option value="{{ value }}" {% if e.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
       <input class="pf-input" name="notes" value="{{ e.notes or '' }}" placeholder="Notes from the call" style="flex:1;min-width:220px" />
       <button class="pf-btn pf-btn--dark pf-btn--sm">Save</button>
     </form>
 
-    {% if not r.outcome %}
+    {% if r.waiver %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+      <form method="post" action="{{ url_for('ops_admin.call_book', enquiry_id=e.id) }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="show" value="{{ show }}" />
+        <label class="pf-label" style="margin:0;font-size:13px">First class</label>
+        <input class="pf-input" type="date" name="booked_for" value="{{ e.booked_for.isoformat() if e.booked_for else '' }}" style="width:170px" />
+        <button class="pf-btn pf-btn--dark pf-btn--sm">{{ "Change date" if e.booked_for else "Booked" }}</button>
+      </form>
+      {% if e.booked_for %}
+      <form method="post" action="{{ url_for('ops_admin.call_send_card', enquiry_id=e.id) }}" style="display:flex;gap:8px;align-items:center">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="show" value="{{ show }}" />
+        <button class="pf-btn pf-btn--primary pf-btn--sm">{{ "Send card link again" if e.card_sent_at else "Send card link" }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
     <form method="post" action="{{ url_for('ops_admin.call_send_link', enquiry_id=e.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="show" value="{{ show }}" />
@@ -53,6 +71,7 @@
       <button class="pf-btn pf-btn--primary pf-btn--sm">Send sign-up link</button>
       <input class="pf-input" value="{{ r.link }}" readonly onclick="this.select()" title="Or copy and send it yourself" style="flex:1;min-width:200px;font-size:12px;color:var(--pf-text-3)" />
     </form>
+    {% endif %}
     {% endif %}
   </div>
   {% endfor %}

@@ -27,6 +27,11 @@
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
           <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ b.spots }} spots · coached, small group</span>
         </div>
+        {# Same offer as the 6 am challenge (owner 2026-10-26). #}
+        <ul class="included" aria-label="Included">
+          <li><b>Your own gloves and hand wraps</b><span>fitted on day one, yours to keep</span></li>
+          <li><b>A one-to-one session with your coach</b><span>your goals and your starting point</span></li>
+        </ul>
       </div>
       <div class="hero-media">
         <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Boot camp at Box2Fit White Rock">
@@ -54,6 +59,20 @@
     </div>
   </section>
 
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">What's included</div>
+        <h2>Everything you need to start, and a reason to finish.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">1</div><h3 style="margin:8px 0 6px">A one-to-one session with your coach</h3><p style="color:var(--pf-text-2);margin:0">Just you and your coach: your goals for the five weeks, your starting point, and a first round on the pads at your pace.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">5</div><h3 style="margin:8px 0 6px">Five weeks of coached sessions</h3><p style="color:var(--pf-text-2);margin:0">{{ b.class_days }} at {{ b.class_time.replace(':00', '') }}, 60 minutes, with the same coach and the same small group. Come to as many as you can.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">✓</div><h3 style="margin:8px 0 6px">Gloves and hand wraps, yours to keep</h3><p style="color:var(--pf-text-2);margin:0">Your own pair of gloves and hand wraps, fitted on day one. Bring water and runners; we have the rest.</p></div>
+      </div>
+    </div>
+  </section>
+
   <section class="section" style="background:var(--pf-paper-2)">
     <div class="wrap">
       <div class="section-head">
@@ -63,7 +82,7 @@
       <div class="faq">
         <details open><summary>I haven't trained in years. Is this for me?</summary><p>Yes. Your coach scales every round up or down, so you start where you are.</p></details>
         <details><summary>Will I get hit?</summary><p>No. There's no sparring and no head contact. You work on pads and bags with a coach.</p></details>
-        <details><summary>What do I need to bring?</summary><p>Water and runners. Gloves and wraps are provided.</p></details>
+        <details><summary>What do I need to bring?</summary><p>Water and runners. Your own gloves and hand wraps are included, and they're yours to keep.</p></details>
         <details><summary>Why do you need my details now?</summary><p>So the gym can call you and book your first class, and so your waiver is done before you arrive. No card details are taken until after your first class, and only if you want to keep going.</p></details>
       </div>
     </div>

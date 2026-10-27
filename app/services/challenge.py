@@ -58,8 +58,9 @@ SHEHITS_INTRO = {
 }
 # 7 pm boot camp test (owner 2026-10-26). Call-first: contact details and
 # waiver on the short form, the gym books the first class by phone, and the
-# card link is emailed after that class. PRICE, DAYS, START AND SPOTS ARE
-# PLACEHOLDERS copied from the 6 am challenge until the gym confirms them.
+# card link is emailed after that class. Same offer as the 6 am challenge
+# (owner 2026-10-26): price, renewal, gloves + wraps to keep, one-to-one
+# session. Days and start date still to confirm with the gym.
 BOOTCAMP = {
     "key": "bootcamp7-2026-11-02",
     "name": "5-Week Boot Camp, 7 pm",
@@ -72,7 +73,7 @@ BOOTCAMP = {
     "class_days": "Monday to Friday",
     "reminder_hours": 72,
     "cohort_label": "Boot Camp · 7 pm",
-    "description": "Five weeks of coached boot camp at 7 pm, gloves and wraps provided.",
+    "description": "Five weeks of coached boot camp at 7 pm, gloves, wraps and one personal training session.",
 }
 OFFERS = {CHALLENGE["key"]: CHALLENGE, SHEHITS_INTRO["key"]: SHEHITS_INTRO, BOOTCAMP["key"]: BOOTCAMP}
 BLOCK_OFFERS = (CHALLENGE["key"], BOOTCAMP["key"])  # renew in 5-week blocks, not into the membership

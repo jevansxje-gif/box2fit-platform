@@ -6,7 +6,7 @@
     {% if paid %}
       <div class="pf-kicker">{{ b.name }}</div>
       <div class="big">You're in{% if guardian %}, {{ guardian.name.split(' ')[0] }}{% endif %}.</div>
-      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Your five weeks are paid. Classes run {{ b.class_days }} at {{ b.class_time }}, 1522 Finlay St, Unit 216, White Rock. Free underground parking; gloves and wraps provided.</p>
+      <p style="margin:18px 0 4px;color:var(--pf-text-2)">Your five weeks are paid. Classes run {{ b.class_days }} at {{ b.class_time }}, 1522 Finlay St, Unit 216, White Rock. Free underground parking. Your gloves and hand wraps (yours to keep) are fitted at your first class, and your coach will book your one-to-one session.</p>
       <p style="margin:12px 0 4px;color:var(--pf-text-3);font-size:14px">A confirmation is on its way by email. It carries on in five-week blocks at {{ renew_total }} including GST from {{ b.renew.strftime('%B') }} {{ b.renew.day }}, unless you cancel before then; we'll remind you three days ahead with a one-click cancel link.</p>
     {% else %}
       <div class="pf-kicker">Almost there</div>

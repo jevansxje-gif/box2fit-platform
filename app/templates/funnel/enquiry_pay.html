@@ -8,7 +8,7 @@
   <p style="color:var(--pf-text-2);margin:0 0 16px">{{ b.class_days }} at {{ b.class_time }}. Agree to the terms below, then add your card on Stripe's secure page.</p>
   <div class="pf-panel" style="border:2px solid var(--pf-ink)">
     <h2>What you pay</h2>
-    <p style="margin:0 0 8px"><strong>Today: {{ price_total }}</strong> ({{ price }} + GST) for the five weeks.</p>
+    <p style="margin:0 0 8px"><strong>Today: {{ price_total }}</strong> ({{ price }} + GST) for the five weeks, your one-to-one session, and your gloves and hand wraps to keep.</p>
     <p style="margin:0 0 8px"><strong>From {{ b.renew.strftime('%A, %B') }} {{ b.renew.day }}: {{ renew_total }}</strong> including GST for each next five-week block, unless you cancel before then.</p>
     <p class="note" style="margin:0">We'll email and text a reminder three days before, with a one-click cancel link.</p>
   </div>

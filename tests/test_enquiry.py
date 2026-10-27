@@ -221,3 +221,29 @@ def test_short_form_rejects_bad_input(app, client, client_account):
     assert b"email doesn" in r.data
     assert db.session.query(Enquiry).count() == 0
     assert client.get("/start/nonsense").status_code == 404
+
+
+def test_repeat_submit_keeps_one_row(app, client, client_account):
+    """A double tap (owner 2026-10-27) must not put the same person on the
+    Call list twice, or send the gym a second alert."""
+    from app.models import WaiverSignature
+
+    _staff_alerts_on()
+    data = {"first_name": "Jo", "last_name": "Park", "phone": "604-555-0111", "email": "jo@example.com",
+            "dob": "1990-02-02", "waiver_agree": "1", "signature": "Jo Park"}
+    assert client.post("/start/bootcamp", data=data).status_code == 302
+    r = client.post("/start/bootcamp", data={**data, "phone": "+1 (604) 555-0111", "times": "evening", "sms_ok": "1"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/start/bootcamp/thanks")
+    e = db.session.query(Enquiry).one()
+    assert e.best_time == "After work (5 to 7)" and e.sms_ok
+    assert db.session.query(WaiverSignature).filter_by(attendee_id=e.attendee_id).count() == 1
+    assert db.session.query(Message).filter_by(template="admin_new_enquiry").count() == 1
+    assert b"Thanks, Jo" in client.get("/start/bootcamp/thanks").data
+
+    # a different class, or after 'Not interested', is a new row
+    client.post("/start/challenge", data={k: data[k] for k in ("first_name", "last_name", "phone", "dob")})
+    assert db.session.query(Enquiry).count() == 2
+    e.status = "not_interested"
+    db.session.commit()
+    client.post("/start/bootcamp", data=data)
+    assert db.session.query(Enquiry).filter_by(offer="bootcamp").count() == 2

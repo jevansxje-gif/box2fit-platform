@@ -56,9 +56,15 @@
     </div>
     {% endif %}
 
-    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit">Call me back</button>
+    <button class="pf-btn pf-btn--primary pf-btn--lg pf-btn--block" type="submit" id="enquiry-submit">Call me back</button>
   </form>
 </div>
+<script>
+  // One tap sends it once (a double tap put people on the Call list twice).
+  document.getElementById('enquiry-submit').form.addEventListener('submit', function () {
+    var b = document.getElementById('enquiry-submit'); setTimeout(function () { b.disabled = true; b.textContent = 'Sending…'; }, 0);
+  });
+</script>
 {% if offer.waiver %}
 <script>
   (function () {

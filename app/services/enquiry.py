@@ -123,6 +123,32 @@ def digits(phone: str) -> str:
     return "".join(c for c in phone or "" if c.isdigit())
 
 
+DUPLICATE_WINDOW_DAYS = 30
+
+
+def find_repeat(client_id: int, offer: str, phone: str, child_first_name: str | None = None) -> Enquiry | None:
+    """The same person sending the form again (a double tap, or back for
+    another go): same phone and class, still on the Call list. Kids also
+    match on the child, so a second child is a second row."""
+    want = digits(phone)[-10:]
+    since = utcnow() - timedelta(days=DUPLICATE_WINDOW_DAYS)
+    rows = (
+        db.session.query(Enquiry)
+        .filter(Enquiry.client_account_id == client_id, Enquiry.offer == offer,
+                Enquiry.status != "not_interested", Enquiry.created_at >= since)
+        .order_by(Enquiry.created_at.desc())
+        .all()
+    )
+    child = (child_first_name or "").strip().lower()
+    for e in rows:
+        if digits(e.phone)[-10:] != want:
+            continue
+        if child and (e.child_first_name or "").strip().lower() != child:
+            continue
+        return e
+    return None
+
+
 def outcome(enq: Enquiry) -> str | None:
     """'paid' once it's real: an adult intro/boot camp subscription paid, or
     (kids) a membership set up with a card, billing after the free week."""

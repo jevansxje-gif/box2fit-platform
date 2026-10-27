@@ -1352,6 +1352,23 @@ def enquiry_start(offer: str):
             error = "Please enter your child's first name and date of birth."
         elif o["waiver"] and (not request.form.get("waiver_agree") or not form["signature"]):
             error = "Please open and read each section, tick the box and type your full name to sign."
+        repeat = None
+        if error is None:
+            repeat = enq_svc.find_repeat(client.id, offer, form["phone"], form["child_first_name"] if o["kids"] else None)
+        if repeat is not None:
+            # Sent twice (owner 2026-10-27: a double submit put one person on
+            # the Call list twice). Keep the first row and its ad; take any
+            # new details; no second alert.
+            labels = dict(TIME_SLOTS)
+            best = ", ".join(labels[t] for t in times if t in labels)[:200]
+            if best:
+                repeat.best_time = best
+            if email and not repeat.email:
+                repeat.email = email
+            repeat.sms_ok = repeat.sms_ok or bool(request.form.get("sms_ok"))
+            db.session.commit()
+            session["enquiry_done"] = repeat.id
+            return redirect(url_for("funnel.enquiry_thanks", offer=offer))
         if error is None:
             touch = read_first_touch(request) or {}
             labels = dict(TIME_SLOTS)

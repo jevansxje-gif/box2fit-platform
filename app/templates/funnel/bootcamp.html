@@ -4,6 +4,8 @@
    Price, days, start and spots come from challenge.BOOTCAMP (placeholders
    until the gym confirms). #}
 {% set cta = "Save my spot" %}
+{# No price on this page (owner 2026-10-26): the gym talks price on the call;
+   it is shown on the payment link page. #}
 
 {% block title %}{{ b.name }} — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Five weeks of coached boot camp at 7 pm, {{ b.class_days }}, in a small group of {{ b.spots }}. Box2Fit White Rock. No card details needed to save your spot.{% endblock %}
@@ -23,7 +25,7 @@
         <p style="color:var(--pf-on-dark-2);margin:6px 0 16px;font-size:15.5px">Leave your name and number. The gym calls you and books your first class.</p>
         <div class="hero-cta">
           <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
-          <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ b.spots }} spots · {{ price }} + GST for five weeks</span>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">{{ b.spots }} spots · coached, small group</span>
         </div>
       </div>
       <div class="hero-media">
@@ -52,19 +54,6 @@
     </div>
   </section>
 
-  <section class="section" style="background:#fff;border-top:1px solid var(--pf-line);border-bottom:1px solid var(--pf-line)">
-    <div class="wrap" style="max-width:820px">
-      <div class="pf-kicker">The price, plainly</div>
-      <h2 style="margin:8px 0 12px;font-weight:800;letter-spacing:-.02em;font-size:clamp(1.4rem,2.8vw,1.9rem)">{{ price }} + GST for the five weeks.</h2>
-      <div class="pf-card pf-card--pad">
-        <p style="margin:0 0 8px"><strong>Today:</strong> nothing. No card details needed to save your spot.</p>
-        <p style="margin:0 0 8px"><strong>After your first class:</strong> {{ price_total }} ({{ price }} + GST) for the five weeks, if you want to keep going. You add your card from the link we email you.</p>
-        <p style="margin:0;color:var(--pf-text-2)">After the five weeks it carries on in five-week blocks at {{ renew_total }} including GST, unless you cancel before then. We email and text you three days before, with a one-click cancel link.</p>
-      </div>
-      <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}" style="margin-top:18px">{{ cta }}</a>
-    </div>
-  </section>
-
   <section class="section" style="background:var(--pf-paper-2)">
     <div class="wrap">
       <div class="section-head">
@@ -87,7 +76,7 @@
       <div class="pf-kicker" style="color:rgba(255,255,255,.85)">Starts {{ b.start.strftime('%A, %B') }} {{ b.start.day }} · {{ b.class_time }}</div>
       <h2>{{ b.spots }} spots. No card details needed.</h2>
       <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
-      <div class="fine">{{ price }} + GST for five weeks, paid after your first class · 1522 Finlay St, White Rock</div>
+      <div class="fine">No card details needed · 1522 Finlay St, White Rock</div>
     </div>
   </section>
 {% endblock %}

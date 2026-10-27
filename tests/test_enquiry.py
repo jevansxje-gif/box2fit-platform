@@ -93,7 +93,7 @@ def test_kids_f6_waiver_first_then_card_after_class(app, client, client_account)
     from app.services.tzutil import today_local
 
     _staff_alerts_on()
-    for ad in ("f5", "f2"):  # these keep booking the free week with a card
+    for ad in ("f2", "f5"):  # these keep booking the free week with a card
         r = app.test_client().get(f"/kids?v={ad}&utm_source=meta&utm_campaign=families&utm_content=families-{ad}")
         assert b"Book their free week" in r.data and b"/start/kids" not in r.data
     client = app.test_client()  # a different parent, who clicked F6

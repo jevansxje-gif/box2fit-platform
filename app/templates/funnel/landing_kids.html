@@ -11,8 +11,8 @@
   {"key": "f6", "q": "Won't it make them rougher?", "a": "The research says the opposite: structured combat-sport training makes kids calmer and better at self-control. Every session is rules, focus and discipline.", "proof": "A review of 12 studies found less aggression after martial-arts training, across ages and genders."},
   {"key": "f7", "q": "What if 4 pm doesn't work?", "a": "Tell us which time would, at the bottom of this page. If enough parents ask for the same slot, we open it.", "proof": "Class times are set by what people ask for."},
 ] %}
-{# F6 is the F5 video with the no-card link, so it opens on F5's message. #}
-{% set hero_obj = objections | selectattr('key', 'equalto', 'f5' if variant == 'f6' else variant) | first %}
+{# F6 is the F2 video with the no-card link, so it opens on F2's message. #}
+{% set hero_obj = objections | selectattr('key', 'equalto', 'f2' if variant == 'f6' else variant) | first %}
 
 {% block title %}Kids Boxing — Box2Fit White Rock{% endblock %}
 {% block meta_description %}Confidence, focus, and real skills for kids ages 6 to 10. Their first week is free at Box2Fit White Rock.{% endblock %}

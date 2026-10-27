@@ -70,8 +70,8 @@ OFFERS = {
 }
 
 # Kids ads that get the call-first form (no card) instead of the free-week
-# booking. F6 is a copy of the F5 video with only the link changed, so F5
-# (card) vs F6 (no card) tests the flow, not the creative (owner 2026-10-26).
+# booking. F6 is a copy of the F2 kids video with only the link changed, so
+# F2 (card) vs F6 (no card) tests the flow, not the creative (owner 2026-10-26).
 KIDS_CALL_FIRST_VARIANTS = {"f6"}
 
 

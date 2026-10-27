@@ -31,11 +31,12 @@
     </div>
 
     <div class="pf-panel">
-      <h2 style="margin:0 0 4px">Best time to call <span style="color:var(--pf-text-3);font-weight:400;font-size:15px">(optional)</span></h2>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px">
-        {% for value, label in time_slots %}
-        <label style="border:1.5px solid var(--pf-ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13.5px;cursor:pointer;background:#fff"><input type="checkbox" name="times" value="{{ value }}" style="margin-right:6px" {% if value in times %}checked{% endif %} />{{ label }}</label>
-        {% endfor %}
+      <div class="pf-field" style="margin-bottom:4px">
+        <label class="pf-label" for="best-time">Best time to call <span style="color:var(--pf-text-3);font-weight:400">(optional)</span></label>
+        <select class="pf-input" id="best-time" name="times">
+          <option value="">Any time</option>
+          {% for value, label in time_slots %}<option value="{{ value }}" {% if value in times %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
       </div>
       <label class="pf-check" style="margin-top:12px"><input type="checkbox" name="sms_ok" value="1" /> <span class="t">OK to text me</span></label>
     </div>

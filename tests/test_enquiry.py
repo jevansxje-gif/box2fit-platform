@@ -26,11 +26,11 @@ def test_adult_short_form_to_paid(app, client, client_account):
     r = client.post("/start/challenge", data=base)
     assert b"date of birth" in r.data and db.session.query(Enquiry).count() == 0
 
-    r = client.post("/start/challenge", data={**base, "dob": "1984-03-09", "times": ["evening", "late"], "sms_ok": "1"})
+    r = client.post("/start/challenge", data={**base, "dob": "1984-03-09", "times": "evening", "sms_ok": "1"})
     assert r.status_code == 302 and r.headers["Location"].endswith("/start/challenge/thanks")
     e = db.session.query(Enquiry).one()
     assert e.offer == "challenge" and e.name == "Dana Lee" and e.email is None and e.sms_ok
-    assert e.utm_content == "guided-g4" and e.best_time == "After work (5 to 7), Later evening (7 to 9)"
+    assert e.utm_content == "guided-g4" and e.best_time == "After work (5 to 7)"
     alert = db.session.query(Message).filter_by(template="admin_new_enquiry").one()
     assert alert.recipient == "frankie@example.com"
 

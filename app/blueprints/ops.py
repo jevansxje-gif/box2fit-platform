@@ -83,7 +83,7 @@ def login():
             login_user(user)
             if user.role == Role.trainer.value:
                 return redirect(url_for("ops.coach"))
-            return redirect(url_for("ops.today"))
+            return redirect(url_for("ops_admin.calls"))
         flash("Invalid email or password.", "error")
     return render_template("ops/login.html", form=form)
 
@@ -171,6 +171,12 @@ def coach():
 
 
 @bp.get("/")
+@desk_required
+def home():
+    """Staff home is the Call list (owner 2026-10-26)."""
+    return redirect(url_for("ops_admin.calls"))
+
+
 @bp.get("/today")
 @desk_required
 def today():

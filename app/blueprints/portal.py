@@ -89,7 +89,7 @@ def _home_url(user) -> str:
     if user.role == Role.trainer.value:
         return url_for("ops.coach")
     if user.role in STAFF_ROLES:
-        return url_for("ops.today")
+        return url_for("ops_admin.calls")
     return url_for("portal.dashboard")
 
 

@@ -1,6 +1,9 @@
 {% macro ops_nav() %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
-  {% for ep, label in [('ops.today','Today'), ('ops_admin.live_schedule','Schedule'), ('ops_admin.schedule_builder','Builder'), ('ops_admin.calls','Call list'), ('ops_admin.members','Members'), ('ops_admin.trainers','Trainers'), ('ops_admin.announcements','Announce'), ('ops_admin.reviews','Reviews'), ('ops_admin.reports','Reports'), ('ops_admin.payments','Payments'), ('ops_admin.marketing','Marketing'), ('ops.kiosk','Kiosk')] %}
+  {# Owner 2026-10-26: the gym only uses these four. The other screens
+     (Today, Schedule, Builder, Trainers, Announce, Reviews, Reports, Kiosk)
+     still work at their addresses; they're just off the menu. #}
+  {% for ep, label in [('ops_admin.calls','Call list'), ('ops_admin.members','Members'), ('ops_admin.payments','Payments'), ('ops_admin.marketing','Marketing')] %}
   <a href="{{ url_for(ep) }}" class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if request.endpoint == ep else 'pf-btn--ghost' }}">{{ label }}</a>
   {% endfor %}
 </div>

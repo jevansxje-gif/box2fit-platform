@@ -9,7 +9,6 @@
     {% if offer.waiver %}
     <p style="margin:12px 0 4px;color:var(--pf-text-2)">Your waiver is signed, so {{ e.child_first_name or "you" }} can go straight into class. No card details are needed now; after the first class the gym will email you a link if you'd like to keep going.</p>
     {% endif %}
-    <p style="margin:12px 0 4px;color:var(--pf-text-2)">Want to talk sooner? Call <a href="tel:+17783846284">{{ gym_phone }}</a>.</p>
     {% if ready_url %}<p style="margin:22px 0 4px;color:var(--pf-text-3);font-size:14px">Already decided? <a href="{{ ready_url }}">{{ offer.pay_cta }}</a></p>{% endif %}
   </div>
 </div>

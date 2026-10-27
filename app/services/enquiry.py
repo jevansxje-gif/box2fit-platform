@@ -69,14 +69,15 @@ OFFERS = {
     },
 }
 
-# Kids ads that get the call-first form instead of the free-week booking
-# (test against F5, which keeps booking directly).
-KIDS_CALL_FIRST_VARIANTS = {"f2"}
+# Kids ads that get the call-first form (no card) instead of the free-week
+# booking. F6 is a copy of the F5 video with only the link changed, so F5
+# (card) vs F6 (no card) tests the flow, not the creative (owner 2026-10-26).
+KIDS_CALL_FIRST_VARIANTS = {"f6"}
 
 
 def kids_call_first(v: str | None, utm_content: str | None) -> bool:
-    """The kids page shows the short form for the F2 ad (?v=f2 or
-    utm_content=families-f2)."""
+    """The kids page shows the short form for the F6 ad (?v=f6 or
+    utm_content=families-f6)."""
     codes = {(v or "").lower(), (utm_content or "").rsplit("-", 1)[-1].lower()}
     return bool(codes & KIDS_CALL_FIRST_VARIANTS)
 

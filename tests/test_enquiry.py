@@ -85,7 +85,7 @@ def test_adult_short_form_to_paid(app, client, client_account):
     assert b"Call-first short form" in r.data and b"Dana Lee" in r.data
 
 
-def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account):
+def test_kids_f6_waiver_first_then_card_after_class(app, client, client_account):
     from datetime import timedelta
 
     from app.models import AttendeeProfile, WaiverSignature
@@ -93,10 +93,11 @@ def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account)
     from app.services.tzutil import today_local
 
     _staff_alerts_on()
-    r = client.get("/kids?v=f5&utm_source=meta&utm_campaign=families&utm_content=families-f5")
-    assert b"Book their free week" in r.data and b"/start/kids" not in r.data
-    client = app.test_client()  # a different parent, who clicked F2
-    r = client.get("/kids?utm_source=meta&utm_campaign=families&utm_content=families-f2")
+    for ad in ("f5", "f2"):  # these keep booking the free week with a card
+        r = app.test_client().get(f"/kids?v={ad}&utm_source=meta&utm_campaign=families&utm_content=families-{ad}")
+        assert b"Book their free week" in r.data and b"/start/kids" not in r.data
+    client = app.test_client()  # a different parent, who clicked F6
+    r = client.get("/kids?utm_source=meta&utm_campaign=families&utm_content=families-f6")
     assert b'href="/start/kids">Save their free week' in r.data and b"No card details needed." in r.data
 
     r = client.get("/start/kids")
@@ -109,7 +110,7 @@ def test_kids_f2_waiver_first_then_card_after_class(app, client, client_account)
     r = client.post("/start/kids", data={**base, "waiver_agree": "1", "signature": "Pat Singh"})
     assert r.status_code == 302
     e = db.session.query(Enquiry).one()
-    assert e.offer == "kids" and e.child_first_name == "Ravi" and e.utm_content == "families-f2"
+    assert e.offer == "kids" and e.child_first_name == "Ravi" and e.utm_content == "families-f6"
     child = db.session.get(AttendeeProfile, e.attendee_id)
     assert child.first_name == "Ravi" and child.kind == "child" and child.user_id == e.user_id
     sig = db.session.query(WaiverSignature).filter_by(attendee_id=child.id).one()

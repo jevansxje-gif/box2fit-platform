@@ -60,13 +60,13 @@ SHEHITS_INTRO = {
 # waiver on the short form, the gym books the first class by phone, and the
 # card link is emailed after that class. Same offer as the 6 am challenge
 # (owner 2026-10-26): price, renewal, gloves + wraps to keep, one-to-one
-# session. Days and start date still to confirm with the gym.
+# session. Days (Mon to Fri) still to confirm with the gym.
 BOOTCAMP = {
-    "key": "bootcamp7-2026-11-02",
+    "key": "bootcamp7-2026-11-09",
     "name": "5-Week Boot Camp, 7 pm",
-    "start": date(2026, 11, 2),       # first class (Monday)
-    "end": date(2026, 12, 4),         # last class (Friday)
-    "renew": date(2026, 12, 7),       # next 5-week block from here
+    "start": date(2026, 11, 9),       # first class (Monday); owner 2026-10-26: two weeks out, ads run now
+    "end": date(2026, 12, 11),        # last class (Friday)
+    "renew": date(2026, 12, 14),      # next 5-week block from here
     "price_cents": 24900,             # pre-tax, charged when they add the card
     "spots": 12,
     "class_time": "7:00 pm",

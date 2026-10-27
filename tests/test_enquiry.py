@@ -174,7 +174,7 @@ def test_bootcamp_page_form_book_card_paid(app, client, client_account):
     _staff_alerts_on()
     r = client.get("/bootcamp-7pm?utm_source=meta&utm_campaign=bootcamp&utm_content=bootcamp-b1")
     assert r.status_code == 200 and b"No card details needed." in r.data and b'href="/start/bootcamp"' in r.data
-    assert b"7 pm" in r.data and b"$249" not in r.data and b"November 2" in r.data  # no price until the call
+    assert b"7 pm" in r.data and b"$249" not in r.data and b"November 9" in r.data  # no price until the call
     assert b"yours to keep" in r.data and b"one-to-one session with your coach" in r.data
 
     data = {"first_name": "Jo", "last_name": "Park", "phone": "604-555-0111", "email": "jo@example.com",

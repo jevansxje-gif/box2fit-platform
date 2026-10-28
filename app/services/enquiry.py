@@ -57,6 +57,7 @@ OFFERS = {
         "back": ("funnel.landing_kids", {}),
         "kids": True,
         "waiver": True,
+        "membership": True,  # card goes on the monthly membership form
         "free_days": 7,  # membership billing starts after the free week
     },
     "bootcamp": {
@@ -66,6 +67,19 @@ OFFERS = {
         "back": ("funnel.bootcamp_landing", {}),
         "kids": False,
         "waiver": True,
+    },
+    # Walk-in boxing circuit (owner 2026-10-27): waiver up front so they can
+    # walk straight in; after the first visit the card link starts the
+    # $189/month membership (12 Rounds plus every class, all three gyms).
+    "rounds": {
+        "label": "12 Rounds",
+        "class_line": "Walk in Monday to Friday, 8 to 11 am · coaches on the floor",
+        "pay": None,  # card email after the first visit (membership form)
+        "back": ("funnel.rounds_landing", {}),
+        "kids": False,
+        "waiver": True,
+        "membership": True,
+        "next_step": "set up your first visit",  # walk-in: no class to book
     },
 }
 
@@ -154,7 +168,7 @@ def outcome(enq: Enquiry) -> str | None:
     (kids) a membership set up with a card, billing after the free week."""
     if not enq.user_id:
         return None
-    if enq.offer == "kids":
+    if OFFERS.get(enq.offer, {}).get("membership"):
         sub = (
             db.session.query(Subscription)
             .filter(
@@ -192,8 +206,9 @@ def stage(enq: Enquiry, won: str | None = None) -> str:
 
 def card_link(enq: Enquiry) -> str | None:
     """The 'add your card' link for waiver-first offers: the terms page,
-    then the card (boot camp checkout or the kids membership form)."""
-    if enq.offer in ("bootcamp", "kids") and enq.attendee_id:
+    then the card (boot camp checkout, or the membership form for kids and
+    12 Rounds)."""
+    if OFFERS.get(enq.offer, {}).get("waiver") and enq.attendee_id:
         return absolute_url("funnel.enquiry_pay", token=make_token(enq.id, SALT_ENQUIRY_PAY))
     return None
 
@@ -207,8 +222,8 @@ def first_bill_date(enq: Enquiry) -> date | None:
 
 
 def membership_link(enq: Enquiry) -> str:
-    """Kids: the existing membership card form, billing from the end of
-    the free week."""
+    """Kids and 12 Rounds: the existing membership card form. Kids bill
+    from the end of the free week; 12 Rounds from today."""
     from .billing import default_plan
 
     plan = default_plan(enq.client_account_id)

@@ -247,3 +247,45 @@ def test_repeat_submit_keeps_one_row(app, client, client_account):
     db.session.commit()
     client.post("/start/bootcamp", data=data)
     assert db.session.query(Enquiry).filter_by(offer="bootcamp").count() == 2
+
+
+def test_twelve_rounds_page_form_card(app, client, client_account):
+    """12 Rounds (owner 2026-10-27): walk-in circuit page -> short form with
+    waiver -> Call list -> card link after the first visit -> membership."""
+    from app.models import WaiverSignature
+    from app.services import enquiry as enq_svc
+    from app.services.signed_links import SALT_ENQUIRY_PAY, make_token
+    from app.services.tzutil import today_local
+
+    _staff_alerts_on()
+    r = client.get("/12-rounds?utm_source=meta&utm_campaign=rounds&utm_content=rounds-r1")
+    assert r.status_code == 200 and b'href="/start/rounds"' in r.data and b"No card details needed." in r.data
+    assert b"8 and 11 am" in r.data and b"Langley" in r.data and b"November 9" in r.data
+    assert "—".encode() not in r.data.split(b"<body")[1]  # no em dashes in the page copy
+
+    r = client.get("/start/rounds")
+    assert b"set up your first visit" in r.data and b"Waiver" in r.data
+    data = {"first_name": "Sam", "last_name": "Ortiz", "phone": "604-555-0123", "email": "sam@example.com",
+            "dob": "1985-05-05", "waiver_agree": "1", "signature": "Sam Ortiz"}
+    assert client.post("/start/rounds", data=data).status_code == 302
+    e = db.session.query(Enquiry).one()
+    assert e.offer == "rounds" and e.attendee_id and e.utm_content == "rounds-r1"
+    assert db.session.query(WaiverSignature).filter_by(attendee_id=e.attendee_id).count() == 1
+    alert = db.session.query(Message).filter_by(template="admin_new_enquiry").one()
+    assert "12 Rounds" in alert.subject
+
+    staff = _admin(app)
+    assert b"Sam Ortiz" in staff.get("/ops/calls").data
+    staff.post(f"/ops/calls/{e.id}/book", data={"booked_for": today_local().isoformat()})
+    db.session.refresh(e)
+    assert enq_svc.stage(e) == "to_pay"
+    staff.post(f"/ops/calls/{e.id}/send-card")
+    db.session.refresh(e)
+    assert e.card_sent_at and "/p/" in enq_svc.card_link(e)
+
+    tok = make_token(e.id, SALT_ENQUIRY_PAY)
+    r = client.get(f"/p/{tok}")
+    assert r.status_code == 200 and b"Keep training, Sam." in r.data and b"$189" in r.data
+    r = client.post(f"/p/{tok}", data={"terms_agree": "1", "signature": "Sam Ortiz"})
+    assert r.status_code == 302 and "/membership/start/" in r.headers["Location"]
+    assert staff.get("/ops/marketing?c=rounds").status_code == 200

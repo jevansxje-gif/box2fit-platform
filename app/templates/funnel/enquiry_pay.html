@@ -12,6 +12,15 @@
     <p style="margin:0 0 8px"><strong>From {{ b.renew.strftime('%A, %B') }} {{ b.renew.day }}: {{ renew_total }}</strong> including GST for each next five-week block, unless you cancel before then.</p>
     <p class="note" style="margin:0">We'll email and text a reminder three days before, with a one-click cancel link.</p>
   </div>
+  {% elif e.offer == 'rounds' %}
+  <div class="pf-kicker" style="color:var(--pf-red)">12 Rounds</div>
+  <h1 class="pf-h1" style="margin:6px 0 4px">Keep training, {{ e.first_name }}.</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">Walk in Monday to Friday, 8 to 11 am, and book any class at White Rock, Langley or Cloverdale. Agree to the terms below, then add your card.</p>
+  <div class="pf-panel" style="border:2px solid var(--pf-ink)">
+    <h2>What you pay</h2>
+    <p style="margin:0 0 8px"><strong>{{ member_total }}</strong> ({{ member_price }} + GST) a month, starting today and on the same day each month, unless you cancel.</p>
+    <p class="note" style="margin:0">12 Rounds and every class at all three gyms.</p>
+  </div>
   {% else %}
   <div class="pf-kicker" style="color:var(--pf-red)">Kids Boxing</div>
   <h1 class="pf-h1" style="margin:6px 0 4px">Keep {{ e.child_first_name }}'s spot.</h1>

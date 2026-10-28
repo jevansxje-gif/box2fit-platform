@@ -4,6 +4,8 @@
     <h1 style="margin:0 0 8px;font-size:22px;color:#14161A">Thanks for coming in, {{ e.first_name }}.</h1>
     {% if e.offer == 'bootcamp' %}
     <p style="font-size:15px;line-height:1.6;margin:0 0 10px">To keep your place in the {{ offer.label }}, add your card here. It's {{ "$%.2f"|format(bootcamp.price_cents / 100) }} + GST for the five weeks, {{ bootcamp.class_days }} at {{ bootcamp.class_time }}.</p>
+    {% elif e.offer == 'rounds' %}
+    <p style="font-size:15px;line-height:1.6;margin:0 0 10px">To keep coming to 12 Rounds, add your card here. Your membership covers 12 Rounds (walk in Monday to Friday, 8 to 11 am) and every class at White Rock, Langley and Cloverdale.</p>
     {% else %}
     <p style="font-size:15px;line-height:1.6;margin:0 0 10px">To keep {{ e.child_first_name }}'s place in Kids Boxing after the free week, add your card here. Nothing is charged until {% if first_bill %}{{ first_bill.strftime('%A, %B ') ~ first_bill.day }}{% else %}the free week ends{% endif %}, and we'll remind you before then.</p>
     {% endif %}

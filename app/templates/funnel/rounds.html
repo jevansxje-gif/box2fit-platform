@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{# 12 Rounds (owner 2026-10-27): walk-in boxing circuit at White Rock.
+   12 stations, 2:00 work / 0:30 move, 30 minutes, Mon to Fri 8 to 11 am,
+   from the week of Nov 9. Call-first: short form + waiver, the gym calls,
+   card link after the first visit starts the $189/month membership
+   (12 Rounds plus every class at all three gyms). The ads end on
+   health.box2fit.com/12-rounds. #}
+{% set cta = "Save my spot" %}
+
+{% block title %}12 Rounds · Box2Fit White Rock{% endblock %}
+{% block meta_description %}12 Rounds at Box2Fit White Rock: a walk-in boxing circuit. 12 stations, 2 minutes each, done in 30 minutes. Monday to Friday, 8 to 11 am. No class times.{% endblock %}
+{% block og_image %}{{ config.SITE_BASE_URL.rstrip('/') }}{{ url_for('static', filename='video/hero-beast.jpg') }}{% endblock %}
+{% block body_class %}has-mobile-cta{% endblock %}
+
+{% block header_cta %}<a class="pf-btn pf-btn--primary" href="{{ cta_url }}">{{ cta }}</a>{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="pf-kicker" style="color:var(--pf-red-bright)">New in White Rock · 12 Rounds · From the week of November 9</div>
+        <h1>12 rounds. 30 minutes. <span class="accent">No class times.</span></h1>
+        <p class="sub">A boxing circuit you walk into: 12 stations of boxing, strength, cardio and core. Two minutes at each, 30 seconds to move to the next. Come in any time between 8 and 11 am, Monday to Friday, start at the next open station, and you're done in 30 minutes. Or stay for the full hour.</p>
+        <div style="background:#fff;color:var(--pf-ink);border-radius:var(--pf-r-md);padding:14px 18px;margin:18px 0 6px;font-weight:800;font-size:clamp(1.35rem,4vw,1.9rem);line-height:1.15;display:inline-block">No card details needed.</div>
+        <p style="color:var(--pf-on-dark-2);margin:6px 0 16px;font-size:15.5px">Leave your name and number. The gym calls you and sets up your first visit.</p>
+        <div class="hero-cta">
+          <a class="pf-btn pf-btn--primary pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
+          <span class="pf-trust" style="color:var(--pf-on-dark-2)">Coaches on the floor · all fitness levels</span>
+        </div>
+        <ul class="included" aria-label="Included">
+          <li><b>12 Rounds, any weekday morning</b><span>walk in between 8 and 11 am</span></li>
+          <li><b>Every class at all three gyms</b><span>White Rock, Langley and Cloverdale</span></li>
+        </ul>
+      </div>
+      <div class="hero-media">
+        <video autoplay muted loop playsinline preload="metadata" poster="{{ url_for('static', filename='video/hero-beast.jpg') }}" aria-label="Training at Box2Fit White Rock">
+          <source src="{{ url_for('static', filename='video/hero-beast.mp4') }}" type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <div class="time-strip">
+    <div class="wrap"><span>Walk in Monday to Friday, 8 to 11 am · from the week of November 9 · 1522 Finlay St, White Rock</span></div>
+  </div>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">How 12 Rounds works</div>
+        <h2>A full-body workout in 30 minutes.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">12</div><h3 style="margin:8px 0 6px">Stations</h3><p style="color:var(--pf-text-2);margin:0">Each one is a different exercise: bags and pads, strength, cardio and core.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">2:00</div><h3 style="margin:8px 0 6px">Work per round</h3><p style="color:var(--pf-text-2);margin:0">Give it everything for two minutes. Your coach shows you the move and keeps you going.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">0:30</div><h3 style="margin:8px 0 6px">Rest and move</h3><p style="color:var(--pf-text-2);margin:0">Thirty seconds to breathe and step to the next station. Twelve rounds and you're done.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Getting started</div>
+        <h2>Three steps. Nothing to pay until you've tried it.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">1</div><h3 style="margin:8px 0 6px">Save your spot</h3><p style="color:var(--pf-text-2);margin:0">Your name, number, email and date of birth, and sign the waiver. About a minute. No card details.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">2</div><h3 style="margin:8px 0 6px">The gym calls you</h3><p style="color:var(--pf-text-2);margin:0">They answer your questions and set up your first visit.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">3</div><h3 style="margin:8px 0 6px">Walk in and train</h3><p style="color:var(--pf-text-2);margin:0">Come in any weekday morning between 8 and 11. Afterwards we email you a link to keep going.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--pf-paper-2)">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">One membership</div>
+        <h2>{{ member_price }} a month + GST. All of it.</h2>
+      </div>
+      <div class="cards-3">
+        <div class="pf-card pf-card--pad"><div class="bnum">✓</div><h3 style="margin:8px 0 6px">12 Rounds, every weekday</h3><p style="color:var(--pf-text-2);margin:0">Walk in Monday to Friday between 8 and 11 am. Do 30 minutes, or stay for the full hour.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">✓</div><h3 style="margin:8px 0 6px">Every class, too</h3><p style="color:var(--pf-text-2);margin:0">Book any Box2Fit class at White Rock, Langley or Cloverdale on the same membership.</p></div>
+        <div class="pf-card pf-card--pad"><div class="bnum">✓</div><h3 style="margin:8px 0 6px">Coaches on the floor</h3><p style="color:var(--pf-text-2);margin:0">Guidance, technique and motivation every round, whatever your fitness level.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="pf-kicker">Before you sign up</div>
+        <h2>Questions, answered.</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>I've never boxed. Is this for me?</summary><p>Yes. No experience needed. Your coach shows you each station and scales it to where you are, whether you're a beginner, getting back into shape or looking for a harder workout.</p></details>
+        <details><summary>Will I get hit?</summary><p>No. There's no sparring and no contact. You work on bags, pads and fitness stations.</p></details>
+        <details><summary>Do I have to arrive at a set time?</summary><p>No. Come in any time between 8 and 11 am, Monday to Friday, and start at the next open station. Thirty minutes for all 12 rounds, or stay longer if you like.</p></details>
+        <details><summary>What does it cost?</summary><p>{{ member_price }} a month + GST{% if member_total %} ({{ member_total }} in total){% endif %}. It includes 12 Rounds and every class at White Rock, Langley and Cloverdale. No card details are taken until after your first visit, and only if you want to keep going.</p></details>
+        <details><summary>When does it start?</summary><p>The week of November 9. Save your spot now and the gym will call you before then.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="pf-kicker" style="color:rgba(255,255,255,.85)">From the week of November 9 · Monday to Friday, 8 to 11 am</div>
+      <h2>Walk in. Get it done.</h2>
+      <a class="pf-btn pf-btn--light pf-btn--lg" href="{{ cta_url }}">{{ cta }}</a>
+      <div class="fine">No card details needed · 1522 Finlay St, Unit 216, White Rock</div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block after_body %}
+<div class="mobile-cta pf-sticky">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ cta_url }}">{{ cta }}</a>
+</div>
+{% endblock %}

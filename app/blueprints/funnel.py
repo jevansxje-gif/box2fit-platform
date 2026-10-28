@@ -1514,7 +1514,7 @@ def enquiry_pay(token: str):
 
     eid = read_token(token, SALT_ENQUIRY_PAY)
     e = db.session.get(Enquiry, eid) if eid else None
-    if e is None or e.offer not in ("bootcamp", "kids") or not e.attendee_id:
+    if e is None or not enq_svc.OFFERS.get(e.offer, {}).get("waiver") or not e.attendee_id:
         abort(404)
     guardian = db.session.get(User, e.user_id)
     attendee = db.session.get(AttendeeProfile, e.attendee_id)
@@ -1528,7 +1528,7 @@ def enquiry_pay(token: str):
         else:
             booking_flow.sign_waiver(attendee, guardian, signature)  # the full document: release + terms
             db.session.commit()
-            if e.offer == "kids":
+            if enq_svc.OFFERS[e.offer].get("membership"):
                 return redirect(enq_svc.membership_link(e))
             return _bootcamp_checkout(guardian, attendee)
     plan = __import__("app.services.billing", fromlist=["default_plan"]).default_plan(e.client_account_id)
@@ -1550,6 +1550,25 @@ def _bootcamp_checkout(guardian, attendee):
     ch._local_sub(attendee, None, ch.BOOTCAMP)  # Stripe not configured (dev/test)
     db.session.commit()
     return render_template("funnel/bootcamp_done.html", paid=True, guardian=guardian, **_bootcamp_ctx())
+
+
+@bp.get("/12-rounds")
+def rounds_landing():
+    """12 Rounds (owner 2026-10-27): a walk-in boxing circuit, 12 stations,
+    2 minutes on / 30 seconds to move, Mon to Fri 8 to 11 am. Call-first
+    short form with the waiver; the membership card link after the first
+    visit."""
+    from ..services.billing import default_plan
+    from ..services.tax import fmt_cents, total_with_gst_cents
+
+    plan = default_plan(get_client().id)
+    resp = make_response(render_template(
+        "funnel/rounds.html", cta_url=url_for("funnel.enquiry_start", offer="rounds"), slug="12-rounds",
+        member_price=fmt_cents(plan.price_cents) if plan else "$189",
+        member_total=fmt_cents(total_with_gst_cents(plan.price_cents)) if plan else "",
+    ))
+    capture_first_touch(request, resp, landing_variant=f"rounds:{request.args.get('v', 'a')[:20]}")
+    return resp
 
 
 @bp.get("/bootcamp-7pm/done")

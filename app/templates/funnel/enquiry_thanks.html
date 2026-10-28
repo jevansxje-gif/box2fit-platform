@@ -5,7 +5,7 @@
   <div class="confirm-card">
     <div class="pf-kicker">{{ offer.label }}</div>
     <div class="big">Thanks, {{ e.first_name }}. The gym will call you.</div>
-    <p style="margin:18px 0 4px;color:var(--pf-text-2)">Expect a call within one business day{% if e.best_time %}, at the time you picked ({{ e.best_time | lower }}){% endif %}. They'll answer your questions{% if e.child_first_name %} about {{ e.child_first_name }}{% endif %} and {{ "book the first class" if offer.waiver else "get you set up" }}.</p>
+    <p style="margin:18px 0 4px;color:var(--pf-text-2)">Expect a call within one business day{% if e.best_time %}, at the time you picked ({{ e.best_time | lower }}){% endif %}. They'll answer your questions{% if e.child_first_name %} about {{ e.child_first_name }}{% endif %} and {{ offer.next_step or ("book the first class" if offer.waiver else "get you set up") }}.</p>
     {% if offer.waiver %}
     <p style="margin:12px 0 4px;color:var(--pf-text-2)">Your waiver is signed, so {{ e.child_first_name or "you" }} can go straight into class. No card details are needed now; after the first class the gym will email you a link if you'd like to keep going.</p>
     {% endif %}

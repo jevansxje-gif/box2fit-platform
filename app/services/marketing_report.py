@@ -65,6 +65,10 @@ CAMPAIGNS = {
                  "picker": [("GET", ("/start/bootcamp",))],
                  "details": [("POST", ("/start/bootcamp",))],
                  "paid": True, "call_offer": "bootcamp"},
+    "rounds": {"label": "12 Rounds", "landings": ("/12-rounds",),
+               "picker": [("GET", ("/start/rounds",))],
+               "details": [("POST", ("/start/rounds",))],
+               "paid": True, "call_offer": "rounds"},
     # August 2026 test, kept for the record
     "kids": {"label": "Kids (Aug)", "landings": ("/kids",),
              "picker": ("GET", ("/book/kids",)), "details": ("GET", ("/book/kids/details",)),

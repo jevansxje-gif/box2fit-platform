@@ -2185,3 +2185,33 @@ def test_marketing_page_reads_october_campaigns(app, client, client_account, tmp
     assert r.status_code == 200 and b"Families" in r.data and b"F2" in r.data
     r = staff.get("/ops/marketing?c=guided")
     assert b"Paid" in r.data and b"A4" in r.data and b"Gee Bee" in r.data
+
+
+def test_payments_already_paid_comes_off_owed(app, client, client_account):
+    """Owner 2026-11-04: record what the gym has already paid us; it is
+    taken off the commission earned to show what is still owed."""
+    from app.models import Payment
+
+    guardian, _child = _make_member(client_account, email="owed@example.com")
+    db.session.add(Payment(
+        client_account_id=client_account.id, user_id=guardian.id,
+        stripe_invoice_id="in_owed1", amount_cents=19845, tax_cents=945,
+        status="paid", agency_share_cents=4725,
+    ))
+    db.session.commit()
+    staff = _admin(app)
+    r = staff.get("/ops/payments")
+    assert b"Still owed to you" in r.data and b"$47.25" in r.data
+
+    r = staff.post("/ops/payments/received",
+                   data={"amount": "20.00", "paid_on": "2026-11-01", "note": "e-Transfer"},
+                   follow_redirects=True)
+    assert b"Recorded $20.00" in r.data
+    assert b"$27.25" in r.data and b"e-Transfer" in r.data
+
+    from app.models import CommissionPayout
+    row = db.session.query(CommissionPayout).one()
+    staff.post(f"/ops/payments/received/{row.id}/delete", follow_redirects=True)
+    r = staff.get("/ops/payments")
+    assert db.session.query(CommissionPayout).count() == 0
+    assert b"Already paid to you" in r.data

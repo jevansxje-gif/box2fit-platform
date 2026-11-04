@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% from "ops/_nav.html" import ops_nav %}
 {% block title %}Payments — Box2Fit Ops{% endblock %}
-{% block head %}<meta http-equiv="refresh" content="60" />{% endblock %}
+{% block head %}<script>
+  // Refresh every minute for new payments, but not while a form is open or being typed in.
+  setInterval(function () {
+    var open = Array.prototype.some.call(document.querySelectorAll('form[id]'), function (f) { return !f.hidden; });
+    if (!open && !(document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) location.reload();
+  }, 60000);
+</script>{% endblock %}
 {% block content %}
 <div class="ops-shell" style="max-width:1040px">
   {{ ops_nav() }}
@@ -104,6 +110,49 @@
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Collected (net of refunds)</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.collected) }}</div><div style="color:var(--pf-text-3);font-size:12.5px">{{ totals.paid }} successful payment(s)</div></div>
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-red)">Your commission (25%)</div><div style="font-size:26px;font-weight:800;color:var(--pf-red);font-variant-numeric:tabular-nums">${{ '%.2f'|format(totals.commission) }}</div></div>
     <div class="pf-card pf-card--pad"><div class="pf-kicker" style="color:var(--pf-text-3)">Needs attention</div><div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">{{ totals.failed }}</div><div style="color:var(--pf-text-3);font-size:12.5px">failed · {{ totals.refunded }} refunded</div></div>
+  </div>
+
+  {# What the gym has already paid us (owner 2026-11-04): comes off what's owed. #}
+  <div class="pf-card pf-card--pad" style="margin:0 0 16px">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end">
+      <div><div class="pf-kicker" style="color:var(--pf-text-3)">Commission earned (all time)</div><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${{ '{:,.2f}'.format(totals.earned) }}</div></div>
+      <div style="font-size:22px;color:var(--pf-text-3);padding-bottom:2px">−</div>
+      <div><div class="pf-kicker" style="color:var(--pf-text-3)">Already paid to you</div><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${{ '{:,.2f}'.format(totals.received) }}</div></div>
+      <div style="font-size:22px;color:var(--pf-text-3);padding-bottom:2px">=</div>
+      <div><div class="pf-kicker" style="color:var(--pf-red)">{{ 'Still owed to you' if totals.owed >= 0 else 'Paid ahead' }}</div><div id="owed-total" style="font-size:28px;font-weight:800;color:var(--pf-red);font-variant-numeric:tabular-nums">${{ '{:,.2f}'.format(totals.owed|abs) }}</div></div>
+      <button type="button" class="pf-btn pf-btn--dark pf-btn--sm" style="margin-left:auto" onclick="document.getElementById('received').hidden = !document.getElementById('received').hidden">+ Add a payment they made you</button>
+    </div>
+    <form id="received" method="post" action="{{ url_for('ops_admin.add_commission_payout') }}" hidden style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--pf-line)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div>
+        <label class="pf-label" style="font-size:12px">Amount they paid you ($)</label>
+        <input class="pf-input" name="amount" type="number" step="0.01" min="0.01" required placeholder="250.00" style="width:140px" />
+      </div>
+      <div>
+        <label class="pf-label" style="font-size:12px">Date paid</label>
+        <input class="pf-input" name="paid_on" type="date" value="{{ today }}" style="width:auto" />
+      </div>
+      <div style="flex:1;min-width:200px">
+        <label class="pf-label" style="font-size:12px">Note (optional)</label>
+        <input class="pf-input" name="note" maxlength="200" placeholder="e-Transfer, October commission" />
+      </div>
+      <button class="pf-btn pf-btn--dark pf-btn--sm">Save</button>
+    </form>
+    {% if payouts %}
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums;margin-top:14px">
+      <thead><tr style="text-align:left;color:var(--pf-text-3);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em"><th style="padding:6px 0">Paid to you on</th><th style="text-align:right">Amount</th><th style="padding-left:16px">Note</th><th></th></tr></thead>
+      <tbody>
+        {% for x in payouts %}
+        <tr style="border-top:1px solid #F0EEE9">
+          <td style="padding:8px 0;white-space:nowrap">{{ x.paid_on.strftime('%b %d, %Y') }}</td>
+          <td style="text-align:right;font-weight:700">${{ '{:,.2f}'.format(x.amount_cents / 100) }}</td>
+          <td style="padding-left:16px;color:var(--pf-text-2)">{{ x.note or '' }}</td>
+          <td style="text-align:right"><form method="post" action="{{ url_for('ops_admin.delete_commission_payout', payout_id=x.id) }}" style="display:inline" onsubmit="return confirm('Remove this payment? It will be added back to what is owed.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><button class="pf-btn pf-btn--ghost pf-btn--sm">Remove</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
   </div>
 
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">

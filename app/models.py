@@ -559,6 +559,24 @@ class Payment(db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+
+class CommissionPayout(db.Model):
+    """Money the gym has already paid us against our 25% commission
+    (owner 2026-11-04). Typed in on the Payments page; "still owed" is the
+    commission earned minus the sum of these."""
+
+    __tablename__ = "commission_payouts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_account_id: Mapped[int] = mapped_column(
+        ForeignKey("client_accounts.id"), index=True
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    paid_on: Mapped[date] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
 # --------------------------------------------------- comms, tracking, misc ---
 class EventOutbox(db.Model):
     __tablename__ = "events_outbox"

@@ -1639,9 +1639,30 @@ def payments():
         )
     }
     paid = [p for p in rows if p.status == "paid"]
+    # Commission owed is all-time, whatever filter is showing: everything
+    # earned on paid charges, less what the gym has already paid us.
+    from sqlalchemy import func
+
+    from ..models import CommissionPayout
+
+    earned_cents = (
+        db.session.query(func.coalesce(func.sum(Payment.agency_share_cents), 0))
+        .filter(Payment.client_account_id == _cid(), Payment.status == "paid")
+        .scalar()
+    )
+    payouts = (
+        db.session.query(CommissionPayout)
+        .filter(CommissionPayout.client_account_id == _cid())
+        .order_by(CommissionPayout.paid_on.desc(), CommissionPayout.id.desc())
+        .all()
+    )
+    received_cents = sum(x.amount_cents for x in payouts)
     totals = {
         "collected": sum(p.amount_cents - p.refunded_cents for p in paid) / 100,
         "commission": sum(p.agency_share_cents for p in paid) / 100,
+        "earned": earned_cents / 100,
+        "received": received_cents / 100,
+        "owed": (earned_cents - received_cents) / 100,
         "paid": len(paid),
         "failed": sum(1 for p in rows if p.status == "failed"),
         "refunded": sum(1 for p in rows if p.status == "refunded"),
@@ -1663,7 +1684,53 @@ def payments():
     return render_template(
         "ops/payments.html", rows=rows, members=members, totals=totals,
         status=status, invite_segments=AD_INVITE_SEGMENTS, one_offs=one_offs,
+        payouts=payouts, today=date.today().isoformat(),
     )
+
+
+@bp.post("/payments/received")
+@admin_required
+def add_commission_payout():
+    """Record money the gym has already paid us; it comes off "still owed"."""
+    from decimal import Decimal, InvalidOperation
+
+    from ..models import CommissionPayout
+
+    back = url_for("ops_admin.payments")
+    raw = (request.form.get("amount") or "").strip().replace("$", "").replace(",", "")
+    try:
+        cents = int((Decimal(raw) * 100).to_integral_value())
+    except (InvalidOperation, ValueError):
+        cents = 0
+    if cents < 1 or cents > 10_000_000:
+        flash("Enter the amount they paid you, e.g. 250.00.", "error")
+        return redirect(back)
+    try:
+        paid_on = date.fromisoformat(request.form.get("paid_on") or "")
+    except ValueError:
+        paid_on = date.today()
+    note = (request.form.get("note") or "").strip()[:200] or None
+    db.session.add(CommissionPayout(
+        client_account_id=_cid(), amount_cents=cents, paid_on=paid_on,
+        note=note, created_by=current_user.email,
+    ))
+    db.session.commit()
+    flash(f"Recorded ${cents / 100:,.2f} paid to you on {paid_on:%b %d}.", "success")
+    return redirect(back)
+
+
+@bp.post("/payments/received/<int:payout_id>/delete")
+@admin_required
+def delete_commission_payout(payout_id: int):
+    from ..models import CommissionPayout
+
+    row = db.session.get(CommissionPayout, payout_id)
+    if row is None or row.client_account_id != _cid():
+        abort(404)
+    db.session.delete(row)
+    db.session.commit()
+    flash("Removed that payment.", "success")
+    return redirect(url_for("ops_admin.payments"))
 
 
 @bp.get("/reports")

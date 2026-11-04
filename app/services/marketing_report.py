@@ -222,6 +222,26 @@ def db_funnel(client_account_id: int, campaign: str = DEFAULT_CAMPAIGN) -> dict:
             per_ad[ad]["attended"] += 1
         if lead.status == LeadStatus.activated.value:
             per_ad[ad]["activated"] += 1
+    # Call-first short forms are leads too (owner 2026-11-04: the boot camp
+    # tab said 0 with 9 people on the Call list). Skip anyone already
+    # counted through the booking form.
+    offer = CAMPAIGNS.get(campaign, {}).get("call_offer")
+    if offer:
+        from ..models import Enquiry
+        from . import enquiry as enq_svc
+
+        seen = {lead.user_id for lead in leads if lead.user_id}
+        for e in (
+            db.session.query(Enquiry)
+            .filter_by(client_account_id=client_account_id, offer=offer, utm_source="meta")
+            .all()
+        ):
+            if e.user_id and e.user_id in seen:
+                continue
+            a = per_ad[ad_label(e.utm_content)]
+            a["leads"] += 1
+            a["booked"] += 1 if e.booked_for else 0
+            a["paid"] += 1 if enq_svc.outcome(e) else 0
     totals = {
         k: sum(a[k] for a in per_ad.values())
         for k in ("leads", "booked", "paid", "attended", "activated")

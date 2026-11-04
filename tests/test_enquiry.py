@@ -289,3 +289,16 @@ def test_twelve_rounds_page_form_card(app, client, client_account):
     r = client.post(f"/p/{tok}", data={"terms_agree": "1", "signature": "Sam Ortiz"})
     assert r.status_code == 302 and "/membership/start/" in r.headers["Location"]
     assert staff.get("/ops/marketing?c=rounds").status_code == 200
+
+
+def test_marketing_counts_short_form_leads(app, client, client_account):
+    """Owner 2026-11-04: the boot camp tab showed 0 leads with 9 on the Call
+    list. Short-form sign-ups from ads count as leads on their tab."""
+    from app.services.marketing_report import db_funnel
+
+    client.get("/bootcamp-7pm?utm_source=meta&utm_campaign=bootcamp&utm_content=bootcamp-b2")
+    client.post("/start/bootcamp", data={"first_name": "Kim", "last_name": "Ray", "phone": "604-555-0177",
+                                         "email": "kim@example.com", "dob": "1980-01-01",
+                                         "waiver_agree": "1", "signature": "Kim Ray"})
+    f = db_funnel(client_account.id, "bootcamp")
+    assert f["totals"]["leads"] == 1 and f["totals"]["booked"] == 0

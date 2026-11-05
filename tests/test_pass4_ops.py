@@ -2342,3 +2342,42 @@ def test_email_status_furthest_step():
     assert email_status([m(failed_at=datetime(2026, 11, 1))])[0] == "Not delivered"
     assert email_status([m(opened_at=datetime(2026, 11, 1))])[0] == "Opened"
     assert email_status([m(clicked_at=datetime(2026, 11, 1)), m(sent_at=datetime(2026, 11, 3))])[0] == "Clicked"
+
+
+def test_row_payment_link_sends_the_right_link_and_moves_to_awaiting(
+    app, client, client_account, monkeypatch
+):
+    """Each row's button: membership link with no history, moving them to
+    Awaiting payment. Nothing starts, and no ad lead is invented for them."""
+    from app.models import Lead, Message, Subscription
+
+    u = User(client_account_id=client_account.id, email="row@example.com", name="Rowan Row",
+             role=Role.member.value)
+    db.session.add(u)
+    db.session.commit()
+    monkeypatch.setitem(app.config, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.messaging._send_via_brevo_api", lambda *a, **k: None)
+    monkeypatch.setattr("requests.get", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no network")))
+    staff = _admin(app)
+
+    page = staff.get("/ops/members?show=working").data
+    assert b"Send payment link" in page
+
+    r = staff.post(f"/ops/members/{u.id}/send-payment-link", data={"show": "working"},
+                   follow_redirects=True)
+    assert b"Payment link sent to row@example.com" in r.data
+    msg = db.session.query(Message).filter_by(recipient="row@example.com").one()
+    assert msg.template == "payment_link"
+    assert db.session.query(Subscription).filter_by(user_id=u.id).count() == 0
+    assert db.session.query(Lead).filter_by(user_id=u.id).count() == 0
+
+    page = staff.get("/ops/members?show=awaiting").data
+    assert b"row@example.com" in page and b"Resend payment link" in page
+
+    # A failed send says so.
+    def boom(*a, **k):
+        raise RuntimeError("down")
+    monkeypatch.setattr("app.services.messaging._send_via_brevo_api", boom)
+    r = staff.post(f"/ops/members/{u.id}/send-payment-link", follow_redirects=True)
+    assert b"failed to send" in r.data
+    assert staff.post("/ops/members/999999/send-payment-link").status_code == 404

@@ -115,6 +115,10 @@
     {% if i.section == 'working' and r.user.keep_working_until and r.user.keep_working_until >= today %}<span style="color:var(--pf-text-3);font-size:12.5px">kept until {{ r.user.keep_working_until.strftime('%b') }} {{ r.user.keep_working_until.day }}</span>{% endif %}
     {% if i.section != 'paying' %}
     <span class="ops-actions">
+      <form method="post" action="{{ url_for('ops_admin.member_send_payment_link', user_id=r.user.id) }}" data-msg="{{ 'Send another payment link to ' if i.payment_emails else 'Send a payment link to ' }}{{ r.user.name }}?" onsubmit="return confirm(this.dataset.msg)">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
+        <button class="pf-btn pf-btn--dark pf-btn--sm ops-action">{{ 'Resend payment link' if i.payment_emails else 'Send payment link' }}</button>
+      </form>
       {% if i.section != 'awaiting' %}
       <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='keep') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />

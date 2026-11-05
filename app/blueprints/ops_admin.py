@@ -948,6 +948,107 @@ def members():
     )
 
 
+@bp.post("/members/<int:user_id>/send-payment-link")
+@staff_required
+def member_send_payment_link(user_id: int):
+    """One button on a member's row. Sends the link that fits how they came
+    in: the Call list card link (right terms for boot camp or the kids' free
+    week), the after-class link once they've attended, otherwise the
+    membership link. Only sends an email: nothing starts or charges until
+    they add their card themselves."""
+    from ..models import AttendeeKind, AttendeeProfile, Enquiry, Message
+    from ..services import enquiry as enq_svc
+    from ..services.billing import default_plan
+    from ..services.email_tracking import PAYMENT_TEMPLATES
+    from ..services.messaging import send_email, send_sms
+    from ..services.signed_links import SALT_MEMBERSHIP_SETUP, make_payload_token
+    from ..services.tax import price_with_gst_label
+    from ..services.urls import absolute_url
+    from .ops import _send_post_class_email
+
+    u = db.session.get(User, user_id)
+    if u is None or u.client_account_id != _cid() or u.role != Role.member.value:
+        abort(404)
+    back = url_for(
+        "ops_admin.members", show=request.form.get("show") or None,
+        q=request.form.get("q") or None,
+    )
+    if _paying_subscription(u):
+        flash(f"{u.name} already has a membership.", "error")
+        return redirect(back)
+
+    enquiry = next(
+        (
+            e for e in db.session.query(Enquiry)
+            .filter_by(client_account_id=_cid(), user_id=u.id)
+            .order_by(Enquiry.created_at.desc())
+            if e.status != "not_interested" and enq_svc.card_link(e)
+        ),
+        None,
+    )
+    attendee_ids = [a.id for a in u.attendees] or [0]
+    bookings = (
+        db.session.query(Booking).join(ClassInstance)
+        .filter(Booking.attendee_id.in_(attendee_ids))
+        .order_by(ClassInstance.local_date.desc(), Booking.id.desc())
+        .all()
+    )
+    attended = next(
+        (b for b in bookings if b.status == BookingStatus.attended.value
+         and b.kind in ("trial", "walkin")),
+        None,
+    )
+    to_email = u.email
+    if enquiry:
+        to_email = enquiry.email or u.email
+        if not enq_svc.send_card_email(enquiry):
+            flash(f"Couldn't send a payment link to {u.name}: no email on file.", "error")
+            return redirect(back)
+    elif attended:
+        _send_post_class_email(attended, requested=True)
+    else:
+        plan = default_plan(_cid())
+        if plan is None:
+            flash("No active plan is configured to bill against.", "error")
+            return redirect(back)
+        attendee = bookings[0].attendee if bookings else (u.attendees[0] if u.attendees else None)
+        if attendee is None:
+            attendee = AttendeeProfile(
+                client_account_id=_cid(), user_id=u.id,
+                kind=AttendeeKind.self_.value, first_name=u.name.split(" ")[0],
+            )
+            db.session.add(attendee)
+            db.session.flush()
+        link = absolute_url(
+            "funnel.membership_pay",
+            token=make_payload_token(
+                {"aid": attendee.id, "plan": plan.id, "charge_on": None}, SALT_MEMBERSHIP_SETUP
+            ),
+        )
+        html = render_template(
+            "emails/payment_link.html", name=u.name,
+            price_label=price_with_gst_label(plan.price_cents), link=link,
+        )
+        send_email(u, u.email, "Set up your Box2Fit membership", html, "payment_link", _cid())
+        if u.phone and u.consent_sms:
+            send_sms(u, u.phone, f"Box2Fit: set up your membership payment here: {link}",
+                     "payment_link", _cid(), transactional=True)
+    db.session.flush()
+    sent = (
+        db.session.query(Message)
+        .filter(Message.recipient == to_email, Message.channel == "email",
+                Message.template.in_(PAYMENT_TEMPLATES))
+        .order_by(Message.id.desc())
+        .first()
+    )
+    db.session.commit()
+    if sent is None or sent.delivery_status.startswith("error"):
+        flash(f"The payment link to {to_email} failed to send. Try again in a moment.", "error")
+    else:
+        flash(f"Payment link sent to {to_email}. {u.name} is now in Awaiting payment.", "success")
+    return redirect(back)
+
+
 @bp.post("/members/<int:user_id>/section/<string:what>")
 @staff_required
 def member_section(user_id: int, what: str):

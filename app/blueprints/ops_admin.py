@@ -888,7 +888,6 @@ def call_send_link(enquiry_id: int):
 
 
 # ------------------------------------------------------- member directory ---
-NOSHOW_FLAG_THRESHOLD = 3  # no-shows in the last 60 days → "high no-show"
 
 
 @bp.get("/members")
@@ -1461,22 +1460,10 @@ def _member_row(u: User) -> dict:
         .all()
     )
     last_visit = attended[0].class_instance.local_date if attended else None
-    noshows_60d = (
-        db.session.query(Booking)
-        .join(ClassInstance)
-        .filter(
-            Booking.attendee_id.in_(ids),
-            Booking.status == BookingStatus.no_show.value,
-            ClassInstance.local_date >= today_local() - timedelta(days=60),
-        )
-        .count()
-    )
     lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
     flags = []
     if not attended:
         flags.append("first-timer")
-    if noshows_60d >= NOSHOW_FLAG_THRESHOLD:
-        flags.append("high no-show")
     return {
         "user": u,
         "status": status,

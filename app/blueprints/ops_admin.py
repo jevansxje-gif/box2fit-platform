@@ -1437,15 +1437,6 @@ def _paying_subscription(u: User) -> Subscription | None:
     )
 
 
-def _billed_by_payment_link(u: User) -> bool:
-    """Payment-link members take classes through the gym's own app, so our
-    visit count says nothing about whether they still come."""
-    return (
-        db.session.query(Lead.id).filter_by(user_id=u.id, utm_content="call-in").first()
-        is not None
-    )
-
-
 def _member_row(u: User) -> dict:
     subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
     status = "trial"
@@ -1484,11 +1475,6 @@ def _member_row(u: User) -> dict:
     flags = []
     if not attended:
         flags.append("first-timer")
-    elif last_visit and last_visit < today_local() - timedelta(days=14) and status in (
-        "active",
-        "pending",
-    ) and not _billed_by_payment_link(u):
-        flags.append("at-risk")
     if noshows_60d >= NOSHOW_FLAG_THRESHOLD:
         flags.append("high no-show")
     return {

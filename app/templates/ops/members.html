@@ -97,7 +97,10 @@
       {% endif %}
       {% if r.membership %}
       {% set s = r.membership %}
-      {% set next_charge = s.current_period_end or s.first_charge_at %}
+      {# The stored date can be the last charge (it isn't always rolled forward), so
+         only show it if it's still ahead. #}
+      {% set stored_charge = s.current_period_end or s.first_charge_at %}
+      {% set next_charge = stored_charge if stored_charge and stored_charge.date() >= today else None %}
       <span style="display:block;color:var(--pf-text-2);font-size:12.5px">{% if s.mrr_cents %}${{ '%.2f'|format(s.mrr_cents / 100) }} a month{% endif %}{% if s.mrr_cents and next_charge %} · {% endif %}{% if next_charge %}next charge {{ fmt_local(next_charge, '%b %d') }}{% endif %}</span>
       {% endif %}
     </a>

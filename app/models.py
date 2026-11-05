@@ -620,6 +620,11 @@ class Message(db.Model):
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     delivery_status: Mapped[str] = mapped_column(String(40), default="queued")
     unsubscribe_honored: Mapped[bool] = mapped_column(Boolean, default=False)
+    # From the email provider's event log (services/email_tracking.py).
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime)
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime)
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Call(db.Model):

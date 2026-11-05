@@ -156,3 +156,10 @@ img{ display:block; max-width:100%; }
 
 /* An inline display style must not beat the hidden attribute (toggled ops forms). */
 [hidden]{ display:none !important; }
+
+/* Stacked, left-aligned, equal-width action buttons (Members page). */
+.ops-actions{ display:flex; flex-direction:column; align-items:stretch; gap:6px; width:max-content; }
+.ops-actions form{ display:block; }
+.ops-actions .ops-action{ width:100%; justify-content:flex-start; text-align:left; cursor:pointer; box-shadow:0 2px 0 rgba(0,0,0,.25); transition:transform .08s ease, box-shadow .08s ease, background .08s ease; }
+.ops-actions .ops-action:hover{ background:var(--pf-red); border-color:var(--pf-red); color:#fff; transform:translateY(-1px); box-shadow:0 3px 6px rgba(0,0,0,.25); }
+.ops-actions .ops-action:active{ transform:translateY(1px); box-shadow:none; }

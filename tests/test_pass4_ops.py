@@ -2264,3 +2264,81 @@ def test_members_page_sections_search_and_overrides(app, client, client_account)
     staff.post(f"/ops/members/{old.id}/section/lapse", data={"show": "working"})
     assert b"oldie@example.com" in staff.get("/ops/members?show=lapsed").data
     assert staff.post("/ops/members/999999/section/keep").status_code == 404
+
+
+def test_tidied_duplicate_does_not_lapse_and_awaiting_payment_tracks_email(
+    app, client, client_account, monkeypatch
+):
+    """Judy's case: a duplicate marked not interested must not lapse someone
+    with an open Call list row. Once a payment email goes out they wait in
+    Awaiting payment, with opens and clicks from the provider's log."""
+    from datetime import date
+
+    from app.models import Enquiry, Message
+
+    u = User(client_account_id=client_account.id, email="judy@example.com", name="Judy Example",
+             role=Role.member.value)
+    db.session.add(u)
+    db.session.flush()
+    for status, booked in (("agreed", date(2026, 11, 3)), ("not_interested", None)):
+        db.session.add(Enquiry(
+            client_account_id=client_account.id, offer="challenge", first_name="Judy",
+            last_name="Example", phone="6045550111", email="judy@example.com",
+            status=status, user_id=u.id, booked_for=booked,
+        ))
+    db.session.commit()
+    staff = _admin(app)
+    assert b"judy@example.com" in staff.get("/ops/members?show=working").data
+    assert b"judy@example.com" not in staff.get("/ops/members?show=lapsed").data
+
+    # The Call list logs its email with no user; the address still links it.
+    sent = utcnow() - timedelta(hours=1)
+    db.session.add(Message(
+        client_account_id=client_account.id, user_id=None, channel="email",
+        template="enquiry_card_link", recipient="Judy@example.com",
+        subject="Box2Fit: add your card to keep your spot",
+        sent_at=sent, delivery_status="sent",
+    ))
+    db.session.commit()
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            when = (sent + timedelta(minutes=10)).isoformat() + "Z"
+            subject = "Box2Fit: add your card to keep your spot"
+            return {"events": [
+                {"event": "delivered", "email": "judy@example.com", "subject": subject, "date": when},
+                {"event": "clicks", "email": "judy@example.com", "subject": subject, "date": when},
+                {"event": "clicks", "email": "other@example.com", "subject": subject, "date": when},
+            ]}
+
+    monkeypatch.setitem(app.config, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr("requests.get", lambda *a, **k: Resp())
+    page = staff.get("/ops/members?show=awaiting").data
+    assert b"judy@example.com" in page and b"Clicked" in page
+    assert b"judy@example.com" not in staff.get("/ops/members?show=working").data
+
+    # Marking them lapsed clears the tab; a new payment email brings them back.
+    staff.post(f"/ops/members/{u.id}/section/lapse", data={"show": "awaiting"})
+    assert b"judy@example.com" not in staff.get("/ops/members?show=awaiting").data
+    assert b"judy@example.com" in staff.get("/ops/members?show=lapsed").data
+
+
+def test_email_status_furthest_step():
+    from datetime import datetime
+    from types import SimpleNamespace as N
+
+    from app.services.email_tracking import email_status
+
+    def m(**k):
+        base = dict(sent_at=datetime(2026, 11, 1), delivered_at=None, opened_at=None,
+                    clicked_at=None, failed_at=None)
+        return N(**{**base, **k})
+
+    assert email_status([m()])[0] == "Sent"
+    assert email_status([m(delivered_at=datetime(2026, 11, 1))])[0] == "Delivered, not opened"
+    assert email_status([m(failed_at=datetime(2026, 11, 1))])[0] == "Not delivered"
+    assert email_status([m(opened_at=datetime(2026, 11, 1))])[0] == "Opened"
+    assert email_status([m(clicked_at=datetime(2026, 11, 1)), m(sent_at=datetime(2026, 11, 3))])[0] == "Clicked"

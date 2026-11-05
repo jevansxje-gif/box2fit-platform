@@ -4,16 +4,16 @@
 {% block content %}
 <div class="ops-shell" style="max-width:1000px">
   {{ ops_nav() }}
-  <div style="display:flex;justify-content:space-between;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:16px">
-    <h1 class="pf-h1" style="margin:0">Members</h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button type="button" class="pf-btn pf-btn--primary pf-btn--sm" onclick="document.getElementById('ad-invite').hidden = !document.getElementById('ad-invite').hidden">+ Invite from an ad enquiry</button>
-      <button type="button" class="pf-btn pf-btn--dark pf-btn--sm" onclick="document.getElementById('pay-link').hidden = !document.getElementById('pay-link').hidden">+ Send payment link</button>
-      <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
-        <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:240px;min-height:44px" />
-        <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
-      </form>
+  <h1 class="pf-h1" style="margin:0 0 12px">Members</h1>
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px">
+    <div class="ops-actions">
+      <button type="button" class="pf-btn pf-btn--dark pf-btn--sm ops-action" onclick="document.getElementById('ad-invite').hidden = !document.getElementById('ad-invite').hidden">+ Invite from an ad enquiry</button>
+      <button type="button" class="pf-btn pf-btn--dark pf-btn--sm ops-action" onclick="document.getElementById('pay-link').hidden = !document.getElementById('pay-link').hidden">+ Send payment link</button>
     </div>
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:240px;min-height:44px" />
+      <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
+    </form>
   </div>
 
   {# Someone who saw an ad but phoned/walked in instead of clicking — send
@@ -78,6 +78,7 @@
   </div>
   <p style="color:var(--pf-text-2);margin:0 0 14px;font-size:13.5px">
     {% if show == 'paying' %}Active or starting memberships, with failed payments first.
+    {% elif show == 'awaiting' %}Everyone sent a payment email who hasn't paid yet, newest first. They leave by themselves when they pay. "Clicked" is the reliable sign; a mail app can sometimes trigger "Opened" on its own.{% if not tracking_ok %} <b>Couldn't refresh the email status just now, so this may be a little behind.</b>{% endif %}
     {% elif show == 'working' %}Signed up or active in the last 30 days, or with a class coming up. Who needs action comes first.
     {% else %}Nothing for 30 days, not interested, or cancelled. They move back by themselves if they book, sign up again or pay.{% endif %}
   </p>
@@ -90,10 +91,22 @@
       <b>{{ r.user.name }}</b>
       <span>{{ r.user.email }} · {{ r.user.phone or '—' }}{% if r.user.attendees %} · kids: {{ r.user.attendees|selectattr('kind','equalto','child')|map(attribute='first_name')|join(', ') or '—' }}{% endif %}</span>
       <span style="display:block;color:var(--pf-text-3);font-size:12.5px">Signed up {{ r.user.created_at.strftime('%b') }} {{ r.user.created_at.day }}, {{ r.user.created_at.year }} · {{ r.visits }} visit{{ '' if r.visits == 1 else 's' }}{% if r.last_visit %} · last {{ r.last_visit.strftime('%b') }} {{ r.last_visit.day }}{% endif %}{% if i.section == 'lapsed' %} · last active {{ i.last_activity.strftime('%b') }} {{ i.last_activity.day }}{% endif %}</span>
+      {% if i.section == 'awaiting' %}
+      {% set latest = i.payment_emails[0] %}
+      <span style="display:block;color:var(--pf-text-2);font-size:12.5px">Payment email {{ fmt_local(latest.sent_at, '%b %d, %I:%M %p') }}: "{{ latest.subject }}"{% if i.payment_emails|length > 1 %} · {{ i.payment_emails|length }} sent{% endif %}</span>
+      {% endif %}
+      {% if r.membership %}
+      {% set s = r.membership %}
+      {% set next_charge = s.current_period_end or s.first_charge_at %}
+      <span style="display:block;color:var(--pf-text-2);font-size:12.5px">{% if s.mrr_cents %}${{ '%.2f'|format(s.mrr_cents / 100) }} a month{% endif %}{% if s.mrr_cents and next_charge %} · {% endif %}{% if next_charge %}next charge {{ fmt_local(next_charge, '%b %d') }}{% endif %}</span>
+      {% endif %}
     </a>
     {% if q %}<span class="pf-chip pf-chip--ink">{{ section_names[i.section] }}</span>{% endif %}
     {% if i.section == 'working' %}
     <span class="pf-chip pf-chip--{{ 'info' if i.upcoming else 'warn' }}">{{ i.next_step }}</span>
+    {% elif i.section == 'awaiting' %}
+    {% set label, tone, when = r.email_status %}
+    <span class="pf-chip pf-chip--{{ tone }}">{{ label }}{% if label in ('Clicked', 'Opened') %} {{ fmt_local(when, '%b %d') }}{% endif %}</span>
     {% else %}
     <span class="pf-chip pf-chip--{{ 'success' if r.status == 'active' else ('warn' if r.status in ('past_due','cancelled') else 'info') }}">{{ r.status.replace('_',' ') }}</span>
     {% endif %}
@@ -101,15 +114,17 @@
     {% for f in r.flags if f != 'first-timer' %}<span class="pf-chip pf-chip--warn">{{ f }}</span>{% endfor %}
     {% if i.section == 'working' and r.user.keep_working_until and r.user.keep_working_until >= today %}<span style="color:var(--pf-text-3);font-size:12.5px">kept until {{ r.user.keep_working_until.strftime('%b') }} {{ r.user.keep_working_until.day }}</span>{% endif %}
     {% if i.section != 'paying' %}
-    <span style="display:flex;gap:6px">
+    <span class="ops-actions">
+      {% if i.section != 'awaiting' %}
       <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='keep') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
-        <button class="pf-btn pf-btn--ghost pf-btn--sm">Keep working</button>
+        <button class="pf-btn pf-btn--dark pf-btn--sm ops-action">Keep working</button>
       </form>
-      {% if i.section == 'working' and not i.upcoming %}
+      {% endif %}
+      {% if i.section == 'awaiting' or (i.section == 'working' and not i.upcoming) %}
       <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='lapse') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
-        <button class="pf-btn pf-btn--ghost pf-btn--sm">Mark lapsed</button>
+        <button class="pf-btn pf-btn--dark pf-btn--sm ops-action">Mark lapsed</button>
       </form>
       {% endif %}
     </span>

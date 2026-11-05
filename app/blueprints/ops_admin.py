@@ -910,12 +910,15 @@ def members():
             or q in (u.phone or "")
             or any(q in a.first_name.lower() for a in u.attendees)
         ]
-    from ..services import member_sections as ms
+    from ..services import email_tracking, member_sections as ms
 
-    info = ms.build(_cid(), users)
     show = request.args.get("show")
     if show not in {key for key, _ in ms.SECTIONS}:
         show = ms.WORKING
+    tracking_ok = True
+    if show == ms.AWAITING or q:
+        tracking_ok = email_tracking.sync(_cid())
+    info = ms.build(_cid(), users)
     counts = {key: 0 for key, _ in ms.SECTIONS}
     for u in users:
         counts[info[u.id].section] += 1
@@ -924,15 +927,24 @@ def members():
     if not q:
         if show == ms.PAYING:  # failed payments first
             shown.sort(key=lambda u: not info[u.id].past_due)
+        elif show == ms.AWAITING:  # newest email first
+            shown.sort(key=lambda u: info[u.id].payment_emails[0].sent_at, reverse=True)
         elif show == ms.WORKING:  # who needs action first, newest first within
             shown.sort(key=lambda u: info[u.id].next_order)
         else:
             shown.sort(key=lambda u: info[u.id].last_activity, reverse=True)
-    rows = [{**_member_row(u), "info": info[u.id]} for u in shown[:200]]
+    rows = []
+    for u in shown[:200]:
+        i = info[u.id]
+        rows.append({
+            **_member_row(u), "info": i,
+            "email_status": email_tracking.email_status(i.payment_emails) if i.payment_emails else None,
+            "membership": _paying_subscription(u) if i.section == ms.PAYING else None,
+        })
     return render_template(
         "ops/members.html", rows=rows, q=q, invite_segments=AD_INVITE_SEGMENTS,
         sections=ms.SECTIONS, counts=counts, show=show,
-        section_names=dict(ms.SECTIONS), today=today_local(),
+        section_names=dict(ms.SECTIONS), today=today_local(), tracking_ok=tracking_ok,
     )
 
 
@@ -1122,6 +1134,17 @@ def send_payment_link():
         "success",
     )
     return redirect(back)
+
+
+def _paying_subscription(u: User) -> Subscription | None:
+    """For the Paying section: what they pay and when it next charges."""
+    from ..services.member_sections import PAYING_STATUSES
+
+    return (
+        db.session.query(Subscription)
+        .filter(Subscription.user_id == u.id, Subscription.status.in_(PAYING_STATUSES))
+        .first()
+    )
 
 
 def _billed_by_payment_link(u: User) -> bool:

@@ -940,12 +940,201 @@ def members():
             **_member_row(u), "info": i,
             "email_status": email_tracking.email_status(i.payment_emails) if i.payment_emails else None,
             "membership": _paying_subscription(u) if i.section == ms.PAYING else None,
+            "rebook": _rebook_context(u) if i.section != ms.PAYING else None,
         })
     return render_template(
         "ops/members.html", rows=rows, q=q, invite_segments=AD_INVITE_SEGMENTS,
         sections=ms.SECTIONS, counts=counts, show=show,
         section_names=dict(ms.SECTIONS), today=today_local(), tracking_ok=tracking_ok,
+        class_options=_rebook_class_options() if any(r["rebook"] for r in rows) else [],
     )
+
+
+def _rebook_class_options() -> list[dict]:
+    """Classes staff can book someone into: the next three weeks, by type."""
+    from ..models import ClassType
+    from ..services.scheduling import booked_counts
+    from ..services.tzutil import fmt_local, now_utc
+
+    classes = (
+        db.session.query(ClassInstance)
+        .join(ClassType, ClassInstance.class_type_id == ClassType.id)
+        .filter(
+            ClassInstance.client_account_id == _cid(),
+            ClassInstance.status == InstanceStatus.scheduled.value,
+            ClassInstance.accepts_trials.is_(True),
+            ClassType.active.is_(True),
+            ClassInstance.starts_at_utc > now_utc(),
+            ClassInstance.starts_at_utc < now_utc() + timedelta(days=21),
+        )
+        .order_by(ClassType.name, ClassInstance.starts_at_utc)
+        .all()
+    )
+    counts = booked_counts([c.id for c in classes]) if classes else {}
+    return [
+        {
+            "id": c.id,
+            "type_id": c.class_type_id,
+            "type": c.class_type.name,
+            "label": fmt_local(c.starts_at_utc, "%a %b %d · %I:%M %p")
+            + (f" · {c.cohort_label}" if c.cohort_label else ""),
+            "left": c.capacity - counts.get(c.id, 0),
+        }
+        for c in classes
+    ]
+
+
+def _open_enquiry(u: User):
+    from ..models import Enquiry
+
+    return (
+        db.session.query(Enquiry)
+        .filter(
+            Enquiry.client_account_id == _cid(), Enquiry.user_id == u.id,
+            Enquiry.status != "not_interested",
+        )
+        .order_by(Enquiry.created_at.desc())
+        .first()
+    )
+
+
+def _rebook_context(u: User) -> dict:
+    """What the row's Rebook panel needs: who, what they last booked, and any
+    upcoming class it would replace."""
+    from ..services.tzutil import fmt_local, now_utc
+
+    ids = [a.id for a in u.attendees] or [0]
+    bookings = (
+        db.session.query(Booking).join(ClassInstance)
+        .filter(Booking.attendee_id.in_(ids))
+        .order_by(ClassInstance.starts_at_utc.desc())
+        .all()
+    )
+    live = [
+        b for b in bookings
+        if b.status == BookingStatus.booked.value and b.class_instance.starts_at_utc > now_utc()
+    ]
+    replace = live[-1] if live else None  # the soonest upcoming class
+    latest = replace or (bookings[0] if bookings else None)
+    return {
+        "attendee_id": latest.attendee_id if latest else None,
+        "type_id": latest.class_instance.class_type_id if latest else None,
+        "replace": replace,
+        "replace_label": (
+            f"{replace.attendee.first_name}: {replace.class_instance.class_type.name}, "
+            + fmt_local(replace.class_instance.starts_at_utc, "%a %b %d")
+        ) if replace else None,
+        "phone_booking": _open_enquiry(u) is not None,
+    }
+
+
+@bp.post("/members/<int:user_id>/rebook")
+@staff_required
+def member_rebook(user_id: int):
+    """The row's Rebook tool: book or move someone into a class, or set a
+    first-class date for a Call list person, and keep what they said as a
+    staff note. Any one of those on its own is fine."""
+    from ..models import AttendeeKind, AttendeeProfile, MemberNote
+    from ..services import booking_flow
+    from ..services.scheduling import validate_bookable
+    from ..services.tzutil import fmt_local, now_utc
+
+    u = db.session.get(User, user_id)
+    if u is None or u.client_account_id != _cid() or u.role != Role.member.value:
+        abort(404)
+    back = url_for(
+        "ops_admin.members", show=request.form.get("show") or None,
+        q=request.form.get("q") or None,
+    )
+    instance_id = request.form.get("instance_id", type=int)
+    raw_date = (request.form.get("date_only") or "").strip()
+    note = (request.form.get("note") or "").strip()[:2000]
+    if not (instance_id or raw_date or note):
+        flash("Pick a class or a date, or add a note.", "error")
+        return redirect(back)
+
+    chosen = request.form.get("attendee_id", type=int)
+    attendee = next((a for a in u.attendees if a.id == chosen), None) or (
+        u.attendees[0] if u.attendees else None
+    )
+    enquiry = _open_enquiry(u)
+    message = f"Note saved for {u.name}. No class was changed."
+
+    if instance_id:
+        target = db.session.get(ClassInstance, instance_id)
+        if not (
+            target
+            and target.client_account_id == _cid()
+            and target.status == InstanceStatus.scheduled.value
+            and target.starts_at_utc > now_utc()
+        ):
+            flash("That class isn't available to book. Nothing was saved.", "error")
+            return redirect(back)
+        if attendee is None:
+            attendee = AttendeeProfile(
+                client_account_id=_cid(), user_id=u.id,
+                kind=AttendeeKind.self_.value, first_name=u.name.split(" ")[0],
+            )
+            db.session.add(attendee)
+            db.session.flush()
+        previous = (
+            db.session.query(Booking).filter_by(attendee_id=attendee.id)
+            .order_by(Booking.id.desc()).first()
+        )
+        kind = previous.kind if previous else "trial"
+        lead_id = previous.lead_id if previous else None
+        if lead_id is None:
+            lead = db.session.query(Lead).filter_by(user_id=u.id).order_by(Lead.id).first()
+            lead_id = lead.id if lead else None
+        err = validate_bookable(target, attendee=attendee, for_trial=kind == "trial")
+        if err:
+            db.session.rollback()
+            flash(f"{err} Nothing was saved.", "error")
+            return redirect(back)
+        replace = db.session.get(Booking, request.form.get("replace_booking_id", type=int) or 0)
+        if replace is not None and replace.attendee_id != attendee.id:
+            replace = None
+        new, moved = booking_flow.place_rebooking(attendee, target, kind, lead_id, replace=replace)
+        when = fmt_local(target.starts_at_utc, "%a %b %d · %I:%M %p")
+        if new is None:
+            db.session.rollback()
+            flash(f"{attendee.first_name} is already booked for {when}. Nothing was saved.", "info")
+            return redirect(back)
+        if enquiry:  # keep the Call list in step
+            enquiry.booked_for = target.local_date
+            enquiry.status = "agreed"
+        notify = bool(request.form.get("notify"))
+        if notify:
+            booking_flow.send_booking_confirmation(new)
+        message = (
+            f"{attendee.first_name} {'moved to' if moved else 'booked into'} "
+            f"{target.class_type.name}, {when}."
+            + (" Confirmation sent." if notify else " No email sent.")
+        )
+    elif raw_date:
+        try:
+            first_class = date.fromisoformat(raw_date)
+        except ValueError:
+            first_class = None
+        if first_class is None or first_class < today_local():
+            flash("Pick today or a later date. Nothing was saved.", "error")
+            return redirect(back)
+        if enquiry is None:
+            flash(f"{u.name} isn't on the Call list, so pick a class instead.", "error")
+            return redirect(back)
+        enquiry.booked_for = first_class
+        enquiry.status = "agreed"
+        message = f"{u.name} booked for {first_class:%a %b %d}. No email sent."
+
+    if note:
+        db.session.add(MemberNote(
+            client_account_id=_cid(), user_id=u.id,
+            attendee_id=attendee.id if attendee else None,
+            author_user_id=current_user.id, body=note,
+        ))
+    db.session.commit()
+    flash(message, "success")
+    return redirect(back)
 
 
 @bp.post("/members/<int:user_id>/send-payment-link")
@@ -1061,7 +1250,7 @@ def member_section(user_id: int, what: str):
     if what == "keep":
         u.keep_working_until = today_local() + timedelta(days=ms.KEEP_DAYS)
         u.marked_lapsed_at = None
-        flash(f"{u.name} stays in Working on until {u.keep_working_until:%b %d}.", "success")
+        flash(f"{u.name} stays in New sign-ups until {u.keep_working_until:%b %d}.", "success")
     elif what == "lapse":
         u.marked_lapsed_at = utcnow()
         u.keep_working_until = None
@@ -1400,7 +1589,7 @@ def member_detail(user_id: int):
             # upcoming booked one, into a chosen (or next same-slot) class.
             # For a live future booking this also releases the old seat and
             # offers it to any waitlist. A fresh confirmation is sent.
-            from ..services import booking_flow, waitlist
+            from ..services import booking_flow
             from ..services.scheduling import validate_bookable
             from ..services.tzutil import fmt_local, now_utc
 
@@ -1450,44 +1639,16 @@ def member_detail(user_id: int):
             if err:
                 flash(err, "error")
                 return redirect(url_for("ops_admin.member_detail", user_id=u.id))
-            existing = (
-                db.session.query(Booking)
-                .filter_by(attendee_id=bk.attendee_id, class_instance_id=target.id)
-                .one_or_none()
+            new, rescheduled = booking_flow.place_rebooking(
+                bk.attendee, target, bk.kind, bk.lead_id, replace=bk
             )
-            if existing and existing.status == BookingStatus.booked.value:
+            if new is None:
                 flash(
                     f"{bk.attendee.first_name} is already booked for "
                     f"{fmt_local(target.starts_at_utc, '%a %b %d')}.",
                     "info",
                 )
                 return redirect(url_for("ops_admin.member_detail", user_id=u.id))
-            if existing:  # revive a prior cancelled/no-show row for that class
-                existing.status = BookingStatus.booked.value
-                existing.cancelled_at = None
-                new = existing
-            else:
-                new = Booking(
-                    client_account_id=target.client_account_id,
-                    attendee_id=bk.attendee_id,
-                    class_instance_id=target.id,
-                    kind=bk.kind,
-                    lead_id=bk.lead_id,  # keep original attribution
-                )
-                db.session.add(new)
-            db.session.flush()
-            # Reschedule: if the original was a live upcoming booking, release
-            # it (and offer the freed seat to any waitlist) so they're moved,
-            # not double-booked.
-            rescheduled = (
-                bk.id != new.id
-                and bk.status == BookingStatus.booked.value
-                and old.starts_at_utc > now_utc()
-            )
-            if rescheduled:
-                bk.status = BookingStatus.cancelled.value
-                bk.cancelled_at = utcnow()
-                waitlist.promote_next(old)
             booking_flow.send_booking_confirmation(new)
             db.session.commit()
             verb = "rescheduled to" if rescheduled else "rebooked into"

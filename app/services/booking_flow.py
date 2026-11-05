@@ -276,6 +276,55 @@ def create_trial_booking(
     return booking, True
 
 
+def place_rebooking(
+    attendee: AttendeeProfile,
+    target: ClassInstance,
+    kind: str,
+    lead_id: int | None,
+    replace: Booking | None = None,
+) -> tuple[Booking | None, bool]:
+    """Book an attendee into a class staff picked. Returns (booking, moved):
+    booking is None if they already hold that class. A prior cancelled or
+    no-show row for the class is revived. When replace is a live upcoming
+    booking it is released and its seat offered to any waitlist, so they're
+    moved rather than double-booked."""
+    from . import waitlist
+    from .tzutil import now_utc
+
+    existing = (
+        db.session.query(Booking)
+        .filter_by(attendee_id=attendee.id, class_instance_id=target.id)
+        .one_or_none()
+    )
+    if existing and existing.status == BookingStatus.booked.value:
+        return None, False
+    if existing:
+        existing.status = BookingStatus.booked.value
+        existing.cancelled_at = None
+        new = existing
+    else:
+        new = Booking(
+            client_account_id=target.client_account_id,
+            attendee_id=attendee.id,
+            class_instance_id=target.id,
+            kind=kind,
+            lead_id=lead_id,  # keep original attribution
+        )
+        db.session.add(new)
+    db.session.flush()
+    moved = bool(
+        replace
+        and replace.id != new.id
+        and replace.status == BookingStatus.booked.value
+        and replace.class_instance.starts_at_utc > now_utc()
+    )
+    if moved:
+        replace.status = BookingStatus.cancelled.value
+        replace.cancelled_at = now_utc()
+        waitlist.promote_next(replace.class_instance)
+    return new, moved
+
+
 def admin_alert_recipients() -> list[str]:
     """Staff alert mailboxes: the ops-managed list (site setting), falling
     back to the ADMIN_NOTIFY_EMAIL env value if the list was never set."""

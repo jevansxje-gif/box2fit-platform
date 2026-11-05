@@ -93,7 +93,7 @@
       <span style="display:block;color:var(--pf-text-3);font-size:12.5px">Signed up {{ r.user.created_at.strftime('%b') }} {{ r.user.created_at.day }}, {{ r.user.created_at.year }} · {{ r.visits }} visit{{ '' if r.visits == 1 else 's' }}{% if r.last_visit %} · last {{ r.last_visit.strftime('%b') }} {{ r.last_visit.day }}{% endif %}{% if i.section == 'lapsed' %} · last active {{ i.last_activity.strftime('%b') }} {{ i.last_activity.day }}{% endif %}</span>
       {% if i.section == 'awaiting' %}
       {% set latest = i.payment_emails[0] %}
-      <span style="display:block;color:var(--pf-text-2);font-size:12.5px">Payment email {{ fmt_local(latest.sent_at, '%b %d, %I:%M %p') }}: "{{ latest.subject }}"{% if i.payment_emails|length > 1 %} · {{ i.payment_emails|length }} sent{% endif %}</span>
+      <span style="display:block;color:var(--pf-text-2);font-size:12.5px">Payment email {{ fmt_local(latest.sent_at, '%b %d, %I:%M %p') }}: "{{ latest.subject }}"{% if i.payment_emails|length > 1 %} · {{ i.payment_emails|length }} sent{% endif %}{% if i.upcoming %} · class booked {{ i.upcoming.strftime('%b') }} {{ i.upcoming.day }}{% endif %}</span>
       {% endif %}
       {% if r.membership %}
       {% set s = r.membership %}
@@ -119,6 +119,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
         <button class="pf-btn pf-btn--dark pf-btn--sm ops-action">{{ 'Resend payment link' if i.payment_emails else 'Send payment link' }}</button>
       </form>
+      <button type="button" class="pf-btn pf-btn--dark pf-btn--sm ops-action" onclick="toggleRebook('rebook-{{ r.user.id }}')">{{ 'Reschedule' if i.upcoming else 'Rebook' }}</button>
       {% if i.section != 'awaiting' %}
       <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='keep') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
@@ -132,10 +133,63 @@
       </form>
       {% endif %}
     </span>
+    {% set rb = r.rebook %}
+    <form id="rebook-{{ r.user.id }}" method="post" action="{{ url_for('ops_admin.member_rebook', user_id=r.user.id) }}" hidden style="flex-basis:100%;display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:10px;padding-top:12px;border-top:1px solid var(--pf-line)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
+      {% if r.user.attendees|length > 1 %}
+      <div>
+        <label class="pf-label" style="font-size:12px">Who</label>
+        <select class="pf-input" name="attendee_id" style="width:auto">
+          {% for a in r.user.attendees %}<option value="{{ a.id }}" {{ 'selected' if a.id == rb.attendee_id }}>{{ a.first_name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div style="flex:1 1 280px;min-width:0">
+        <label class="pf-label" style="font-size:12px">Class</label>
+        <select class="pf-input rebook-class" name="instance_id" data-type="{{ rb.type_id or '' }}" style="width:100%"></select>
+      </div>
+      {% if rb.phone_booking %}
+      <div>
+        <label class="pf-label" style="font-size:12px">Or just a date (Call list, no email)</label>
+        <input class="pf-input" type="date" name="date_only" min="{{ today.isoformat() }}" style="width:auto" />
+      </div>
+      {% endif %}
+      <div style="flex:1 1 100%">
+        <label class="pf-label" style="font-size:12px">Notes (what they said, why they missed, anything they need)</label>
+        <textarea class="pf-input" name="note" rows="2" maxlength="2000" style="width:100%"></textarea>
+      </div>
+      {% if rb.replace %}
+      <label class="pf-check" style="flex:1 1 100%;margin:0"><input type="checkbox" name="replace_booking_id" value="{{ rb.replace.id }}" checked /> <span class="t">Move them from {{ rb.replace_label }} (frees that spot)</span></label>
+      {% endif %}
+      <label class="pf-check" style="flex:1 1 100%;margin:0"><input type="checkbox" name="notify" value="1" checked /> <span class="t">Email them the class confirmation</span></label>
+      <button class="pf-btn pf-btn--primary pf-btn--sm">Save</button>
+      <button type="button" class="pf-btn pf-btn--ghost pf-btn--sm" onclick="toggleRebook('rebook-{{ r.user.id }}')">Close</button>
+    </form>
     {% endif %}
   </div>
   {% else %}
   <p style="color:var(--pf-text-2)">{{ 'No members match.' if q else 'Nobody in this section.' }}</p>
   {% endfor %}
 </div>
+<template id="class-options">
+  <option value="">No class, just save the rest</option>
+  {% for type, classes in class_options|groupby('type') %}
+  <optgroup label="{{ type }}">
+    {% for c in classes %}<option value="{{ c.id }}" data-type="{{ c.type_id }}" {{ 'disabled' if c.left <= 0 }}>{{ c.label }} ({{ 'full' if c.left <= 0 else c.left ~ ' left' }})</option>{% endfor %}
+  </optgroup>
+  {% endfor %}
+</template>
+<script>
+  // Classes are filled in when a panel opens, so a long list stays light.
+  function toggleRebook(id) {
+    var form = document.getElementById(id), select = form.querySelector('.rebook-class');
+    form.hidden = !form.hidden;
+    if (form.hidden || select.options.length) return;
+    select.appendChild(document.getElementById('class-options').content.cloneNode(true));
+    var same = select.dataset.type && Array.prototype.find.call(select.options, function (o) {
+      return o.dataset.type === select.dataset.type && !o.disabled;
+    });
+    if (same) same.selected = true;
+  }
+</script>
 {% endblock %}

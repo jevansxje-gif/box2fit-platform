@@ -2381,3 +2381,82 @@ def test_row_payment_link_sends_the_right_link_and_moves_to_awaiting(
     r = staff.post(f"/ops/members/{u.id}/send-payment-link", follow_redirects=True)
     assert b"failed to send" in r.data
     assert staff.post("/ops/members/999999/send-payment-link").status_code == 404
+
+
+def test_row_rebook_tool(app, client, client_account, monkeypatch):
+    """Owner 2026-11-04: Rebook on each row books or moves someone, keeps the
+    Call list in step, and saves what they said as a staff note."""
+    from datetime import date
+
+    from app.models import Enquiry, MemberNote
+
+    instance = _first_instance(client_account)
+    _book_child(client, instance)
+    guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
+    first = db.session.query(Booking).filter_by(class_instance_id=instance.id).one()
+    first.status = BookingStatus.no_show.value
+    later = (
+        db.session.query(ClassInstance)
+        .filter(ClassInstance.id != instance.id, ClassInstance.class_type_id == instance.class_type_id,
+                ClassInstance.starts_at_utc > instance.starts_at_utc)
+        .order_by(ClassInstance.starts_at_utc).first()
+    )
+    db.session.add(Enquiry(
+        client_account_id=client_account.id, offer="kids", first_name="Sam", last_name="Parent",
+        phone="6045550112", email="sam.parent@example.com", status="no_answer", user_id=guardian.id,
+    ))
+    db.session.commit()
+    staff = _admin(app)
+
+    page = staff.get("/ops/members?show=working").data
+    assert b"No-show" in page and b"Rebook" in page and b"class-options" in page
+    assert f'<option value="{later.id}"'.encode() in page  # the dropdown lists real classes
+
+    # Nothing entered: told so, nothing changes.
+    r = staff.post(f"/ops/members/{guardian.id}/rebook", data={}, follow_redirects=True)
+    assert b"Pick a class or a date" in r.data
+
+    # Note on its own.
+    r = staff.post(f"/ops/members/{guardian.id}/rebook", data={"note": "Sick, try next week"},
+                   follow_redirects=True)
+    assert b"No class was changed" in r.data
+    assert db.session.query(MemberNote).filter_by(user_id=guardian.id).one().body == "Sick, try next week"
+
+    # Into a class, without an email.
+    r = staff.post(f"/ops/members/{guardian.id}/rebook",
+                   data={"instance_id": later.id, "attendee_id": first.attendee_id},
+                   follow_redirects=True)
+    assert b"booked into" in r.data and b"No email sent" in r.data
+    new = db.session.query(Booking).filter_by(class_instance_id=later.id).one()
+    assert new.status == BookingStatus.booked.value and new.attendee_id == first.attendee_id
+    enq = db.session.query(Enquiry).filter_by(user_id=guardian.id).one()
+    assert enq.booked_for == later.local_date and enq.status == "agreed"
+
+    # The same class again is refused.
+    r = staff.post(f"/ops/members/{guardian.id}/rebook",
+                   data={"instance_id": later.id, "attendee_id": first.attendee_id},
+                   follow_redirects=True)
+    assert b"already booked" in r.data
+
+    # Moving releases the old seat.
+    third = ClassInstance(
+        client_account_id=client_account.id, class_type_id=later.class_type_id,
+        starts_at_utc=later.starts_at_utc + timedelta(days=7),
+        local_date=later.local_date + timedelta(days=7), local_time=later.local_time,
+        duration_min=later.duration_min, capacity=later.capacity,
+    )
+    db.session.add(third)
+    db.session.commit()
+    r = staff.post(f"/ops/members/{guardian.id}/rebook",
+                   data={"instance_id": third.id, "attendee_id": first.attendee_id,
+                         "replace_booking_id": new.id, "notify": "1"},
+                   follow_redirects=True)
+    assert b"moved to" in r.data and b"Confirmation sent" in r.data
+    db.session.refresh(new)
+    assert new.status == BookingStatus.cancelled.value
+
+    # A date only updates the Call list; past dates are refused.
+    r = staff.post(f"/ops/members/{guardian.id}/rebook", data={"date_only": "2020-01-01"},
+                   follow_redirects=True)
+    assert b"today or a later date" in r.data
+    assert staff.post("/ops/members/999999/rebook", data={"note": "x"}).status_code == 404

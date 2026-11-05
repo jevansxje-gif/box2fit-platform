@@ -1,5 +1,5 @@
 """Members page sections (owner 2026-11-04): Paying, Awaiting payment,
-Working on, Lapsed. The Call list converts people; this page manages them.
+New sign-ups, Lapsed. The Call list converts people; this page manages them.
 
 Read from the real records on every page load, so people move by themselves:
 a lapsed person who books, signs up again or pays comes back without anyone
@@ -26,13 +26,13 @@ from .email_tracking import PAYMENT_TEMPLATES
 from .tzutil import today_local
 
 LAPSE_DAYS = 30  # no activity for this long moves a trial-only person to Lapsed
-KEEP_DAYS = 30  # "Keep working" holds someone in Working on for this long
+KEEP_DAYS = 30  # "Keep working" holds someone in New sign-ups for this long
 
 PAYING, AWAITING, WORKING, LAPSED = "paying", "awaiting", "working", "lapsed"
 SECTIONS = [
     (PAYING, "Paying"),
     (AWAITING, "Awaiting payment"),
-    (WORKING, "Working on"),
+    (WORKING, "New sign-ups"),
     (LAPSED, "Lapsed"),
 ]
 PAYING_STATUSES = {
@@ -100,22 +100,22 @@ def next_step(
     phone_class = enquiry.booked_for if enquiry else None
     if phone_class and phone_class < today and (not last_class or phone_class > last_class[0]):
         if enquiry.card_sent_at:
-            return 1, "Came, follow up"
-        return 0, "Came, send link"
+            return 1, "Came, link sent"
+        return 0, "Came, no link sent"
     if last_class:
         status = last_class[1]
         if status == BookingStatus.attended.value:
-            return 1, "Came, follow up"  # the after-class email has gone out
+            return 1, "Came"
         if status == BookingStatus.no_show.value:
-            return 2, "No-show, rebook"
-        return 0, "Mark attendance"  # the class passed and nobody marked it
+            return 2, "No-show"
+        return 0, "Attendance not marked"  # the class passed and nobody marked it
     if any_cancelled:
-        return 3, "Cancelled, rebook"
+        return 3, "Cancelled"
     if enquiry and enquiry.status == "call_back":
         return 3, "Call back"
     if enquiry and enquiry.status == "no_answer":
-        return 3, "No answer, try again"
-    return 4, "Never booked, call"
+        return 3, "No answer"
+    return 4, "Never booked"
 
 
 def _later(a: datetime | None, b: datetime | None) -> datetime | None:

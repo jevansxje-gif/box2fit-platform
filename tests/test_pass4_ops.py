@@ -781,7 +781,7 @@ def test_member_directory_flags_and_notes(app, client, client_account):
 
     r = staff.get("/ops/members")
     assert b"Sam Parent" in r.data
-    assert b"first-timer" in r.data  # no attendance yet → flag
+    assert b"Booked " in r.data  # next step shown instead of the old first-timer tag
 
     guardian = db.session.query(User).filter_by(email="sam.parent@example.com").one()
     r = staff.post(
@@ -2215,3 +2215,52 @@ def test_payments_already_paid_comes_off_owed(app, client, client_account):
     r = staff.get("/ops/payments")
     assert db.session.query(CommissionPayout).count() == 0
     assert b"Already paid to you" in r.data
+
+
+def test_member_sections_rules():
+    """Owner 2026-11-04: Paying / Working on / Lapsed, 30 days to lapse."""
+    from datetime import date, datetime
+    from app.services.member_sections import classify
+
+    today = date(2026, 11, 4)
+    base = dict(paying=False, marked_lapsed_at=None, keep_until=None, upcoming=None,
+                closed=False, cancelled=False, last_signal=None, today=today)
+    assert classify(**base, last_activity=today - timedelta(days=30)) == "working"
+    assert classify(**base, last_activity=today - timedelta(days=31)) == "lapsed"
+    old = today - timedelta(days=90)
+    assert classify(**{**base, "paying": True}, last_activity=old) == "paying"
+    assert classify(**{**base, "upcoming": today}, last_activity=old) == "working"
+    assert classify(**{**base, "keep_until": today}, last_activity=old) == "working"
+    assert classify(**{**base, "closed": True}, last_activity=today) == "lapsed"
+    assert classify(**{**base, "cancelled": True}, last_activity=today) == "lapsed"
+    # A manual lapse holds until something new happens after it.
+    marked = datetime(2026, 11, 1)
+    assert classify(**{**base, "marked_lapsed_at": marked,
+                       "last_signal": datetime(2026, 10, 30)}, last_activity=today) == "lapsed"
+    assert classify(**{**base, "marked_lapsed_at": marked,
+                       "last_signal": datetime(2026, 11, 2)}, last_activity=today) == "working"
+
+
+def test_members_page_sections_search_and_overrides(app, client, client_account):
+    from datetime import datetime
+
+    _make_member(client_account, email="newbie@example.com")
+    old = User(client_account_id=client_account.id, email="oldie@example.com", name="Olive Oldie",
+               role=Role.member.value, created_at=datetime.utcnow() - timedelta(days=60))
+    db.session.add(old)
+    db.session.commit()
+    staff = _admin(app)
+
+    working = staff.get("/ops/members?show=working").data
+    lapsed = staff.get("/ops/members?show=lapsed").data
+    assert b"oldie@example.com" not in working and b"oldie@example.com" in lapsed
+    assert b"first-timer" not in working
+    # search crosses sections
+    assert b"oldie@example.com" in staff.get("/ops/members?q=olive").data
+
+    # keep working brings them back; mark lapsed sends them away again
+    staff.post(f"/ops/members/{old.id}/section/keep", data={"show": "lapsed"})
+    assert b"oldie@example.com" in staff.get("/ops/members?show=working").data
+    staff.post(f"/ops/members/{old.id}/section/lapse", data={"show": "working"})
+    assert b"oldie@example.com" in staff.get("/ops/members?show=lapsed").data
+    assert staff.post("/ops/members/999999/section/keep").status_code == 404

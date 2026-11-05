@@ -153,3 +153,6 @@ img{ display:block; max-width:100%; }
 .hero .included li::before{ content:"✓"; font-weight:900; color:var(--pf-red-bright); font-size:17px; }
 .hero .included b{ color:var(--pf-on-dark); font-weight:800; display:block; }
 .hero .included span{ grid-column:2; }
+
+/* An inline display style must not beat the hidden attribute (toggled ops forms). */
+[hidden]{ display:none !important; }

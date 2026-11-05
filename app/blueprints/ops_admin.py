@@ -910,10 +910,56 @@ def members():
             or q in (u.phone or "")
             or any(q in a.first_name.lower() for a in u.attendees)
         ]
-    rows = [_member_row(u) for u in users[:200]]
+    from ..services import member_sections as ms
+
+    info = ms.build(_cid(), users)
+    show = request.args.get("show")
+    if show not in {key for key, _ in ms.SECTIONS}:
+        show = ms.WORKING
+    counts = {key: 0 for key, _ in ms.SECTIONS}
+    for u in users:
+        counts[info[u.id].section] += 1
+    # A search looks across all three sections, so nobody gets lost.
+    shown = users if q else [u for u in users if info[u.id].section == show]
+    if not q:
+        if show == ms.PAYING:  # failed payments first
+            shown.sort(key=lambda u: not info[u.id].past_due)
+        elif show == ms.WORKING:  # who needs action first, newest first within
+            shown.sort(key=lambda u: info[u.id].next_order)
+        else:
+            shown.sort(key=lambda u: info[u.id].last_activity, reverse=True)
+    rows = [{**_member_row(u), "info": info[u.id]} for u in shown[:200]]
     return render_template(
-        "ops/members.html", rows=rows, q=q, invite_segments=AD_INVITE_SEGMENTS
+        "ops/members.html", rows=rows, q=q, invite_segments=AD_INVITE_SEGMENTS,
+        sections=ms.SECTIONS, counts=counts, show=show,
+        section_names=dict(ms.SECTIONS), today=today_local(),
     )
+
+
+@bp.post("/members/<int:user_id>/section/<string:what>")
+@staff_required
+def member_section(user_id: int, what: str):
+    """Manual overrides: hold someone in Working on, or lapse them now."""
+    from ..services import member_sections as ms
+
+    u = db.session.get(User, user_id)
+    if u is None or u.client_account_id != _cid() or u.role != Role.member.value:
+        abort(404)
+    if what == "keep":
+        u.keep_working_until = today_local() + timedelta(days=ms.KEEP_DAYS)
+        u.marked_lapsed_at = None
+        flash(f"{u.name} stays in Working on until {u.keep_working_until:%b %d}.", "success")
+    elif what == "lapse":
+        u.marked_lapsed_at = utcnow()
+        u.keep_working_until = None
+        flash(f"{u.name} moved to Lapsed. They come back if they book or sign up again.", "success")
+    else:
+        abort(404)
+    db.session.commit()
+    return redirect(url_for(
+        "ops_admin.members", show=request.form.get("show") or None,
+        q=request.form.get("q") or None,
+    ))
 
 
 # Campaigns we actively advertise — the segments a gym-referred enquiry can
@@ -1078,6 +1124,15 @@ def send_payment_link():
     return redirect(back)
 
 
+def _billed_by_payment_link(u: User) -> bool:
+    """Payment-link members take classes through the gym's own app, so our
+    visit count says nothing about whether they still come."""
+    return (
+        db.session.query(Lead.id).filter_by(user_id=u.id, utm_content="call-in").first()
+        is not None
+    )
+
+
 def _member_row(u: User) -> dict:
     subs = db.session.query(Subscription).filter_by(user_id=u.id).all()
     status = "trial"
@@ -1119,7 +1174,7 @@ def _member_row(u: User) -> dict:
     elif last_visit and last_visit < today_local() - timedelta(days=14) and status in (
         "active",
         "pending",
-    ):
+    ) and not _billed_by_payment_link(u):
         flags.append("at-risk")
     if noshows_60d >= NOSHOW_FLAG_THRESHOLD:
         flags.append("high no-show")

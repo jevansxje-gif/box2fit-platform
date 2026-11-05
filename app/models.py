@@ -134,6 +134,9 @@ class User(UserMixin, db.Model):
     # Per-category notification prefs {"reminders": true, "schedule": true,
     # "news": false} — marketing consent stays separate (CASL).
     notify_prefs: Mapped[dict | None] = mapped_column(JSON)
+    # Members page overrides (see services/member_sections.py).
+    keep_working_until: Mapped[date | None] = mapped_column(Date)
+    marked_lapsed_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     attendees: Mapped[list["AttendeeProfile"]] = relationship(back_populates="guardian")

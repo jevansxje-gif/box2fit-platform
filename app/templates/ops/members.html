@@ -9,8 +9,8 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button type="button" class="pf-btn pf-btn--primary pf-btn--sm" onclick="document.getElementById('ad-invite').hidden = !document.getElementById('ad-invite').hidden">+ Invite from an ad enquiry</button>
       <button type="button" class="pf-btn pf-btn--dark pf-btn--sm" onclick="document.getElementById('pay-link').hidden = !document.getElementById('pay-link').hidden">+ Send payment link</button>
-      <form method="get" style="display:flex;gap:8px">
-        <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:280px;min-height:44px" autofocus />
+      <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="pf-input" name="q" value="{{ q }}" placeholder="Search name, email, phone, child…" style="min-width:240px;min-height:44px" />
         <button class="pf-btn pf-btn--dark pf-btn--sm">Search</button>
       </form>
     </div>
@@ -68,19 +68,55 @@
     <button class="pf-btn pf-btn--dark pf-btn--sm">Send payment link</button>
     <p class="note" style="width:100%;margin:4px 0 0;color:var(--pf-text-3);font-size:12.5px">Emails (and texts) a link to add a card. Their membership then bills through us — payments and your commission are tracked here — while classes stay in the gym's own app.</p>
   </form>
+  {% if q %}
+  <p style="color:var(--pf-text-2);margin:0 0 12px;font-size:14px">Searching all sections for "{{ q }}". <a href="{{ url_for('ops_admin.members', show=show) }}">Clear search</a></p>
+  {% else %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px">
+    {% for key, label in sections %}
+    <a class="pf-btn pf-btn--sm {{ 'pf-btn--dark' if show == key else 'pf-btn--ghost' }}" href="{{ url_for('ops_admin.members', show=key) }}">{{ label }} <span style="opacity:.7">({{ counts[key] }})</span></a>
+    {% endfor %}
+  </div>
+  <p style="color:var(--pf-text-2);margin:0 0 14px;font-size:13.5px">
+    {% if show == 'paying' %}Active or starting memberships, with failed payments first.
+    {% elif show == 'working' %}Signed up or active in the last 30 days, or with a class coming up. Who needs action comes first.
+    {% else %}Nothing for 30 days, not interested, or cancelled. They move back by themselves if they book, sign up again or pay.{% endif %}
+  </p>
+  {% endif %}
+
   {% for r in rows %}
-  <a href="{{ url_for('ops_admin.member_detail', user_id=r.user.id) }}" class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:12px 16px;margin-bottom:6px;text-decoration:none;color:inherit">
-    <div class="who" style="flex:1.4">
+  {% set i = r.info %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:12px 16px;margin-bottom:6px;flex-wrap:wrap">
+    <a class="who" href="{{ url_for('ops_admin.member_detail', user_id=r.user.id) }}" style="flex:1 1 280px;text-decoration:none;color:inherit">
       <b>{{ r.user.name }}</b>
       <span>{{ r.user.email }} · {{ r.user.phone or '—' }}{% if r.user.attendees %} · kids: {{ r.user.attendees|selectattr('kind','equalto','child')|map(attribute='first_name')|join(', ') or '—' }}{% endif %}</span>
-    </div>
+      <span style="display:block;color:var(--pf-text-3);font-size:12.5px">Signed up {{ r.user.created_at.strftime('%b') }} {{ r.user.created_at.day }}, {{ r.user.created_at.year }} · {{ r.visits }} visit{{ '' if r.visits == 1 else 's' }}{% if r.last_visit %} · last {{ r.last_visit.strftime('%b') }} {{ r.last_visit.day }}{% endif %}{% if i.section == 'lapsed' %} · last active {{ i.last_activity.strftime('%b') }} {{ i.last_activity.day }}{% endif %}</span>
+    </a>
+    {% if q %}<span class="pf-chip pf-chip--ink">{{ section_names[i.section] }}</span>{% endif %}
+    {% if i.section == 'working' %}
+    <span class="pf-chip pf-chip--{{ 'info' if i.upcoming else 'warn' }}">{{ i.next_step }}</span>
+    {% else %}
     <span class="pf-chip pf-chip--{{ 'success' if r.status == 'active' else ('warn' if r.status in ('past_due','cancelled') else 'info') }}">{{ r.status.replace('_',' ') }}</span>
+    {% endif %}
     {% for c in r.cohorts %}<span class="pf-chip pf-chip--ink">{{ c }}</span>{% endfor %}
-    {% for f in r.flags %}<span class="pf-chip pf-chip--{{ 'red' if f == 'first-timer' else 'warn' }}">{{ f }}</span>{% endfor %}
-    <span style="color:var(--pf-text-2);font-size:13px;min-width:130px;text-align:right">{{ r.visits }} visits{% if r.last_visit %} · last {{ r.last_visit.strftime('%b %d') }}{% endif %}</span>
-  </a>
+    {% for f in r.flags if f != 'first-timer' %}<span class="pf-chip pf-chip--warn">{{ f }}</span>{% endfor %}
+    {% if i.section == 'working' and r.user.keep_working_until and r.user.keep_working_until >= today %}<span style="color:var(--pf-text-3);font-size:12.5px">kept until {{ r.user.keep_working_until.strftime('%b') }} {{ r.user.keep_working_until.day }}</span>{% endif %}
+    {% if i.section != 'paying' %}
+    <span style="display:flex;gap:6px">
+      <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='keep') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm">Keep working</button>
+      </form>
+      {% if i.section == 'working' and not i.upcoming %}
+      <form method="post" action="{{ url_for('ops_admin.member_section', user_id=r.user.id, what='lapse') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" /><input type="hidden" name="show" value="{{ show }}" /><input type="hidden" name="q" value="{{ q }}" />
+        <button class="pf-btn pf-btn--ghost pf-btn--sm">Mark lapsed</button>
+      </form>
+      {% endif %}
+    </span>
+    {% endif %}
+  </div>
   {% else %}
-  <p style="color:var(--pf-text-2)">No members match.</p>
+  <p style="color:var(--pf-text-2)">{{ 'No members match.' if q else 'Nobody in this section.' }}</p>
   {% endfor %}
 </div>
 {% endblock %}

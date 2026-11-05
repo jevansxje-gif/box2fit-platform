@@ -165,6 +165,8 @@ def send_trial_followups() -> int:
         )
         if already:
             continue
+        from ..services.unsubscribe import unsubscribe_url
+
         guardian = attendee.guardian
         is_child = attendee.kind == AttendeeKind.child.value
         url = absolute_url(
@@ -173,7 +175,7 @@ def send_trial_followups() -> int:
         html = render_template(
             "emails/trial_followup.html",
             guardian=guardian, attendee=attendee, is_child=is_child,
-            activate_url=url,
+            activate_url=url, unsubscribe_url=unsubscribe_url(guardian),
         )
         who = f"{attendee.first_name}'s" if is_child else "Your"
         send_email(
@@ -181,6 +183,8 @@ def send_trial_followups() -> int:
             f"{who} spot at Box2Fit is still open",
             html, "trial_followup", b.client_account_id,
             attendee_id=attendee.id, transactional=False,
+            # They've just been to a class: CASL implied consent (inquiry).
+            implied_consent=True, unsubscribe_link=unsubscribe_url(guardian),
         )
         sent += 1
     db.session.commit()

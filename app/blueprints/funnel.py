@@ -98,6 +98,26 @@ def _save(state: dict) -> None:
     session[SESSION_KEY] = state
 
 
+@bp.route("/unsubscribe/<token>", methods=["GET", "POST"])
+def unsubscribe(token: str):
+    """Asks on GET because mail scanners open links; the button (or a mail
+    app's own Unsubscribe, which POSTs) does it. Exempt from CSRF: the signed
+    token is the proof, and it must work with no session."""
+    from ..models import User
+    from ..services import unsubscribe as unsub
+
+    user_id = unsub.user_id_from(token)
+    user = db.session.get(User, user_id) if user_id else None
+    if user is None:
+        return render_template("funnel/unsubscribe.html", state="invalid")
+    if request.method == "POST":
+        unsub.apply(user)
+        db.session.commit()
+        return render_template("funnel/unsubscribe.html", state="done")
+    state = "done" if user.unsubscribed_at else "ask"
+    return render_template("funnel/unsubscribe.html", state=state, email=user.email)
+
+
 @bp.get("/healthz")
 def healthz():
     return {"status": "ok"}
@@ -1149,7 +1169,8 @@ def challenge_join():
         if error is None:
             guardian = booking_flow.get_or_create_guardian(
                 client.id, name=form["name"], email=email, phone=form["phone"],
-                consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
+                consent_email=bool(request.form.get("consent_email")),
+                consent_sms=bool(request.form.get("consent_sms")),
             )
             db.session.flush()
             __import__("app.services.enquiry", fromlist=["attach_user"]).attach_user(guardian.id)
@@ -1264,7 +1285,8 @@ def shehits_start():
         if error is None:
             guardian = booking_flow.get_or_create_guardian(
                 client.id, name=form["name"], email=email, phone=form["phone"],
-                consent_email=True, consent_sms=bool(request.form.get("consent_sms")),
+                consent_email=bool(request.form.get("consent_email")),
+                consent_sms=bool(request.form.get("consent_sms")),
             )
             db.session.flush()
             __import__("app.services.enquiry", fromlist=["attach_user"]).attach_user(guardian.id)
@@ -1391,7 +1413,7 @@ def enquiry_start(offer: str):
                 # so the gym can book them straight in.
                 guardian = booking_flow.get_or_create_guardian(
                     client.id, name=e.name, email=email, phone=e.phone,
-                    consent_email=True, consent_sms=e.sms_ok,
+                    consent_email=bool(request.form.get("consent_email")), consent_sms=e.sms_ok,
                 )
                 db.session.flush()
                 if o["kids"]:

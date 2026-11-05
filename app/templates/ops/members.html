@@ -82,6 +82,9 @@
     {% elif show == 'working' %}Signed up or active in the last 30 days, or with a class coming up. Who needs action comes first.
     {% else %}Nothing for 30 days, not interested, or cancelled. They move back by themselves if they book, sign up again or pay.{% endif %}
   </p>
+  {% if show == 'lapsed' and current_user.role in ('gym_admin', 'agency_admin') %}
+  <p style="margin:0 0 14px"><a class="pf-btn pf-btn--dark pf-btn--sm ops-email" href="{{ url_for('ops_admin.lapsed_email') }}">Email Lapsed</a></p>
+  {% endif %}
   {% endif %}
 
   {% for r in rows %}

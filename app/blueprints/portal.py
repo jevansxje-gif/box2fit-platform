@@ -657,6 +657,8 @@ def settings():
         was_consented = current_user.consent_email or current_user.consent_sms
         current_user.consent_email = request.form.get("consent_email") == "on"
         current_user.consent_sms = request.form.get("consent_sms") == "on"
+        if current_user.consent_email:
+            current_user.unsubscribed_at = None
         if (current_user.consent_email or current_user.consent_sms) and not was_consented:
             current_user.consent_captured_at = utcnow()
         db.session.commit()

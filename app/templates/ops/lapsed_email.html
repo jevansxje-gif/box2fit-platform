@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Email Lapsed — Box2Fit Ops{% endblock %}
+{% block content %}
+<div class="ops-shell" style="max-width:1000px">
+  {{ ops_nav() }}
+  <p style="margin:0 0 6px"><a href="{{ url_for('ops_admin.members', show='lapsed') }}">← Back to Lapsed</a></p>
+  <h1 class="pf-h1" style="margin:0 0 6px">Email Lapsed</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px;font-size:14px">Only people the rules allow get this. Each email has your address and an unsubscribe link added automatically. Nothing goes out until you press Send.</p>
+  {% if error %}<p style="color:var(--pf-red);font-weight:700">{{ error }}</p>{% endif %}
+
+  <form method="post" class="pf-panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="hidden" name="expected" value="{{ eligible|length }}" />
+    <div class="pf-field"><label class="pf-label">Subject line</label><input class="pf-input" name="subject" maxlength="150" value="{{ content.subject }}" /></div>
+    <div class="pf-field"><label class="pf-label">Headline (optional, uses the subject if blank)</label><input class="pf-input" name="headline" maxlength="150" value="{{ content.headline }}" /></div>
+    <div class="pf-field"><label class="pf-label">Message (starts after "Hi first name,")</label><textarea class="pf-input" name="body" rows="8" maxlength="4000" style="width:100%">{{ content.body }}</textarea></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="pf-field" style="flex:1 1 200px"><label class="pf-label">Button text (optional)</label><input class="pf-input" name="button_text" maxlength="60" value="{{ content.button_text }}" /></div>
+      <div class="pf-field" style="flex:2 1 300px"><label class="pf-label">Button link (full web address)</label><input class="pf-input" name="button_link" maxlength="400" value="{{ content.button_link }}" placeholder="https://health.box2fit.com/" /></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="preview">Preview</button>
+      <button class="pf-btn pf-btn--dark pf-btn--sm" name="action" value="test">Send a test to {{ current_user.email }}</button>
+      <button class="pf-btn pf-btn--primary pf-btn--sm" name="action" value="send" {{ 'disabled' if not eligible }} onclick="return confirm('Send this to {{ eligible|length }} people? This can\'t be undone.')">Send to {{ eligible|length }} {{ 'person' if eligible|length == 1 else 'people' }}</button>
+    </div>
+  </form>
+
+  {% if preview %}
+  <h2 style="font-size:18px;margin:18px 0 8px">Preview</h2>
+  <iframe title="Email preview" srcdoc="{{ preview }}" style="width:100%;height:520px;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);background:#fff"></iframe>
+  {% endif %}
+
+  <h2 style="font-size:18px;margin:18px 0 8px">Will get it ({{ eligible|length }})</h2>
+  {% for p in eligible %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px;flex-wrap:wrap">
+    <div class="who"><b>{{ p.user.name }}</b><span>{{ p.user.email }}</span></div>
+    <span style="color:var(--pf-text-2);font-size:13px">{{ p.reason }}</span>
+  </div>
+  {% else %}
+  <p style="color:var(--pf-text-2)">Nobody right now.</p>
+  {% endfor %}
+
+  <h2 style="font-size:18px;margin:18px 0 8px">Left out ({{ left_out|length }})</h2>
+  {% for p in left_out %}
+  <div class="roster-row" style="background:#fff;border:1px solid var(--pf-line);border-radius:var(--pf-r-md);padding:10px 16px;margin-bottom:6px;flex-wrap:wrap">
+    <div class="who"><b>{{ p.user.name }}</b><span>{{ p.user.email }}</span></div>
+    <span class="pf-chip pf-chip--warn">{{ p.reason }}</span>
+  </div>
+  {% else %}
+  <p style="color:var(--pf-text-2)">Nobody.</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -51,6 +51,7 @@ class MemberSection:
     upcoming: date | None
     last_activity: date
     payment_emails: list[Message] = field(default_factory=list)  # newest first
+    not_interested: bool = False
 
 
 def classify(
@@ -238,5 +239,6 @@ def build(client_account_id: int, users: list[User]) -> dict[int, MemberSection]
             upcoming=upcoming,
             last_activity=max(activity),
             payment_emails=emails,
+            not_interested=bool(enqs) and not open_enqs,
         )
     return out

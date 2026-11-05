@@ -67,6 +67,7 @@ def create_app(config_class=Config) -> Flask:
 
     csrf.exempt(api_bp)  # the API authenticates with JWT, not session cookies
     csrf.exempt(app.view_functions["funnel.stripe_webhook_root"])
+    csrf.exempt(app.view_functions["funnel.unsubscribe"])
 
     from .tasks import celery_init_app
 

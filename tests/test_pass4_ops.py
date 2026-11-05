@@ -2460,3 +2460,130 @@ def test_row_rebook_tool(app, client, client_account, monkeypatch):
                    follow_redirects=True)
     assert b"today or a later date" in r.data
     assert staff.post("/ops/members/999999/rebook", data={"note": "x"}).status_code == 404
+
+
+def test_unsubscribe_stops_marketing_but_not_service_email(app, client, client_account, monkeypatch):
+    from app.models import Message
+    from app.services.messaging import send_email
+    from app.services.unsubscribe import unsubscribe_url
+
+    u = User(client_account_id=client_account.id, email="unsub@example.com", name="Una Sub",
+             role=Role.member.value, consent_email=True)
+    db.session.add(u)
+    db.session.commit()
+    with app.test_request_context():
+        link = unsubscribe_url(u)
+        test_link = unsubscribe_url(None)
+    path = link.split("//", 1)[1].split("/", 1)[1]
+
+    # Opening the link changes nothing (mail scanners open links).
+    r = client.get("/" + path)
+    assert b"Unsubscribe from Box2Fit emails?" in r.data
+    assert db.session.get(User, u.id).unsubscribed_at is None
+
+    # The button works with no session or CSRF token.
+    plain = app.test_client()
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        r = plain.post("/" + path)
+    finally:
+        app.config["WTF_CSRF_ENABLED"] = False
+    assert r.status_code == 200 and b"unsubscribed" in r.data
+    db.session.refresh(u)
+    assert u.unsubscribed_at and u.consent_email is False
+
+    # Marketing is stopped even on implied consent; service email still goes.
+    m = send_email(u, u.email, "Offer", "<p>x</p>", "lapsed_offer", client_account.id,
+                   transactional=False, implied_consent=True)
+    assert m.delivery_status == "suppressed_no_consent"
+    m = send_email(u, u.email, "Your booking", "<p>x</p>", "booking_confirmation", client_account.id)
+    assert m.delivery_status != "suppressed_no_consent"
+
+    # The staff test link can't unsubscribe anyone, and a junk link is handled.
+    assert b"didn't work" in client.get("/" + test_link.split("//", 1)[1].split("/", 1)[1]).data
+    assert b"didn't work" in client.get("/unsubscribe/junk").data
+
+
+def test_short_form_only_opts_in_on_a_real_tick(app, client, client_account):
+    from app.models import Enquiry
+
+    def submit(phone, email, **extra):
+        page = client.get("/start/kids")
+        assert page.status_code == 200
+        client.post("/start/kids", data={
+            "first_name": "Tick", "last_name": "Test", "phone": phone, "email": email,
+            "child_first_name": "Kid", "child_dob": "2018-01-01",
+            "waiver_agree": "1", "signature": "Tick Test", **extra,
+        })
+        return db.session.query(User).filter_by(email=email).one_or_none()
+
+    page = client.get("/start/kids").data
+    assert b'name="consent_email"' in page
+    assert b'name="consent_email" value="1" checked' not in page
+    no_tick = submit("6045550121", "notick@example.com")
+    assert no_tick is not None and no_tick.consent_email is False
+    ticked = submit("6045550122", "ticked@example.com", consent_email="1")
+    assert ticked.consent_email is True
+    assert db.session.query(Enquiry).count() >= 2
+
+
+def test_lapsed_email_only_goes_to_people_the_rules_allow(app, client, client_account, monkeypatch):
+    from app.models import Enquiry, Message
+
+    now = utcnow()
+
+    def member(email, name, days, **kw):
+        u = User(client_account_id=client_account.id, email=email, name=name,
+                 role=Role.member.value, created_at=now - timedelta(days=days), **kw)
+        db.session.add(u)
+        db.session.flush()
+        return u
+
+    ok = member("ok@example.com", "Okay Person", 60)
+    member("old@example.com", "Too Old", 200)
+    member("gone@example.com", "Gone Person", 60, unsubscribed_at=now)
+    no = member("no@example.com", "No Thanks", 60)
+    db.session.add(Enquiry(client_account_id=client_account.id, offer="kids", first_name="No",
+                           last_name="Thanks", phone="6045550123", status="not_interested",
+                           user_id=no.id, created_at=now - timedelta(days=60)))
+    paid = member("paid@example.com", "Paid Once", 300)
+    db.session.add(Payment(client_account_id=client_account.id, user_id=paid.id, amount_cents=19845,
+                           tax_cents=945, status="paid", agency_share_cents=4725,
+                           stripe_invoice_id="in_lapsed1", created_at=now - timedelta(days=300)))
+    fresh = member("fresh@example.com", "Fresh Signup", 3)
+    db.session.commit()
+
+    sends = []
+    monkeypatch.setitem(app.config, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.messaging._send_via_brevo_api",
+                        lambda to, subject, html, link=None: sends.append((to, subject, html, link)))
+    staff = _admin(app)
+
+    page = staff.get("/ops/members/lapsed-email").data
+    assert b"Send to 2 people" in page
+    for reason in (b"Unsubscribed", b"Said not interested", b"Over 6 months"):
+        assert reason in page
+    assert b"fresh@example.com" not in page  # not lapsed, so not on this list
+
+    form = {"subject": "Black Friday", "body": "An offer.", "expected": "2"}
+
+    # Preview and test send nobody on the list.
+    assert b"srcdoc" in staff.post("/ops/members/lapsed-email", data={**form, "action": "preview"}).data
+    staff.post("/ops/members/lapsed-email", data={**form, "action": "test"})
+    assert [s[0] for s in sends] == ["admin@test.local"] and "[TEST]" in sends[0][1]
+    sends.clear()
+
+    # A stale count sends nothing.
+    r = staff.post("/ops/members/lapsed-email", data={**form, "expected": "9", "action": "send"})
+    assert b"Nothing was sent" in r.data and not sends
+
+    r = staff.post("/ops/members/lapsed-email", data={**form, "action": "send"}, follow_redirects=True)
+    assert b"Sent to 2 people" in r.data
+    assert {s[0] for s in sends} == {"ok@example.com", "paid@example.com"}
+    to, _subject, html, link = sends[0]
+    assert "Unsubscribe" in html and "1522 Finlay St" in html and "/unsubscribe/" in link
+    assert "\u2014" not in html  # no em dashes in customer email
+
+    # The same email can't go twice.
+    page = staff.post("/ops/members/lapsed-email", data={**form, "action": "preview"}).data
+    assert b"Send to 0 people" in page and b"Already sent this email" in page

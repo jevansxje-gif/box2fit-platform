@@ -61,6 +61,8 @@ def get_or_create_guardian(
     if consent_email or consent_sms:
         user.consent_email = user.consent_email or consent_email
         user.consent_sms = user.consent_sms or consent_sms
+        if consent_email:  # they actively ticked it again
+            user.unsubscribed_at = None
         if user.consent_captured_at is None:
             user.consent_captured_at = utcnow()
     return user

@@ -22,7 +22,12 @@ def send_email(
     client_account_id: int,
     attendee_id: int | None = None,
     transactional: bool = True,
+    implied_consent: bool = False,
+    unsubscribe_link: str | None = None,
 ) -> Message:
+    """implied_consent: the caller has checked CASL implied consent (a recent
+    purchase or inquiry), so the opt-in flag isn't needed. An unsubscribe
+    always stops marketing, whichever consent it relied on."""
     msg = Message(
         client_account_id=client_account_id,
         user_id=user.id if user else None,
@@ -33,7 +38,9 @@ def send_email(
         subject=subject,
         body_preview=html[:4000],
     )
-    if not transactional and user is not None and not user.consent_email:
+    if not transactional and user is not None and (
+        user.unsubscribed_at or not (user.consent_email or implied_consent)
+    ):
         msg.delivery_status = "suppressed_no_consent"
         msg.unsubscribe_honored = True
         db.session.add(msg)
@@ -44,7 +51,7 @@ def send_email(
     api_key = current_app.config["SENDGRID_API_KEY"]
     if brevo_key:
         try:
-            _send_via_brevo_api(to_email, subject, html)
+            _send_via_brevo_api(to_email, subject, html, unsubscribe_link)
             msg.delivery_status = "sent"
         except Exception as exc:
             log.exception("brevo api send failed")
@@ -82,7 +89,9 @@ def send_email(
     return msg
 
 
-def _send_via_brevo_api(to_email: str, subject: str, html: str) -> None:
+def _send_via_brevo_api(
+    to_email: str, subject: str, html: str, unsubscribe_link: str | None = None
+) -> None:
     """Brevo transactional API over HTTPS:443 — works where SMTP egress is
     blocked (DigitalOcean default). Raises on non-2xx."""
     import requests
@@ -101,6 +110,11 @@ def _send_via_brevo_api(to_email: str, subject: str, html: str) -> None:
     reply_to = current_app.config.get("MAIL_REPLY_TO")
     if reply_to:
         payload["replyTo"] = {"email": reply_to}
+    if unsubscribe_link:  # lets mail apps offer their own Unsubscribe button
+        payload["headers"] = {
+            "List-Unsubscribe": f"<{unsubscribe_link}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
     resp = requests.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={

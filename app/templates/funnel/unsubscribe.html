@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Unsubscribe · Box2Fit White Rock{% endblock %}
+{% block content %}
+<div class="flow" style="max-width:520px;margin:0 auto;padding:32px 16px">
+  <div class="pf-kicker" style="color:var(--pf-red)">Box2Fit White Rock</div>
+  {% if state == 'done' %}
+  <h1 class="pf-h1" style="margin:6px 0 8px">You're unsubscribed.</h1>
+  <p style="color:var(--pf-text-2);margin:0">We won't send you offers or news by email. You'll still get messages about any classes you've booked or a membership you hold.</p>
+  {% elif state == 'ask' %}
+  <h1 class="pf-h1" style="margin:6px 0 8px">Unsubscribe from Box2Fit emails?</h1>
+  <p style="color:var(--pf-text-2);margin:0 0 16px">{{ email }} will stop getting offers and news. You'll still get messages about any classes you've booked or a membership you hold.</p>
+  <form method="post">
+    <button class="pf-btn pf-btn--primary pf-btn--lg">Unsubscribe</button>
+  </form>
+  {% else %}
+  <h1 class="pf-h1" style="margin:6px 0 8px">This link didn't work.</h1>
+  <p style="color:var(--pf-text-2);margin:0">To stop our emails, reply to one of them or call (778) 384-6284 and we'll take you off the list.</p>
+  {% endif %}
+</div>
+{% endblock %}

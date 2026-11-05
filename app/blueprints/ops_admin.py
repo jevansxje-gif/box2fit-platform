@@ -1136,6 +1136,68 @@ def member_rebook(user_id: int):
     return redirect(back)
 
 
+@bp.route("/members/lapsed-email", methods=["GET", "POST"])
+@admin_required
+def lapsed_email():
+    """Write, preview, test and send a marketing email to Lapsed. The list is
+    worked out again at send time, so it can't go to anyone newly left out."""
+    from ..services import lapsed_email as le
+    from ..services.messaging import send_email
+    from ..services.unsubscribe import unsubscribe_url
+
+    fields = ("subject", "headline", "body", "button_text", "button_link")
+    content = {k: (request.form.get(k) or "").strip() for k in fields}
+    action = request.form.get("action")
+    error = None
+    if request.method == "POST":
+        if not content["subject"] or not content["body"]:
+            error = "Add a subject line and a message first."
+        elif content["button_link"] and not content["button_link"].startswith("https://"):
+            error = "The button link must be a full web address starting with https://"
+        elif bool(content["button_text"]) != bool(content["button_link"]):
+            error = "A button needs both its text and its link."
+
+    def people():
+        return le.audience(_cid(), content["subject"])
+
+    if request.method == "POST" and not error and action == "test":
+        send_email(
+            None, current_user.email, f"[TEST] {content['subject']}",
+            le.render(current_user.name.split(" ")[0], content, unsubscribe_url(None)),
+            "lapsed_offer_test", _cid(),
+        )
+        db.session.commit()
+        flash(f"Test sent to {current_user.email}.", "success")
+    elif request.method == "POST" and not error and action == "send":
+        eligible = [p for p in people() if p.eligible]
+        if str(len(eligible)) != request.form.get("expected"):
+            error = (
+                f"The list changed: it's now {len(eligible)} people. "
+                "Nothing was sent. Check the list and press Send again."
+            )
+        else:
+            results = [le.send_to(p.user, content) for p in eligible]
+            db.session.commit()
+            sent = sum(1 for m in results if m.delivery_status == "sent")
+            failed = len(results) - sent
+            flash(
+                f"Sent to {sent} {'person' if sent == 1 else 'people'}."
+                + (f" {failed} failed: send again to retry them." if failed else ""),
+                "error" if failed else "success",
+            )
+            return redirect(url_for("ops_admin.lapsed_email"))
+
+    everyone = people()
+    preview = None
+    if content["subject"] and content["body"]:
+        preview = le.render("Alex", content, unsubscribe_url(None))
+    return render_template(
+        "ops/lapsed_email.html", content=content, error=error, preview=preview,
+        eligible=[p for p in everyone if p.eligible],
+        left_out=[p for p in everyone if not p.eligible],
+    )
+
+
 @bp.post("/members/<int:user_id>/send-payment-link")
 @staff_required
 def member_send_payment_link(user_id: int):
@@ -1357,7 +1419,7 @@ def send_payment_link():
 
     guardian = booking_flow.get_or_create_guardian(
         _cid(), name=name, email=email, phone=phone or "",
-        consent_email=True, consent_sms=bool(phone),
+        consent_email=False, consent_sms=False,  # staff can't opt someone in
     )
     db.session.flush()
     attendee = (
@@ -2299,6 +2361,8 @@ def announcements():
 
 
 def _email_announcement(a: Announcement) -> int:
+    from ..services.unsubscribe import unsubscribe_url
+
     members = (
         db.session.query(User)
         .filter_by(client_account_id=_cid(), role=Role.member.value, active=True)
@@ -2311,8 +2375,9 @@ def _email_announcement(a: Announcement) -> int:
             continue
         msg = send_email(
             m, m.email, a.title,
-            render_template("emails/announcement.html", user=m, a=a),
+            render_template("emails/announcement.html", user=m, a=a, unsubscribe_url=unsubscribe_url(m)),
             "announcement", _cid(), transactional=False,  # respects CASL consent
+            unsubscribe_link=unsubscribe_url(m),
         )
         if msg.delivery_status != "suppressed_no_consent":
             sent += 1
@@ -2397,7 +2462,7 @@ def send_one_off_charge():
 
     guardian = booking_flow.get_or_create_guardian(
         _cid(), name=name, email=email, phone=phone or "",
-        consent_email=True, consent_sms=bool(phone),
+        consent_email=False, consent_sms=False,  # staff can't opt someone in
     )
     db.session.flush()
     charge = billing.create_one_off_charge(

@@ -376,6 +376,51 @@ def cancel_subscription(
             log.exception("stripe cancel_at scheduling failed (id=%s)", sub.id)
 
 
+def _add_month(when: datetime) -> datetime:
+    """Same day next month (the 31st becomes the last day of a short month)."""
+    year, month = (when.year + 1, 1) if when.month == 12 else (when.year, when.month + 1)
+    for day in (when.day, 30, 29, 28):
+        try:
+            return when.replace(year=year, month=month, day=day)
+        except ValueError:
+            continue
+    raise ValueError(when)
+
+
+def end_after_next_charge(sub: Subscription) -> datetime | None:
+    """When a membership would end if it takes one more monthly charge: a
+    month after that charge. None if there's no upcoming charge to keep."""
+    nxt = sub.current_period_end
+    if not nxt or nxt <= utcnow() or sub.status not in (
+        SubscriptionStatus.active.value, SubscriptionStatus.past_due.value
+    ):
+        return None
+    return _add_month(nxt)
+
+
+def cancel_after_next_charge(sub: Subscription, note: str | None = None) -> datetime | None:
+    """Staff agreed with the member: take the next charge, then stop. Ends at
+    the close of the month that charge pays for, with no part-month charge
+    (cancel_at lands exactly on that period's end; proration off)."""
+    if sub.cancel_requested_at:
+        return None
+    effective = end_after_next_charge(sub)
+    if effective is None:
+        return None
+    sub.cancel_reason = "staff_initiated"
+    sub.cancel_reason_note = note
+    sub.cancel_requested_at = utcnow()
+    sub.cancel_effective_at = effective
+    if sub.stripe_subscription_id and stripe_service.is_configured():
+        stripe = stripe_service.stripe_client()
+        stripe.Subscription.modify(
+            sub.stripe_subscription_id,
+            cancel_at=int((effective - datetime(1970, 1, 1)).total_seconds()),
+            proration_behavior="none",
+        )
+    return effective
+
+
 # ---------------------------------------------------------- one-off charges ---
 # Staff type an amount + description (e.g. "10-class punch card"); the customer
 # gets a signed link, pays on Stripe Checkout, and staff are emailed when the

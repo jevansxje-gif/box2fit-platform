@@ -59,13 +59,19 @@
         <span class="pf-chip pf-chip--{{ 'success' if s.status == 'active' else ('warn' if s.status in ('past_due','cancelled') else 'info') }}">{{ s.status }}</span>
         {{ s.cohort_label or '' }} ${{ s.mrr_cents // 100 }}{% if s.cancel_reason %} · {{ s.cancel_reason }}{% endif %}
       </p>
-      {% if s.status in ('active','pending','past_due') %}
-      <form method="post" onsubmit="return confirm('Cancel this membership?')" style="margin-top:8px">
+      {% if s.cancel_requested_at and s.status != 'cancelled' %}
+      <p style="margin:6px 0 0;color:var(--pf-text-2);font-size:13px">Cancelled: ends {{ fmt_local(s.cancel_effective_at, '%b %d, %Y') }}, no charges after that.</p>
+      {% elif s.status in ('active','pending','past_due') %}
+      {% set after = end_after_next_charge(s) %}
+      <form method="post" onsubmit="return confirm('Cancel this membership?')" style="margin-top:8px;display:flex;flex-direction:column;align-items:flex-start;gap:6px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <input type="hidden" name="sub_id" value="{{ s.id }}" />
         <input type="hidden" name="reason" value="staff_initiated" />
+        {% if after %}
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_after_next" title="Take the next charge, then stop" formnovalidate onclick="return confirm('Charge ${{ s.mrr_cents // 100 }} on {{ fmt_local(s.current_period_end, '%b %d') }}, then end the membership on {{ fmt_local(after, '%b %d') }} with no more charges?')">Cancel after next charge ({{ fmt_local(s.current_period_end, '%b %d') }})</button>
+        {% endif %}
         <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub" title="Per the terms: 30-day notice, dues continue through the notice period">Cancel membership</button>
-        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub_now" style="margin-left:6px" title="Goodwill / refund case: ends today, no notice period, no further charges. Refund the payment in Stripe." formnovalidate onclick="return confirm('End this membership NOW with no notice period and no further charges? Use this with a refund.')">End now (refund case)</button>
+        <button class="pf-btn pf-btn--ghost pf-btn--sm" name="action" value="cancel_sub_now" title="Goodwill / refund case: ends today, no notice period, no further charges. Refund the payment in Stripe." formnovalidate onclick="return confirm('End this membership NOW with no notice period and no further charges? Use this with a refund.')">End now (refund case)</button>
       </form>
       {% endif %}
       {% else %}<p style="margin:8px 0 0;color:var(--pf-text-2)">Trial only.</p>{% endfor %}

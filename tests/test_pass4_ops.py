@@ -2587,3 +2587,54 @@ def test_lapsed_email_only_goes_to_people_the_rules_allow(app, client, client_ac
     # The same email can't go twice.
     page = staff.post("/ops/members/lapsed-email", data={**form, "action": "preview"}).data
     assert b"Send to 0 people" in page and b"Already sent this email" in page
+
+
+def test_cancel_after_next_charge(app, client, client_account, monkeypatch):
+    from datetime import datetime as dt
+
+    from app.models import Plan, Subscription
+    from app.services import billing, stripe_service
+
+    u = User(client_account_id=client_account.id, email="leaving@example.com", name="Robin Leaving",
+             role=Role.member.value)
+    db.session.add(u)
+    db.session.flush()
+    from app.models import AttendeeProfile
+    kid = AttendeeProfile(client_account_id=client_account.id, user_id=u.id, first_name="Sam")
+    db.session.add(kid)
+    db.session.flush()
+    plan = db.session.query(Plan).first()
+    nxt = utcnow().replace(microsecond=0) + timedelta(days=6)
+    s = Subscription(client_account_id=client_account.id, user_id=u.id, plan_id=plan.id,
+                     status="active", mrr_cents=18900, current_period_end=nxt,
+                     activated_at=utcnow() - timedelta(days=60), stripe_subscription_id="sub_leave1", attendee_id=kid.id)
+    db.session.add(s)
+    db.session.commit()
+
+    calls = []
+
+    class FakeSub:
+        @staticmethod
+        def modify(sid, **kw):
+            calls.append((sid, kw))
+
+    monkeypatch.setattr(stripe_service, "is_configured", lambda: True)
+    monkeypatch.setattr(stripe_service, "stripe_client",
+                        lambda: type("S", (), {"Subscription": FakeSub}))
+
+    assert billing._add_month(dt(2026, 1, 31)) == dt(2026, 2, 28)
+    assert billing._add_month(dt(2026, 12, 23)) == dt(2027, 1, 23)
+
+    staff = _admin(app)
+    page = staff.get(f"/ops/members/{u.id}").data
+    assert b"Cancel after next charge" in page
+    r = staff.post(f"/ops/members/{u.id}", data={"action": "cancel_after_next", "sub_id": s.id},
+                   follow_redirects=True)
+    assert b"then the membership ends" in r.data
+    db.session.refresh(s)
+    assert s.status == "active" and s.cancel_effective_at == billing._add_month(nxt)
+    sid, kw = calls[0]
+    assert sid == "sub_leave1" and kw["proration_behavior"] == "none"
+    assert kw["cancel_at"] == int((billing._add_month(nxt) - dt(1970, 1, 1)).total_seconds())
+    page = staff.get(f"/ops/members/{u.id}").data
+    assert b"Cancelled: ends" in page and b"Cancel after next charge" not in page

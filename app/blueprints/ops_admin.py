@@ -16,6 +16,7 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    current_app,
     flash,
     redirect,
     render_template,
@@ -1787,6 +1788,28 @@ def member_detail(user_id: int):
                     else "First-charge date cleared (standard 48-hour lead).",
                     "success",
                 )
+        elif action == "cancel_after_next":
+            from ..services import billing
+            from ..services.tzutil import fmt_local
+
+            sub = db.session.get(Subscription, request.form.get("sub_id", type=int))
+            if sub and sub.user_id == u.id:
+                try:
+                    ends = billing.cancel_after_next_charge(sub, note=f"by {current_user.email}")
+                except Exception:
+                    db.session.rollback()
+                    current_app.logger.exception("cancel after next charge failed (sub=%s)", sub.id)
+                    flash("Stripe didn't accept that, so nothing changed. Try again or do it in Stripe.", "error")
+                else:
+                    db.session.commit()
+                    if ends:
+                        flash(
+                            f"Done. They'll be charged on {fmt_local(sub.current_period_end, '%b %d')}, "
+                            f"then the membership ends {fmt_local(ends, '%b %d')} with no more charges.",
+                            "success",
+                        )
+                    else:
+                        flash("There's no upcoming charge on this membership, so nothing changed.", "error")
         elif action in ("cancel_sub", "cancel_sub_now"):
             from ..services import billing
 
@@ -1871,6 +1894,7 @@ def member_detail(user_id: int):
         bookings=bookings,
         subs=subs,
         lead=lead,
+        end_after_next_charge=__import__("app.services.billing", fromlist=["x"]).end_after_next_charge,
         now=now_utc(),
         rebook_options=rebook_options,
         card=stripe_service.card_summary(u),  # live: "did my card go through?"
